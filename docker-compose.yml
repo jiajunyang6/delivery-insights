@@ -42,5 +42,11 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
+  worker:
+    <<: *backend
+    command: ["arq", "insights.sync.worker.WorkerSettings"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
 volumes:
   pgdata:
