@@ -1,0 +1,91 @@
+{
+  "data": {
+    "rateLimit": {
+      "cost": 1,
+      "remaining": 4800,
+      "resetAt": "2027-01-01T00:00:00Z"
+    },
+    "repository": {
+      "nameWithOwner": "a/b",
+      "isArchived": false,
+      "defaultBranchRef": {
+        "name": "main"
+      },
+      "pullRequests": {
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": "end"
+        },
+        "nodes": [
+          {
+            "id": "PR_1",
+            "number": 1,
+            "title": "Example change",
+            "body": "",
+            "url": "https://github.com/a/b/pull/1",
+            "state": "OPEN",
+            "isDraft": false,
+            "createdAt": "2026-01-01T00:00:00Z",
+            "updatedAt": "2026-01-02T00:00:00Z",
+            "closedAt": null,
+            "mergedAt": null,
+            "additions": 10,
+            "deletions": 2,
+            "changedFiles": 1,
+            "baseRefName": "main",
+            "headRefName": "feature",
+            "authorAssociation": "MEMBER",
+            "author": {
+              "__typename": "User",
+              "login": "author"
+            },
+            "mergedBy": null,
+            "mergeCommit": null,
+            "labels": {
+              "nodes": [
+                {
+                  "name": "area-A"
+                },
+                {
+                  "name": "area-A"
+                }
+              ]
+            },
+            "files": {
+              "pageInfo": {
+                "hasNextPage": false
+              },
+              "nodes": [
+                {
+                  "path": "src/A/file.cs"
+                },
+                {
+                  "path": "src/A/file.cs"
+                }
+              ]
+            },
+            "timelineItems": {
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": "end"
+              },
+              "nodes": [
+                {
+                  "__typename": "PullRequestCommit",
+                  "id": "C1",
+                  "commit": {
+                    "oid": "abcdef012345",
+                    "authoredDate": "2025-12-31T23:00:00Z",
+                    "committedDate": "2026-01-01T00:00:00Z",
+                    "messageHeadline": "Update",
+                    "messageBody": "This reverts commit 1234567"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}
