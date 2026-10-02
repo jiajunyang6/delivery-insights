@@ -16,6 +16,7 @@ from insights.domain import PageResult, RepoRef
 from insights.redis import sync_lock_key
 from insights.sources.github.adapter import GitHubAdapter
 from insights.sources.github.client import GitHubAuthError, GitHubError, GitHubNotFoundError
+from insights.sync.derive import current_key, derivation_complete, link_repo
 from insights.sync.queue import enqueue_sync, ensure_repo
 from insights.sync.store import save_page
 
@@ -106,7 +107,9 @@ class SyncRun:
             open_only=open_only,
         )
         async with sessions_for(self.ctx)() as session, session.begin():
-            result = await save_page(session, self.repo.id, page, now=now_for(self.ctx))
+            result = await save_page(
+                session, self.repo.id, page, now=now_for(self.ctx), settings=self.settings
+            )
             if backfill:
                 await session.execute(
                     update(Repository)
@@ -159,7 +162,26 @@ class SyncRun:
     async def checkpoint(self, **values: Any) -> None:
         checkpoint_time = now_for(self.ctx)
         await self.incremental(self.previous_checkpoint)
-        await set_repo(self.ctx, self.repo.id, last_synced_at=checkpoint_time, **values)
+        key = current_key(self.settings)
+        async with sessions_for(self.ctx)() as session, session.begin():
+            await link_repo(session, self.repo.id)
+            complete = await derivation_complete(session, self.repo.id, key)
+            if complete:
+                values["derived_key"] = key
+            await session.execute(
+                update(Repository)
+                .where(Repository.id == self.repo.id)
+                .values(last_synced_at=checkpoint_time, **values)
+            )
+        if not complete:
+            async with sessions_for(self.ctx)() as session:
+                await enqueue_sync(
+                    self.ctx["redis"],
+                    session,
+                    self.repo.full_name,
+                    "rederive",
+                    now=now_for(self.ctx),
+                )
         self.previous_checkpoint = checkpoint_time
 
     async def backfill(self) -> None:
@@ -292,8 +314,15 @@ async def reconcile_tracked_repos(ctx: dict[str, Any]) -> None:
         else:
             logger.error("github_token_missing", job="startup", repo="tracked", phase="startup")
 
+    from insights.sync.rederive import enqueue_rederivation
+
+    await enqueue_rederivation(ctx)
+
 
 async def incremental_sync_all(ctx: dict[str, Any]) -> None:
+    from insights.sync.rederive import enqueue_rederivation
+
+    await enqueue_rederivation(ctx)
     if not cast(Settings, ctx["settings"]).github_token:
         return
     async with sessions_for(ctx)() as session:

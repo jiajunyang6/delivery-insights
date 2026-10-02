@@ -1,51 +1,17 @@
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock
 
 import httpx
 import pytest
-from arq.connections import RedisSettings, create_pool
-from pydantic import SecretStr
 from sqlalchemy import func, select, update
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from insights.config import Settings
 from insights.db.models import PrEvent, PrFile, PullRequest, Repository, SyncJob
 from insights.redis import sync_lock_key
-from insights.sources.github.adapter import GitHubAdapter
-from insights.sources.github.client import GitHubClient
 from insights.sync.jobs import incremental_sync_all, reconcile_tracked_repos, sync_repo
 from insights.sync.queue import enqueue_sync
 
 pytestmark = pytest.mark.integration
 NOW = datetime(2026, 3, 2, tzinfo=UTC)
-
-
-@pytest.fixture
-async def context(migrated_database, redis_url, respx_mock):
-    settings = Settings(
-        database_url=migrated_database,
-        redis_url=redis_url,
-        tracked_repos="a/b",
-        github_token=SecretStr("ghp_" + "x" * 36),
-    )
-    engine = create_async_engine(migrated_database)
-    redis = await create_pool(RedisSettings.from_dsn(redis_url))
-    await redis.flushdb()
-    client = GitHubClient(settings, redis, sleep=AsyncMock())
-    ctx = {
-        "settings": settings,
-        "engine": engine,
-        "session_factory": async_sessionmaker(engine, expire_on_commit=False),
-        "redis": redis,
-        "adapter": GitHubAdapter(client),
-        "now": lambda: NOW,
-        "router": respx_mock,
-    }
-    yield ctx
-    await client.aclose()
-    await redis.aclose()
-    await engine.dispose()
 
 
 def response_page(fixture, number, days, cursor=None, more=False, title=None):

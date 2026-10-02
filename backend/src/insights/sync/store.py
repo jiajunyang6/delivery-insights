@@ -6,9 +6,11 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from insights.config import Settings
 from insights.db.models import PrEvent, PrFile, PullRequest, Repository
 from insights.domain import PageResult, PullRequestRecord
 from insights.sources.github.normalize import content_hash
+from insights.sync.derive import derive_prs
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +64,7 @@ async def save_page(
     page: PageResult,
     *,
     now: datetime,
+    settings: Settings | None = None,
 ) -> SaveResult:
     existing = dict(
         (
@@ -118,4 +121,5 @@ async def save_page(
         .where(Repository.id == repo_id)
         .values(data_version=Repository.data_version + 1)
     )
+    await derive_prs(session, pr_ids, settings=settings or Settings(), now=now)
     return SaveResult(len(records), len(events), pr_ids)
