@@ -13,6 +13,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/app/.venv/bin:$PATH"
 WORKDIR /app
 RUN useradd --create-home --uid 10001 app
 COPY --from=builder /app /app
+COPY alembic.ini ./
+COPY migrations ./migrations
 USER app
 EXPOSE 8000
 CMD ["uvicorn", "insights.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
