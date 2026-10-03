@@ -73,12 +73,17 @@ export function AtRiskTable({
           <h2>
             PRs that need attention <span className="count">{total}</span>
           </h2>
-          <p>Waiting beyond their repository’s historical baseline</p>
+          <p>
+            Opened or active this period and waiting beyond their repository's
+            historical baseline. Extend the date range to include older PRs.
+          </p>
         </div>
         <span>{s.at_risk_summary.critical} critical</span>
       </div>
       {!rows.length ? (
-        <p className="empty">No open PRs exceed the waiting-time threshold.</p>
+        <p className="empty">
+          No PRs opened or active this period exceed the waiting-time threshold.
+        </p>
       ) : (
         <div className="table-scroll">
           <table className="risk-table">

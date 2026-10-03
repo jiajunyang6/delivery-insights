@@ -18,7 +18,9 @@ export function Bottlenecks({
       {!findings.length && (
         <div className="panel empty">
           {s.meta.sample.merged_prs < 20
-            ? "Too few merged PRs for bottleneck findings; see at-risk PRs."
+            ? audience === "director"
+              ? "Too few merged PRs for bottleneck findings."
+              : "Too few merged PRs for bottleneck findings; see at-risk PRs."
             : "No bottleneck exceeded the configured evidence thresholds."}
         </div>
       )}

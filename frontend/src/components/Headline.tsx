@@ -15,7 +15,7 @@ export function Headline({ snapshot: s }: { snapshot: Snapshot }) {
         As of {timestamp(s.as_of)}
         <span>
           {s.meta.sample.merged_prs} merged PRs ·{" "}
-          {s.meta.sample.open_prs_at_as_of} open
+          {s.meta.sample.open_prs_at_as_of} open (opened or active this period)
         </span>
       </div>
       {!s.meta.comparison_available && (
