@@ -163,6 +163,33 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
             high=states["waiting_merge"]["share"] >= t.MERGE_BLOCKED_HIGH_SHARE,
             stage="merge",
         )
+    if ledger["ci_data_available"] and states["waiting_ci"]["share"] >= t.CI_WAIT_SHARE:
+        ci = analysis["ci"]
+        queue_minutes = ci["queue_p50_minutes"]["value"]
+        run_minutes = ci["run_p50_minutes"]["value"]
+        recommendation = "Reduce CI workflow runtime and remove redundant jobs."
+        if queue_minutes is not None and run_minutes is not None and queue_minutes >= run_minutes:
+            recommendation = "Increase runner capacity to reduce CI queue time."
+        flaky = ci["flaky_rerun_rate"]["value"]
+        if flaky is not None and flaky >= 0.1:
+            recommendation += " Investigate flaky tests that pass only after a rerun."
+        add(
+            "ci_wait",
+            "CI contributes substantial waiting time",
+            recommendation,
+            states["waiting_ci"]["pr_hours"],
+            [
+                (
+                    "Share of PR time waiting for CI",
+                    "/time_ledger/states/waiting_ci/share",
+                    "share",
+                ),
+                ("Median CI queue time", "/bottleneck_analysis/ci/queue_p50_minutes", "minutes"),
+                ("Median CI runtime", "/bottleneck_analysis/ci/run_p50_minutes", "minutes"),
+            ],
+            high=states["waiting_ci"]["share"] >= t.CI_WAIT_HIGH_SHARE,
+            stage="ci",
+        )
     if above("/efficiency/avg_review_rounds", t.REWORK_ROUNDS) or above(
         "/efficiency/post_review_commit_share", t.REWORK_POST_REVIEW_SHARE
     ):

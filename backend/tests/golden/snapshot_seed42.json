@@ -1001,11 +1001,11 @@
   },
   "headline": "Median cycle time is 41.0h (+1% vs previous period, not significant); the main bottleneck is review queue is growing (51% of PR time waits on reviewers).",
   "links": {
-    "narrative": "/v1/snapshots/s_faea14f255314919/narrative",
-    "self": "/v1/snapshots/s_faea14f255314919"
+    "narrative": "/v1/snapshots/s_0840432d78ed0579/narrative",
+    "self": "/v1/snapshots/s_0840432d78ed0579"
   },
   "meta": {
-    "analytics_version": "1.0.0",
+    "analytics_version": "1.1.0",
     "ci_source": "none",
     "comparison_available": true,
     "data_freshness": [
@@ -1399,7 +1399,7 @@
       "value": null
     }
   },
-  "snapshot_id": "s_faea14f255314919",
+  "snapshot_id": "s_0840432d78ed0579",
   "time_ledger": {
     "ci_coverage": 0.0,
     "ci_data_available": false,

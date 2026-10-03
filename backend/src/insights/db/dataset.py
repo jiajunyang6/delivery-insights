@@ -6,10 +6,15 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from insights.analytics.ci import union_intervals
+from insights.analytics.classify import ownership_counts
 from insights.analytics.dataset import Baseline, Dataset, PrData, RepoData, Review, SnapshotParams
 from insights.analytics.timeline import WAITING_STATES, Interval
+from insights.db.ci import load_ci_data
+from insights.db.models import OwnershipRule as StoredRule
 from insights.db.models import PrEvent, PrFact, PrInterval, PullRequest, Repository
 from insights.db.records import facts_from_row
+from insights.domain import OwnershipRule
 
 
 async def load_dataset(session: AsyncSession, params: SnapshotParams, *, now: datetime) -> Dataset:
@@ -21,22 +26,29 @@ async def load_dataset(session: AsyncSession, params: SnapshotParams, *, now: da
             .order_by(Repository.full_name)
         )
     ).all()
+    display = {name.lower(): name for name in params.repos}
+    names = {r.id: display[r.full_name_lower] for r in repositories}
+    rules: dict[int, list[OwnershipRule]] = defaultdict(list)
+    for rule in await session.scalars(select(StoredRule).where(StoredRule.repo_id.in_(names))):
+        rules[rule.repo_id].append(
+            OwnershipRule(rule.source, rule.pattern, tuple(rule.owners), rule.line_no)
+        )
     repo_data = []
     for repo in repositories:
         if repo.covered_since is None or repo.last_synced_at is None:
             raise ValueError("Repository is not ready for analytics")
         repo_data.append(
             RepoData(
-                repo.full_name,
+                names[repo.id],
                 repo.data_version,
                 repo.covered_since,
                 repo.last_synced_at,
                 repo.last_sync_status,
+                ownership_counts(rules[repo.id]),
             )
         )
     if len(repo_data) != len(params.repos):
         raise ValueError("Repository is missing")
-    names = {r.id: r.full_name for r in repositories}
     start = datetime.combine(params.period_from, datetime.min.time(), UTC)
     end = datetime.combine(params.period_to + timedelta(days=1), datetime.min.time(), UTC)
     previous_start = start - timedelta(days=(params.period_to - params.period_from).days + 1)
@@ -80,6 +92,7 @@ async def load_dataset(session: AsyncSession, params: SnapshotParams, *, now: da
             )
         ).all():
             intervals[pr_id].append(Interval(state, began, ended))
+    ci = await load_ci_data(session, list(names), pr_ids=ids)
     prs = tuple(
         PrData(
             f.pr_id,
@@ -92,6 +105,7 @@ async def load_dataset(session: AsyncSession, params: SnapshotParams, *, now: da
             author,
             draft,
             created,
+            union_intervals(ci.by_pr.get(f.pr_id, ())),
         )
         for f, title, url, author, draft, created in rows
     )
@@ -155,6 +169,9 @@ async def load_dataset(session: AsyncSession, params: SnapshotParams, *, now: da
         ).all()
         if at is not None and cycle is not None
     )
+    period_ci = await load_ci_data(
+        session, list(names), created_from=previous_start, created_to=as_of, flow_only=True
+    )
     return Dataset(
         tuple(repo_data),
         prs,
@@ -162,6 +179,7 @@ async def load_dataset(session: AsyncSession, params: SnapshotParams, *, now: da
         baselines,
         params.period_from,
         params.period_to,
+        ci_runs=tuple((names[repo_id], run) for repo_id, run in period_ci.runs),
         history=history,
         current_day=params.period_to == now.date(),
     )

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from insights.analytics import thresholds as t
+from insights.analytics.ci import overlap_hours
 from insights.analytics.dataset import (
     Dataset,
     PrData,
@@ -281,7 +282,15 @@ def merge_blockers(dataset: Dataset) -> dict[str, Any]:
         / len(prs)
         if len(prs) >= 10
         else None,
-        "ci_after_approval_p50_hours": None,
+        "ci_after_approval_p50_hours": percentile(
+            [
+                overlap_hours(p.ci_intervals, p.facts.approved_at, p.facts.merged_at)
+                for p in prs
+                if p.facts.ci_covered and p.facts.approved_at and p.facts.merged_at
+            ],
+            50,
+            10,
+        ),
     }
 
 

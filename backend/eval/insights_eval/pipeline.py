@@ -2,6 +2,7 @@ from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
+from insights.analytics.ci import map_runs, mapped_flow_runs, union_intervals
 from insights.analytics.classify import LinkInput, is_flow, link_prs
 from insights.analytics.dataset import Baseline, Dataset, PrData, RepoData, Review, SnapshotParams
 from insights.analytics.facts import compute_facts
@@ -22,8 +23,10 @@ def dataset_from_repo(
     baselines: list[Baseline] = []
     links: list[LinkInput] = []
     history: list[tuple[str, datetime, float]] = []
+    mapped = map_runs({p.number: p for p in syn.records}, syn.ci_runs)
     for record in syn.records:
-        result = build_timeline(pr_input(record), record.events, (), syn.as_of)
+        ci_intervals = union_intervals(mapped.get(record.number, ()))
+        result = build_timeline(pr_input(record), record.events, ci_intervals, syn.as_of)
         facts = compute_facts(
             record,
             record.events,
@@ -32,6 +35,7 @@ def dataset_from_repo(
             location_rules=(),
             now=syn.as_of,
             location_dimension=location_dimension,
+            ci_covered=bool(ci_intervals),
         )
         identifier = record.number
         links.append(LinkInput(identifier, record, facts))
@@ -47,6 +51,7 @@ def dataset_from_repo(
                 record.author.login,
                 record.is_draft,
                 record.created_at,
+                ci_intervals,
             )
         )
         if is_flow(facts):
@@ -74,7 +79,12 @@ def dataset_from_repo(
         tuple(baselines),
         syn.period_from,
         syn.period_to,
-        tuple((syn.repo, run) for run in syn.ci_runs),
+        tuple(
+            (syn.repo, run)
+            for run in mapped_flow_runs(
+                mapped, {p.pr_id: p.number for p in prs if is_flow(p.facts)}
+            )
+        ),
         tuple(history),
     )
 
@@ -91,6 +101,10 @@ def build_snapshot_from_repo(
     return build_snapshot(
         dataset,
         params=SnapshotParams(
-            (syn.repo,), syn.period_from, syn.period_to, location_dimension, ci_source="none"
+            (syn.repo,),
+            syn.period_from,
+            syn.period_to,
+            location_dimension,
+            ci_source="actions" if syn.ci_runs else "none",
         ),
     )

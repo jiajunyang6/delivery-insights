@@ -297,6 +297,7 @@ async def sync_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id:
                 repo_full_name,
                 _job_id=f"precompute:{repo_full_name.lower()}",
             )
+        await enqueue_enrichment(ctx, repo)
         log.info("sync_completed", **run.stats)
         return "succeeded"
 
@@ -341,3 +342,21 @@ async def incremental_sync_all(ctx: dict[str, Any]) -> None:
             await enqueue_sync(
                 ctx["redis"], session, repo.full_name, "incremental", now=now_for(ctx)
             )
+
+
+async def enqueue_enrichment(ctx: dict[str, Any], repo: Repository) -> None:
+    settings = cast(Settings, ctx["settings"])
+    async with sessions_for(ctx)() as session:
+        for kind, interval in (("ci_runs", timedelta(hours=1)), ("ownership", timedelta(days=1))):
+            if kind == "ci_runs" and settings.ci_source != "actions":
+                continue
+            previous = await session.scalar(
+                select(SyncJob.finished_at)
+                .where(
+                    SyncJob.repo_id == repo.id, SyncJob.kind == kind, SyncJob.status == "succeeded"
+                )
+                .order_by(SyncJob.finished_at.desc())
+                .limit(1)
+            )
+            if previous is None or previous < now_for(ctx) - interval:
+                await enqueue_sync(ctx["redis"], session, repo.full_name, kind, now=now_for(ctx))
