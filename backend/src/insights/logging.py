@@ -1,10 +1,12 @@
 import logging
 import sys
 from importlib.resources import files
+from types import TracebackType
 from typing import Any
 
 import orjson
 import structlog
+from structlog.typing import EventDict
 
 SHARED: list[Any] = [
     structlog.contextvars.merge_contextvars,
@@ -21,17 +23,39 @@ def json_dumps(value: Any, **kwargs: Any) -> str:
     return orjson.dumps(value, option=orjson.OPT_SORT_KEYS).decode()
 
 
+def sanitize_exception(logger: Any, method: str, event: EventDict) -> EventDict:
+    info = event.pop("exc_info", None)
+    event.pop("stack_info", None)
+    if info:
+        if info is True:
+            info = sys.exc_info()
+        kind = info[0] if isinstance(info, tuple) else type(info)
+        event["error_type"] = getattr(kind, "__name__", "Exception")
+        event["event"] = "unhandled_exception"
+    return event
+
+
+def log_uncaught(
+    kind: type[BaseException], error: BaseException, traceback: TracebackType | None
+) -> None:
+    logging.getLogger("insights.process").error(
+        "unhandled_exception", exc_info=(kind, error, traceback)
+    )
+
+
 def json_formatter() -> structlog.stdlib.ProcessorFormatter:
     return structlog.stdlib.ProcessorFormatter(
         foreign_pre_chain=SHARED,
         processors=[
             structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            sanitize_exception,
             structlog.processors.JSONRenderer(serializer=json_dumps),
         ],
     )
 
 
 def configure_logging(level: str = "INFO") -> None:
+    sys.excepthook = log_uncaught
     structlog.configure(
         processors=[*SHARED, structlog.stdlib.ProcessorFormatter.wrap_for_formatter],
         logger_factory=structlog.stdlib.LoggerFactory(),

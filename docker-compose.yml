@@ -44,6 +44,7 @@ services:
       retries: 10
   worker:
     <<: *backend
+    restart: unless-stopped
     command: ["arq", "insights.sync.worker.WorkerSettings", "--custom-log-dict", "insights.logging.LOGGING_CONFIG"]
     depends_on:
       migrate: { condition: service_completed_successfully }
