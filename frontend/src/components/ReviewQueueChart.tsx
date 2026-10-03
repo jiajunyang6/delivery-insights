@@ -16,7 +16,10 @@ export function ReviewQueueChart({ weeks }: { weeks: Week[] }) {
       <div className="section-heading">
         <div>
           <h2>Review demand & capacity</h2>
-          <p>Weekly arrivals, first reviews and open queue</p>
+          <p>
+            PRs opened or active this period: weekly arrivals, first reviews and
+            open queue
+          </p>
         </div>
       </div>
       <div

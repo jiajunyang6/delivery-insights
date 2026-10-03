@@ -380,6 +380,13 @@ Actions CI waiting, drivers, Kaplan–Meier survival, historical predictability,
 
 ### Known limitations and next steps
 
+- PRs that have been open without human activity during the selected period are not listed;
+  extend the date range to include them.
+- Stale PRs closed by a bot are not counted as waste unless they were opened or had human
+  activity in the period.
+- PRs opened before the selected period and merged by a bot with no human activity in
+  the period are not counted in throughput.
+
 GitHub omits design discussions, offline coordination and deployments. Rewritten or rebased
 commit timestamps distort coding time. Current labels/owners are not historical ownership.
 Private membership prevents expanding some owner teams into people; teams count as owners.
