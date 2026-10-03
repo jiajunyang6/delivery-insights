@@ -1,5 +1,6 @@
 import base64
 from dataclasses import replace
+from datetime import UTC, datetime
 
 import orjson
 import pytest
@@ -45,6 +46,22 @@ def test_defaults_case_dedup_org_and_combined_errors():
     with pytest.raises(ProblemError) as captured:
         parse_params(QueryParams("org=unknown"), settings, at(24))
     assert captured.value.status == 403
+
+
+@pytest.mark.parametrize("backfill_days", [30, 90, 180])
+def test_ninety_day_preset_respects_configured_horizon(backfill_days):
+    settings = Settings(tracked_repos="a/b", backfill_days=backfill_days)
+    query = QueryParams("repo=a/b&from=2026-07-06&to=2026-10-03")
+    now = datetime(2026, 10, 3, tzinfo=UTC)
+    if backfill_days < 89:
+        with pytest.raises(ProblemError) as captured:
+            parse_params(query, settings, now)
+        assert captured.value.errors == [
+            {"param": "from", "message": "must be within the configured backfill horizon"}
+        ]
+    else:
+        params = parse_params(query, settings, now)
+        assert (params.period_to - params.period_from).days + 1 == 90
 
 
 @pytest.mark.parametrize(

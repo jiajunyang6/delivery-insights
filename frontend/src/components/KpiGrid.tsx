@@ -1,5 +1,5 @@
 import type { Metric, Snapshot } from "../types";
-import { format, number, percent, signed } from "../format";
+import { format, number, signed } from "../format";
 function Card({
   label,
   metric: m,
@@ -90,31 +90,6 @@ export function KpiGrid({ snapshot: s }: { snapshot: Snapshot }) {
           }
         />
         <Card label="Revert rate" metric={e.revert_rate} />
-      </div>
-      <div
-        className={
-          "guardrail " + (s.guardrail.verdict === "ok" ? "" : "warning")
-        }
-      >
-        <div>
-          <strong>Quality guardrail</strong>
-          <span>
-            {s.guardrail.verdict === "ok"
-              ? "No detected trade-off"
-              : s.guardrail.verdict === "watch"
-                ? "Watch quality"
-                : "Speed–quality trade-off suspected"}
-          </span>
-        </div>
-        <p>
-          Cycle time <b>{signed(s.guardrail.cycle_time_p50_change_rel)}</b>
-        </p>
-        <p>
-          Revert rate <b>{percent(s.guardrail.revert_rate)}</b>{" "}
-          <span className="muted">
-            ({signed(s.guardrail.revert_rate_change_pp, " pp", 1)})
-          </span>
-        </p>
       </div>
     </section>
   );

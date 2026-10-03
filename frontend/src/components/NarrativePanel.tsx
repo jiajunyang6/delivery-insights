@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { fetchJson, message } from "../api";
 import { format, signed, safeGithubUrl } from "../format";
 import type { Audience, Narrative } from "../types";
+import { viewLabels } from "../views";
 
 const reasons: Record<string, string> = {
   insufficient_sample: "insufficient sample",
@@ -85,7 +86,7 @@ export function NarrativePanel({
           <h2 id="narrative-heading">The evidence, in words</h2>
         </div>
         <span className="badge neutral">
-          {audience} · EN
+          {viewLabels[audience]}
         </span>
       </div>
       {error ? (

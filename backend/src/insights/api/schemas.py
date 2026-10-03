@@ -557,8 +557,15 @@ class RepoStatus(Contract):
     latest_job: SyncJobResponse | None
 
 
+class DateLimits(Contract):
+    earliest_from: date
+    latest_to: date
+    max_days: int
+
+
 class RepoList(Contract):
     items: list[RepoStatus]
+    date_limits: DateLimits
 
 
 class RiskDetails(Contract):

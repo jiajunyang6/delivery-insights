@@ -76,8 +76,7 @@ export function safeGithubUrl(value: string): boolean {
     return false;
   }
 }
-export function dateRange(days: number) {
-  const to = new Date().toISOString().slice(0, 10);
+export function dateRange(days: number, to = new Date().toISOString().slice(0, 10)) {
   const from = new Date(Date.parse(to + "T00:00:00Z") - (days - 1) * 86_400_000)
     .toISOString()
     .slice(0, 10);

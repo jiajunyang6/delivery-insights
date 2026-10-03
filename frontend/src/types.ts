@@ -2,6 +2,15 @@ export type Audience = "director" | "manager";
 export type State =
   "waiting_reviewer" | "waiting_author" | "waiting_ci" | "waiting_merge";
 export type Params = { repo: string; from: string; to: string };
+export interface DateLimits {
+  earliest_from: string;
+  latest_to: string;
+  max_days: number;
+}
+export interface RepoList {
+  items: RepoStatus[];
+  date_limits: DateLimits;
+}
 export interface Metric {
   value: number | null;
   previous: number | null;
@@ -138,12 +147,6 @@ export interface Snapshot {
   };
   at_risk_prs: RiskPr[];
   at_risk_summary: { total: number; critical: number };
-  guardrail: {
-    verdict: "ok" | "watch" | "tradeoff_suspected";
-    cycle_time_p50_change_rel: number | null;
-    revert_rate_change_pp: number | null;
-    revert_rate: number | null;
-  };
   meta: {
     comparison_available: boolean;
     sample: { merged_prs: number; open_prs_at_as_of: number };

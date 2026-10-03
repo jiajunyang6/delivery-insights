@@ -1,5 +1,7 @@
-import type { Audience, Params, RepoStatus } from "../types";
+import type { Audience, DateLimits, Params, RepoStatus } from "../types";
 import { dateRange } from "../format";
+import { periodError } from "../period";
+import { viewDescriptions, viewLabels } from "../views";
 
 interface Props {
   params: Params;
@@ -7,7 +9,8 @@ interface Props {
   repos: RepoStatus[];
   audience: Audience;
   setAudience: (a: Audience) => void;
-  invalid: boolean;
+  dateLimits: DateLimits | null;
+  validationError: string | null;
   refresh: () => void;
 }
 export function Controls(p: Props) {
@@ -32,12 +35,18 @@ export function Controls(p: Props) {
         <div className="range-control">
           <span className="label">Period · UTC</span>
           <div className="segmented">
-            {[7, 30, 90].map((days) => {
-              const range = dateRange(days);
+            {[7, 30, 60].map((days) => {
+              const range = dateRange(days, p.dateLimits?.latest_to);
+              const unavailable = p.dateLimits
+                ? periodError(range, p.dateLimits)
+                : "Loading supported dates…";
               return (
                 <button
                   type="button"
                   key={days}
+                  disabled={unavailable !== null}
+                  title={unavailable ?? undefined}
+                  aria-pressed={range.from === p.params.from && range.to === p.params.to}
                   className={
                     range.from === p.params.from && range.to === p.params.to
                       ? "selected"
@@ -56,6 +65,7 @@ export function Controls(p: Props) {
           <input
             type="date"
             value={p.params.from}
+            min={p.dateLimits?.earliest_from}
             max={p.params.to}
             onChange={(e) => p.setParams({ ...p.params, from: e.target.value })}
           />
@@ -65,13 +75,14 @@ export function Controls(p: Props) {
           <input
             type="date"
             value={p.params.to}
-            max={dateRange(1).to}
+            min={p.dateLimits?.earliest_from}
+            max={p.dateLimits?.latest_to ?? dateRange(1).to}
             onChange={(e) => p.setParams({ ...p.params, to: e.target.value })}
           />
         </label>
         <button
           className="primary refresh"
-          disabled={p.invalid || !p.params.repo}
+          disabled={p.validationError !== null || !p.params.repo || !p.dateLimits}
           onClick={p.refresh}
         >
           Refresh report ↗
@@ -87,18 +98,23 @@ export function Controls(p: Props) {
                 key={a}
                 className={p.audience === a ? "selected" : ""}
                 aria-pressed={p.audience === a}
+                title={viewDescriptions[a]}
                 onClick={() => p.setAudience(a)}
               >
-                {a === "director" ? "Director" : "Manager"}
+                {viewLabels[a]}
               </button>
             ))}
           </div>
         </div>
       </div>
-      {p.invalid && (
-        <p className="error-text">
-          Choose a valid date range with From no later than To.
+      {p.dateLimits && (
+        <p className="footnote">
+          Supported dates: {p.dateLimits.earliest_from} – {p.dateLimits.latest_to} (UTC).
+          Longer presets are unavailable when history is configured for a shorter period.
         </p>
+      )}
+      {p.validationError && (
+        <p className="error-text" role="alert">{p.validationError}</p>
       )}
     </section>
   );
