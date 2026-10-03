@@ -1,7 +1,8 @@
 """Immutable inputs shared by database loading and synthetic evaluation."""
 
+from bisect import bisect_left
 from collections.abc import Iterator
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
@@ -60,6 +61,9 @@ class PrData:
     ci_intervals: tuple[tuple[datetime, datetime], ...] = ()
     human_activity_at: tuple[datetime, ...] = ()
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "human_activity_at", tuple(sorted(self.human_activity_at)))
+
 
 @dataclass(frozen=True, slots=True)
 class Review:
@@ -97,6 +101,10 @@ class Dataset:
     history: tuple[tuple[str, datetime, float], ...] = ()
     current_day: bool = False
     observation_time: datetime | None = None
+    # init=False gives every dataclasses.replace() an empty, independent cache.
+    cohort_cache: dict[Window, tuple[tuple[PrData, ...], tuple[Review, ...] | None]] = field(
+        default_factory=dict, init=False, compare=False, repr=False
+    )
 
     @property
     def start(self) -> datetime:
@@ -131,11 +139,23 @@ class Dataset:
         return self.flow_in(self.current)
 
     def flow_in(self, window: Window) -> tuple[PrData, ...]:
-        return tuple(p for p in self.prs if is_flow(p.facts) and active_in(p, window))
+        cached = self.cohort_cache.get(window)
+        if cached is None:
+            flow = tuple(p for p in self.prs if is_flow(p.facts) and active_in(p, window))
+            self.cohort_cache[window] = flow, None
+            return flow
+        return cached[0]
 
     def reviews_in(self, window: Window) -> tuple[Review, ...]:
-        ids = {p.pr_id for p in self.flow_in(window)}
-        return tuple(r for r in self.reviews if r.pr_id in ids and window.contains(r.occurred_at))
+        flow = self.flow_in(window)
+        cached = self.cohort_cache[window][1]
+        if cached is None:
+            ids = {p.pr_id for p in flow}
+            cached = tuple(
+                r for r in self.reviews if r.pr_id in ids and window.contains(r.occurred_at)
+            )
+            self.cohort_cache[window] = flow, cached
+        return cached
 
     def for_repo(self, repo: str) -> "Dataset":
         prs = tuple(p for p in self.prs if p.repo == repo)
@@ -154,7 +174,10 @@ class Dataset:
 
 def active_in(pr: PrData, window: Window) -> bool:
     """Select new PRs or recorded human activity, never bot-driven updated_at."""
-    return window.contains(pr.created_at) or any(window.contains(at) for at in pr.human_activity_at)
+    if window.contains(pr.created_at):
+        return True
+    index = bisect_left(pr.human_activity_at, window.start)
+    return index < len(pr.human_activity_at) and pr.human_activity_at[index] < window.end
 
 
 def merged(dataset: Dataset, window: Window, *, scope: Window | None = None) -> tuple[PrData, ...]:
