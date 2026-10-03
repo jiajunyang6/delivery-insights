@@ -19,7 +19,22 @@ CAUSAL = re.compile(
     r"results? in|resulted in|responsible for|explains?|explained)\b",
     re.I,
 )
-ABSTAIN = re.compile(r"\binsufficient\b|\bnot (?:strong )?enough\b", re.I)
+ABSTAIN = re.compile(r"\binsufficient\b|\bnot (?:strong )?enough\b|\bno slowdown\b", re.I)
+# The one sentence an abstained narrative must contain, by abstain_reason.
+ABSTAIN_SENTENCES = {
+    "no_slowdown": "There is no slowdown to explain this period",
+    "insufficient_signal": (
+        "The signals are insufficient to support a specific root cause this period"
+    ),
+    "no_comparison": (
+        "Without a previous period, the signals are insufficient to support a root cause"
+    ),
+}
+ABSTAIN_REQUIRED = {
+    "no_slowdown": re.compile(r"\bno slowdown\b", re.I),
+    "insufficient_signal": re.compile(r"\binsufficient\b|\bnot enough\b", re.I),
+    "no_comparison": re.compile(r"\binsufficient\b|\bnot enough\b", re.I),
+}
 UP = re.compile(r"\b(rose|increased|grew|went up|climbed)\b", re.I)
 DOWN = re.compile(r"\b(fell|decreased|dropped|declined|went down)\b", re.I)
 SUFFIXES = (
@@ -381,12 +396,18 @@ def validate(
             if not levels or not hedges or max(hedges) > max(levels):
                 fail("V7b:overclaim", "Body causal language exceeds the supported level.")
     if not candidates:
-        required = re.search(r"\binsufficient\b|\bnot enough\b", body, re.I)
+        pattern = ABSTAIN_REQUIRED.get(
+            pack.get("abstain_reason") or "", ABSTAIN_REQUIRED["insufficient_signal"]
+        )
+        required = pattern.search(body)
         if (
             hypotheses
             or outside
             or not required
             or any(CAUSAL.search(s) and not ABSTAIN.search(s) for s in body_sentences)
         ):
-            fail("V12:abstain", "Insufficient signals require an explicit abstention.")
+            fail(
+                "V12:abstain",
+                "Without hypotheses, include the required abstention sentence and state no cause.",
+            )
     return list(dict.fromkeys(errors))

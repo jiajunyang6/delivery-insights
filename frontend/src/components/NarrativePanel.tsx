@@ -1,22 +1,118 @@
 import { useEffect, useState } from "react";
 import { fetchJson, message } from "../api";
-import { format, signed, safeGithubUrl } from "../format";
-import type { Audience, Narrative } from "../types";
+import { format, percent, signed, safeGithubUrl, states } from "../format";
+import type {
+  AbstainReason,
+  Audience,
+  Evidence,
+  Hypothesis,
+  Narrative,
+  Snapshot,
+  State,
+} from "../types";
 import { viewLabels } from "../views";
 
-const reasons: Record<string, string> = {
-  insufficient_sample: "insufficient sample",
-  no_data: "no data",
-  below_threshold: "below threshold",
-  not_selected: "not in the top 3",
+const hypothesisTitles: Record<string, string> = {
+  H_review_capacity: "Limited review capacity",
+  H_ci_bottleneck: "Slow or congested CI",
+  H_pr_size_growth: "Pull requests getting larger",
+  H_quality_tradeoff: "Speed gained by lighter review",
 };
+const openReasons: Record<string, string> = {
+  insufficient_sample: "too few PRs to judge",
+  no_data: "no data for this check",
+  below_threshold: "evidence too weak",
+  not_selected: "weaker than the top three",
+};
+const stepLabels: Record<string, string> = {
+  symptom: "What changed",
+  stage: "Where the time went",
+  location: "Which area",
+  mechanism: "Why it may happen",
+  cited: "Evidence",
+};
+const levelLabels: Record<string, string> = {
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+};
+const abstainText: Record<AbstainReason, { title: string; detail: string }> = {
+  no_slowdown: {
+    title: "No slowdown to explain",
+    detail:
+      "Delivery did not get significantly slower than the previous period, so there is no root cause to look for.",
+  },
+  insufficient_signal: {
+    title: "No clear cause yet",
+    detail:
+      "The evidence does not point to a single cause this period. Start with where the time goes now.",
+  },
+  no_comparison: {
+    title: "No previous period to compare",
+    detail:
+      "Root causes need a previous period with data. Choose a later period or sync more history.",
+  },
+};
+const waitingOn: Record<State, string> = {
+  waiting_reviewer: "waiting on reviewers",
+  waiting_author: "waiting on authors",
+  waiting_ci: "waiting on CI",
+  waiting_merge: "waiting to merge after approval",
+};
+
+/** "dir:crates/bevy_pbr" → "crates/bevy_pbr (directory)". Labels stay as they are. */
+export function place(location: string): string {
+  if (location.startsWith("dir:")) return location.slice(4) + " (directory)";
+  if (location.startsWith("codeowners:"))
+    return location.slice(11) + " (CODEOWNERS)";
+  return location;
+}
+
+function change(e: Evidence): string {
+  if (e.change_pp != null) return signed(e.change_pp, " pp", 1);
+  if (e.change_rel != null) return signed(e.change_rel);
+  return "";
+}
+
+function LookFirst({ snapshot }: { snapshot: Snapshot }) {
+  const top = snapshot.bottlenecks[0];
+  if (top) {
+    return (
+      <aside className="look-first" aria-label="Where to look first">
+        <span className="eyebrow">WHERE TO LOOK FIRST</span>
+        <h3>{top.title}</h3>
+        <p>
+          <b>{percent(top.impact_share)} of PR time</b> · {top.recommendation}
+        </p>
+        <a href="#bottlenecks">See all bottlenecks ↓</a>
+      </aside>
+    );
+  }
+  const ledger = snapshot.time_ledger.states;
+  const largest = states
+    .filter((s) => ledger[s])
+    .sort((a, b) => ledger[b].share - ledger[a].share)[0];
+  if (!largest) return null;
+  return (
+    <aside className="look-first" aria-label="Where to look first">
+      <span className="eyebrow">WHERE TO LOOK FIRST</span>
+      <h3>No single bottleneck stands out</h3>
+      <p>
+        The largest share of PR time,{" "}
+        <b>{percent(ledger[largest].share)}</b>, is spent {waitingOn[largest]}.
+      </p>
+    </aside>
+  );
+}
+
 export function NarrativePanel({
-  snapshotId,
+  snapshot,
   audience,
 }: {
-  snapshotId: string;
+  snapshot: Snapshot;
   audience: Audience;
 }) {
+  const snapshotId = snapshot.snapshot_id;
   const [data, setData] = useState<Narrative | null>(null);
   const [error, setError] = useState("");
   const [highlight, setHighlight] = useState("");
@@ -26,10 +122,7 @@ export function NarrativePanel({
     setError("");
     setHighlight("");
     fetchJson<Narrative>(
-      "/v1/snapshots/" +
-        snapshotId +
-        "/narrative?audience=" +
-        audience,
+      "/v1/snapshots/" + snapshotId + "/narrative?audience=" + audience,
       controller.signal,
     )
       .then((r) => {
@@ -64,16 +157,130 @@ export function NarrativePanel({
       {id}
     </button>
   );
-  const text = (value: string) =>
+  // Bracketed citations in narrative text; bare IDs too in free-text reasons.
+  const text = (value: string, bare = false) =>
     value
-      .split(/(\[E\d+\])/)
+      .split(bare ? /(\[?\bE\d+\b\]?)/ : /(\[E\d+\])/)
       .map((part, i) =>
-        /^\[E\d+\]$/.test(part) ? (
-          tag(part.slice(1, -1), String(i))
+        /^\[?E\d+\]?$/.test(part) && (bare || part.startsWith("[")) ? (
+          tag(part.replace(/[[\]]/g, ""), String(i))
         ) : (
           <span key={i}>{part}</span>
         ),
       );
+  const byId = new Map((data?.evidence ?? []).map((e) => [e.id, e]));
+  const chip = (id: string) => {
+    const e = byId.get(id);
+    return (
+      <button
+        key={id}
+        className="evidence-chip"
+        onClick={() => focus(id)}
+        aria-label={"Show evidence " + id}
+      >
+        {e ? (
+          <>
+            <span>{e.label}</span>
+            <b>{format(e.value, e.unit)}</b>
+            {change(e) && <em>{change(e)}</em>}
+          </>
+        ) : (
+          <span>Evidence</span>
+        )}
+        <small>{id}</small>
+      </button>
+    );
+  };
+  const card = (h: Hypothesis) => {
+    const steps = h.evidence_chain.filter((step) => step.evidence.length);
+    const downgrade = h.confidence_basis.llm_downgrade;
+    const checked = h.alternatives_ruled_out.length + h.alternatives_open.length;
+    return (
+      <article className="hypothesis" key={h.id}>
+        <div className="hypothesis-header">
+          <h3>
+            {h.title}
+            {h.location && <span> · {place(h.location)}</span>}
+          </h3>
+          <span className="strength">
+            Evidence strength{" "}
+            <span className="badge">
+              {levelLabels[h.confidence_level] ?? h.confidence_level}
+            </span>{" "}
+            <span className="muted">{h.confidence.toFixed(2)}</span>
+          </span>
+        </div>
+        <progress
+          value={h.confidence}
+          max={1}
+          aria-label={"Evidence strength " + h.confidence.toFixed(2)}
+        />
+        <p className="footnote">
+          Scored from 0 to 1 by fixed rules: Low 0.35–0.50, Medium above 0.50,
+          High 0.75 and above. Not a probability.
+        </p>
+        {h.source === "llm" && (
+          <p className="notice">Outside the hypothesis library</p>
+        )}
+        <p className="statement">{text(h.statement)}</p>
+        {(steps.length > 0 || h.counter_evidence.length > 0) && (
+          <dl className="evidence-chain">
+            {steps.map((step) => (
+              <div key={step.step}>
+                <dt>{stepLabels[step.step] ?? step.step}</dt>
+                <dd>{step.evidence.map(chip)}</dd>
+              </div>
+            ))}
+            {h.counter_evidence.length > 0 && (
+              <div className="against">
+                <dt>Evidence against</dt>
+                <dd>{h.counter_evidence.map(chip)}</dd>
+              </div>
+            )}
+          </dl>
+        )}
+        {downgrade && (
+          <p className="notice">
+            <strong>
+              Lowered from {levelLabels[downgrade.from] ?? downgrade.from} to{" "}
+              {levelLabels[downgrade.to] ?? downgrade.to}:
+            </strong>{" "}
+            {text(downgrade.reason, true)}
+          </p>
+        )}
+        {checked > 0 && (
+          <div className="alternatives">
+            <strong>Other explanations checked</strong>
+            <ul>
+              {h.alternatives_ruled_out.map((a) => (
+                <li key={a.hypothesis}>
+                  {hypothesisTitles[a.hypothesis] ?? a.hypothesis}:{" "}
+                  <span className="verdict">ruled out</span> by{" "}
+                  {a.evidence.map(chip)}
+                </li>
+              ))}
+              {h.alternatives_open.map((a) => (
+                <li key={a.hypothesis}>
+                  {hypothesisTitles[a.hypothesis] ?? a.hypothesis}:{" "}
+                  <span className="verdict open">not assessed</span>,{" "}
+                  {openReasons[a.reason] ?? a.reason}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {h.action && (
+          <div className="action">
+            <strong>Try next</strong>
+            <p>{h.action}</p>
+            <strong>How to verify</strong>
+            <p>{h.verify_next}</p>
+          </div>
+        )}
+      </article>
+    );
+  };
+  const reason = data?.abstained ? data.abstain_reason : null;
   return (
     <section
       className="panel narrative-panel"
@@ -85,9 +292,7 @@ export function NarrativePanel({
           <span className="eyebrow">FROM METRICS TO A WORKING EXPLANATION</span>
           <h2 id="narrative-heading">The evidence, in words</h2>
         </div>
-        <span className="badge neutral">
-          {viewLabels[audience]}
-        </span>
+        <span className="badge neutral">{viewLabels[audience]}</span>
       </div>
       {error ? (
         <p role="alert" className="error-text">
@@ -100,78 +305,15 @@ export function NarrativePanel({
         </p>
       ) : (
         <>
-          {data.abstained && (
-            <p className="notice">Signals are insufficient for a root cause.</p>
-          )}
           <p className="narrative-body">{text(data.narrative)}</p>
-          <div className="hypotheses">
-            {data.hypotheses.map((h) => (
-              <article className="hypothesis" key={h.id}>
-                <div className="hypothesis-header">
-                  <h3>
-                    {h.title}
-                    {h.location && <span> · {h.location}</span>}
-                  </h3>
-                  <b>
-                    {format(h.confidence, "share")}{" "}
-                    <span className="badge">{h.confidence_level}</span>
-                  </b>
-                </div>
-                <progress
-                  value={h.confidence}
-                  max={1}
-                  aria-label={"Evidence strength " + h.confidence}
-                />
-                <p className="footnote">
-                  Evidence-strength score, not a calibrated probability
-                </p>
-                {h.source === "llm" && (
-                  <p className="notice">Outside the hypothesis library</p>
-                )}
-                <p>{text(h.statement)}</p>
-                <div className="evidence-chain">
-                  {h.evidence_chain.map((step, i) => (
-                    <div key={step.step}>
-                      {i > 0 && <span className="chain-arrow">→</span>}
-                      <span className="chain-step">{step.step}</span>
-                      {step.evidence.map((id) => tag(id))}
-                    </div>
-                  ))}
-                </div>
-                {h.counter_evidence.length > 0 && (
-                  <p>
-                    <strong>Counter-evidence </strong>
-                    {h.counter_evidence.map((id) => tag(id))}
-                  </p>
-                )}
-                {h.alternatives_ruled_out.map((a) => (
-                  <p className="alternative" key={a.hypothesis}>
-                    {a.hypothesis} ruled out by{" "}
-                    {a.evidence.map((id) => tag(id))}
-                  </p>
-                ))}
-                {h.alternatives_open.map((a) => (
-                  <p className="alternative" key={a.hypothesis}>
-                    {a.hypothesis} not assessed: {reasons[a.reason] ?? a.reason}
-                  </p>
-                ))}
-                {h.confidence_basis.llm_downgrade && (
-                  <p className="notice">
-                    Reduced from {h.confidence_basis.llm_downgrade.from}:{" "}
-                    {text(h.confidence_basis.llm_downgrade.reason)}
-                  </p>
-                )}
-                {h.action && (
-                  <div className="action">
-                    <strong>Try next</strong>
-                    <p>{h.action}</p>
-                    <strong>How to verify</strong>
-                    <p>{h.verify_next}</p>
-                  </div>
-                )}
-              </article>
-            ))}
-          </div>
+          {reason && (
+            <p className="abstain-note" role="status">
+              <strong>{abstainText[reason].title}.</strong>{" "}
+              {abstainText[reason].detail}
+            </p>
+          )}
+          {data.abstained && <LookFirst snapshot={snapshot} />}
+          <div className="hypotheses">{data.hypotheses.map(card)}</div>
           <div className="evidence-list">
             <h3>Trace every claim</h3>
             <p className="muted">

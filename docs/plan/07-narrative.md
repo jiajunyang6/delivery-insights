@@ -3,7 +3,7 @@
 Narratives, statements, downgrade reasons, actions and verification advice use English only.
 The optional API `lang` parameter accepts only `en` (default); other values return 422.
 The response and evidence pack keep `lang: "en"`. Database/cache language fields remain
-for stored-row identity and are always `en` for new requests. Prompt v6 prevents reuse
+for stored-row identity and are always `en` for new requests. Prompt v7 prevents reuse
 of narratives generated under earlier prompt or language rules.
 
 ## 1. Flow and responsibilities
@@ -24,7 +24,7 @@ snapshot ──▶ evidence pack (§2) ──▶ hypothesis scoring (§3–§4)
 - **Code owns** all numbers, evidence entries, observations, attribution, hypothesis candidates, confidence, evidence chains, alternatives, actions, and validation.
 - **LLM owns** selecting important points, connecting efficiency outcomes to bottleneck causes, and writing short narrative plus one sentence per hypothesis. It may lower but never raise confidence bands; with candidates present, it may propose at most one out-of-library hypothesis, always low.
 - Modules: evidence.py, hypotheses.py, prompt.py, llm.py, validator.py, template.py, service.py. All pure except llm.py/service.py.
-- PROMPT_VERSION="v6" covers prompt, evidence catalog, hypotheses, scoring, validation; increment when any changes to invalidate old narratives.
+- PROMPT_VERSION="v7" covers prompt, evidence catalog, hypotheses, scoring, validation; increment when any changes to invalidate old narratives.
 
 ## 2. Evidence pack (`narrative/evidence.py`)
 
@@ -306,7 +306,12 @@ Order: raw=clamp(score,0,1) → capped=min(raw,cap) if applicable → confidence
 3. At least one symptom **and** one mechanism present. Library sides use **signal roles**, not evidence.side: symptoms represent outcomes, mechanisms bottlenecks, as defined in design (reviewer-wait share can be symptom, revert rate mechanism). covers_both_parts expresses this gate. Evidence.side is for V9 outside-library validation/display only.
 4. `confidence >= 0.35`.
 
-Candidates sort confidence descending then ID, top three in pack. None → insufficient_signal, unless gate-1 no_comparison takes precedence.
+Candidates sort confidence descending then ID, top three in pack. None → abstain, unless gate-1 no_comparison takes precedence:
+- no_slowdown: E1 has a value, a previous value and n>=MIN_SAMPLES_P50, and no slowdown symptom (H_review_capacity, H_ci_bottleneck, H_pr_size_growth) is present. Required sentence: `There is no slowdown to explain this period [E1].`
+- insufficient_signal: otherwise (a slowdown symptom without a supported mechanism, or no comparable E1). Required sentence: `The signals are insufficient to support a specific root cause this period [E1 or E3].`
+- no_comparison: `Without a previous period, the signals are insufficient to support a root cause [E1 or E3].`
+
+Display chain (does not change scores): a stage item appears only when it shows the change (E15 up >=10% for review capacity, down >=10% for quality trade-off; attribution shares E37/E39/E42/E43 >=0.15). A location is named only when its E(53+4i) added-time share is >=0.15; otherwise location=null and the location step is empty. An alternative whose assessable mechanisms have no evidence in the pack is listed as open with reason no_data, never as ruled out with no citation.
 
 ### 4.3 Data-completeness caps
 
@@ -356,11 +361,11 @@ Rules:
 1. Use only numbers from the evidence items you cite in the same sentence, and keep their units: hours as h, shares and relative changes as %, counts as plain numbers. Do not calculate new numbers (no differences, sums, ratios or averages). You may round and convert hours to days. Make sure the direction words (rose, fell) match the sign of the change.
 2. Every sentence must cite, in square brackets before its final punctuation, every evidence item whose numbers it uses, for example "... rose 18% [E1]." Cite only IDs that exist in the pack. Do not use abbreviations such as "e.g.", "i.e." or "vs.".
 3. Describe only hypothesis candidates listed in the pack, using their IDs. Include every candidate whose level is "high" or "medium"; you may omit "low" candidates. In a hypothesis statement, cite only evidence from that candidate's chain, counter-evidence or ruled-out alternatives.
-4. Match the wording to the level. high: "likely". medium: "may", "might", "possibly" or "could". low: "early signs". This applies to every sentence of the narrative too: a sentence that states or implies a cause (cause, because, due to, driven by, drives, leads to, results in, responsible for, explains) must use the wording of a level no higher than the highest level among the hypotheses you describe. If you describe no hypotheses, no sentence may state or imply a cause, except a sentence saying that the signals are insufficient to support a root cause. Never use "definitely", "clearly", "certainly", "undoubtedly", "proves" or "confirms", and never mention confidence scores.
+4. Match the wording to the level. high: "likely". medium: "may", "might", "possibly" or "could". low: "early signs". This applies to every sentence of the narrative too: a sentence that states or implies a cause (cause, because, due to, driven by, drives, leads to, results in, responsible for, explains) must use the wording of a level no higher than the highest level among the hypotheses you describe. If you describe no hypotheses, no sentence may state or imply a cause, except the required abstention sentence given in the submission constraints. Never use "definitely", "clearly", "certainly", "undoubtedly", "proves" or "confirms", and never mention confidence scores.
 5. If a candidate has counter-evidence, mention it and cite at least one counter-evidence ID.
 6. You may lower a candidate's level, never raise it, when the evidence looks weaker than the level suggests. Put the new level and a one-sentence reason with citations in "downgrade", and word the statement for the new level.
 7. Only when the pack has at least one candidate, you may add one explanation that is not in the library as "llm_hypothesis". It must cite significant evidence from both the efficiency side and the bottleneck side, and it is always shown with low confidence, so word it with "early signs".
-8. If the pack has no candidates, return an empty "hypotheses" list, omit "llm_hypothesis", say that the signals are insufficient to support a root cause, and do not state or imply any cause in other sentences.
+8. If the pack has no candidates, return an empty "hypotheses" list, omit "llm_hypothesis", include the required abstention sentence given in the submission constraints, and do not state or imply any cause in other sentences. Use the other sentences to say where PR time goes now: the top bottleneck in top_bottlenecks with its share of PR time, or otherwise the largest waiting share, as plain facts.
 9. Never name or describe individual people. Talk about areas, stages and the team.
 10. Audience "director": 2 to 4 sentences on the trend, the main cause and the expected benefit. Audience "manager": 3 to 6 sentences on what to act on this week: the bottleneck location, at-risk pull requests and the next step. With no candidates: director 1 to 4 sentences, manager 2 to 6 sentences.
 11. Write in English only. Keep evidence IDs, area names and repository names unchanged. Do not write dates.
@@ -371,8 +376,8 @@ Call the submit_narrative tool exactly once.
 Example A. The pack contains E1 (median cycle time 41.2 h, previous 33.0 h, change_rel 0.2485, significant), E15 (median first-review wait 29.0 h, previous 20.0 h), E22 (9 of 13 weeks with demand above first reviews, weeks_total 13), E53 (share of the added time that is reviewer wait in area-Foo: 0.63), and one candidate H_review_capacity with level "high", location "area-Foo", no counter-evidence. A good tool input for audience "director", language "en":
 {"narrative": "Median cycle time rose 25% to 41.2 h [E1]. Most of the added time is waiting for a first review, which went from 20 h to 29 h [E15], and 63% of the added time is reviewer wait in area-Foo [E53]. Review demand outpaced first reviews in 9 of 13 weeks, so limited review capacity in area-Foo is likely the main cause [E22][E53].", "hypotheses": [{"id": "H_review_capacity", "statement": "Limited review capacity in area-Foo is likely the main cause of the slower cycle time [E1][E15][E53]."}]}
 
-Example B. The pack has no candidates and E1 is 30.5 h with no significant change. A good tool input for audience "director", language "en":
-{"narrative": "Median cycle time was 30.5 h, with no significant change from the previous period [E1]. The signals are insufficient to support a specific root cause this period [E1].", "hypotheses": []}
+Example B. The pack has no candidates, abstain_reason is no_slowdown, E1 is 30.5 h with no significant change, and E19 (share of PR time waiting on authors) is 0.41, the largest waiting share. A good tool input for audience "director", language "en":
+{"narrative": "Median cycle time was 30.5 h, with no significant change from the previous period [E1]. There is no slowdown to explain this period [E1]. The largest share of PR time, 41%, is spent waiting on authors [E19].", "hypotheses": []}
 ```
 
 ### 5.2 User message
@@ -387,7 +392,7 @@ Evidence pack (JSON):
 {pack_json}
 ```
 
-The v6 preamble restricts numeric claims to individual current values in their
+The v7 preamble restricts numeric claims to individual current values in their
 original units, describes changes qualitatively, keeps advice and hypothesis
 statements free of numbers, repeats units for each value in comparisons, requests one metric
 per sentence and one decimal place for hours, and separates causal claims from
@@ -630,7 +635,8 @@ Use templates when Bedrock unconfigured, LLM call fails, or both validations fai
 | S3 | Findings present | `The largest time sink is {finding name}, about {pct(E71.value)} of PR time [E71].` |
 | S4 | Manager, E25>0 | `{E25.value} open PRs are waiting longer than usual, {critical} of them critically [E25].` |
 | S5 | Candidates present | First candidate band phrase + first three chain IDs: `{phrase} [..].` |
-| S5' | No candidates | `The signals are insufficient to support a specific root cause this period [E1 or E3].` |
+| S5' | No candidates | The required abstention sentence for abstain_reason (§4.2), cited [E1 or E3] |
+| S3' | No top bottleneck | `No single bottleneck stands out; the largest share of PR time, {share}, is spent {waiting on reviewers/authors/CI/to merge after approval} [E18–E21].` |
 | S6 | guardrail.verdict!=ok, E10 present | `The revert rate is {pct(E10.value)} [E10], so check review depth before pushing for more speed.` |
 
 - Director: one S1 variant → S5/S5' → S3 → S6 (2–4 sentences).

@@ -191,10 +191,7 @@ export default function App() {
           <div className="report">
             <Headline snapshot={snapshot} />
             <KpiGrid snapshot={snapshot} />
-            <NarrativePanel
-              snapshotId={snapshot.snapshot_id}
-              audience={audience}
-            />
+            <NarrativePanel snapshot={snapshot} audience={audience} />
             <TimeLedgerChart snapshot={snapshot} />
             <Bottlenecks snapshot={snapshot} audience={audience} />
             {audience === "manager" && (

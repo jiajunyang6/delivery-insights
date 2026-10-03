@@ -57,3 +57,22 @@ def test_too_few_merged_and_real_no_comparison():
             assert pack["abstain_reason"] == "no_comparison"
             if sparse:
                 assert "E3" in output["narrative"]
+
+
+@pytest.mark.parametrize("audience", ["director", "manager"])
+def test_no_slowdown_template_states_it_and_shows_where_time_goes(audience):
+    snapshot = snapshot_for("no_signal")
+    pack, _ = build_evidence_pack(snapshot, audience, False)
+    assert pack["abstain_reason"] == "no_slowdown"
+    output = build_template(pack, snapshot)
+    assert "There is no slowdown to explain this period" in output["narrative"]
+    assert "insufficient" not in output["narrative"]
+    assert not validate(output, pack, snapshot, audience=audience)
+    pack["top_bottlenecks"] = []
+    output = build_template(pack, snapshot)
+    assert "the largest share of PR time" in output["narrative"]
+    assert not validate(output, pack, snapshot, audience=audience)
+    output["narrative"] = output["narrative"].replace(
+        "There is no slowdown to explain this period", "Delivery was steady"
+    )
+    assert "V12:abstain" in [v.code for v in validate(output, pack, snapshot, audience=audience)]

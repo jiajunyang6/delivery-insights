@@ -7,7 +7,7 @@ Known human comments/reviews/state/label actions qualify; bot/unknown actors, CI
 Historical baselines and lifecycle durations keep their meaning. Risk lists start with five rows and offer **Load more**; there is no dashboard language selector.
 
 The implementation covers P0 and P1 in [the implementation plan](docs/plan/00-overview.md).
-Analytics 1.4.0 and English-only prompt v6 pass automated checks, offline and real Bedrock evaluation. Live pagination recovery and the English manager HTTP smoke also pass.
+Analytics 1.4.0 and English-only prompt v7 pass automated checks and offline evaluation; real Bedrock evaluation last ran on prompt v6. Live pagination recovery and the English manager HTTP smoke also pass.
 Backfill stays at 30 days; human signoff and 90/180-day checks remain pending or excluded. See [acceptance evidence](docs/ACCEPTANCE.md).
 
 ## Quickstart (60 seconds)
@@ -323,11 +323,11 @@ Those analytics 1.2/1.3 measurements and npm ci/audit checks were not repeated h
 The original 90-day performance gate remains excluded; nine upstream deprecation warnings remain.
 
 The harness runs five planted scenarios × two seeds × two English audience variants.
-Current offline and real Bedrock Sonnet 4.6 suites use prompt v6 and analytics 1.4.0.
+The offline suite was re-run on prompt v7 with unchanged results; the real Bedrock Sonnet 4.6 column below is from prompt v6 and analytics 1.4.0.
 [Evaluation records](docs/EVALUATION.md) retain every current and historical per-case outcome.
 Numeric/citation/hedge denominators include final LLM outputs, excluding fallback.
 
-| Metric | Offline (v6) | Real Bedrock (v6) | Required |
+| Metric | Offline (v7) | Real Bedrock (v6) | Required |
 |---|---|---|---|
 | First-attempt validity | 20/20 (1.00) | 20/20 (1.00) | ≥ 0.90 |
 | Numeric / citation / hedge consistency | 20/20 each | 20/20 each | 1.00 each |
@@ -408,7 +408,7 @@ performed by the coding agent, not signed off by a human. Remote CI has not been
 This section is a factual draft for the submitter to review before publication.
 - **Tools:** tools used for the brainstorm, design document and the implementation plan, e.g. Claude Code; Codex, a GPT-6-based coding agent, implemented the project from `docs/plan/`.
 - **What AI did:** Implemented backend, frontend, migrations, tests, evaluation, containers, CI configuration and this README; inspected synthetic and real GitHub HTTP/browser behavior. Cloude Code did for the design and the plan.
-- **What I did:** I made product roadmap, high level architecture design and product decisions. e.g. the metric, the trade-offs, plan reviews, diff reviews.
+- **What I did:** I made product roadmap, tech stack, high level architecture design and product decisions. e.g. the metric, the trade-offs, plan reviews, diff reviews.
 - **How the output was checked:** Current Makefile tool gates, 369 tests, 20-case offline eval, frontend typecheck/build, and real sync/pagination browser checks. Earlier acceptance also ran real Bedrock eval, npm ci/audit, fresh-clone Compose, GitHub invariants/reconciliation/performance and three PR page checks. Submission archive checks follow the final commit. See `docs/ACCEPTANCE.md`.
 - **Not verified:** 180-day live checks (excluded by request)
 
