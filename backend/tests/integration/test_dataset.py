@@ -51,3 +51,30 @@ async def test_readonly_repeatable_snapshot_matches_pure_pipeline(context):
     pure = dataset_from_repo(synthetic, covered_since=at(-5000))
     pure = replace(pure, repos=(replace(pure.repos[0], data_version=original_version),))
     assert build_snapshot(data, params=params) == build_snapshot(pure, params=params)
+
+
+async def test_database_activity_scope_matches_pure_pipeline(context):
+    from tests.unit.test_period_scope import period_repo
+
+    from insights.domain import PageResult, RepositoryInfo
+    from insights.sync.queue import ensure_repo
+    from insights.sync.store import save_page
+
+    syn = period_repo()
+    async with context["session_factory"]() as session, session.begin():
+        repo = await ensure_repo(session, "a/b", NOW)
+        page = PageResult(
+            RepositoryInfo("a/b", "main", False), syn.records, None, False, at(60), at(60), 1
+        )
+        await save_page(session, repo.id, page, now=at(72), settings=context["settings"])
+        repo.covered_since = at(-5000)
+        repo.last_synced_at = at(72)
+        repo.last_sync_status = "ok"
+        version = repo.data_version
+    params = SnapshotParams(("a/b",), syn.period_from, syn.period_to)
+    async with context["session_factory"]() as session:
+        loaded = await load_dataset(session, params, now=at(72))
+    pure = dataset_from_repo(syn, covered_since=at(-5000))
+    pure = replace(pure, repos=(replace(pure.repos[0], data_version=version),))
+    assert {p.number for p in loaded.flow} == {2, 5, 8}
+    assert build_snapshot(loaded, params=params) == build_snapshot(pure, params=params)

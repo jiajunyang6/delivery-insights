@@ -53,6 +53,11 @@ def pr(identifier, *, offset=24, reviewer=20, author=5, merge=5, locations=("are
         "author",
         False,
         at(offset),
+        human_activity_at=tuple(
+            at
+            for at in (f.ready_at, f.first_review_at, f.approved_at, f.merged_at, f.closed_at)
+            if at is not None
+        ),
     )
 
 

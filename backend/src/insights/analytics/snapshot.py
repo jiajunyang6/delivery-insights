@@ -10,7 +10,7 @@ from insights.analytics import ANALYTICS_VERSION
 from insights.analytics import bottlenecks as b
 from insights.analytics import thresholds as t
 from insights.analytics.ci import build_ci
-from insights.analytics.dataset import Dataset, SnapshotParams, closed, merged, open_at
+from insights.analytics.dataset import Dataset, SnapshotParams, active_in, closed, merged, open_at
 from insights.analytics.drivers import build_drivers
 from insights.analytics.efficiency import build_efficiency
 from insights.analytics.findings import build_findings, headline
@@ -110,7 +110,7 @@ def build_snapshot(dataset: Dataset, *, params: SnapshotParams) -> dict[str, Any
     excluded = dict.fromkeys(("bot_prs", "backport_prs", "never_ready_drafts"), 0)
     for pr in dataset.prs:
         f = pr.facts
-        if not dataset.current.contains(f.end_at):
+        if not dataset.current.contains(f.end_at) or not active_in(pr, dataset.current):
             continue
         if f.is_bot_author:
             excluded["bot_prs"] += 1
@@ -187,9 +187,7 @@ def build_snapshot(dataset: Dataset, *, params: SnapshotParams) -> dict[str, Any
                 "closed_unmerged_prs": len(closed(dataset, dataset.current)),
                 "ready_prs": sum(dataset.current.contains(p.facts.ready_at) for p in dataset.flow),
                 "open_prs_at_as_of": sum(open_at(p, dataset.as_of) for p in dataset.flow),
-                "human_reviews": sum(
-                    dataset.current.contains(r.occurred_at) for r in dataset.reviews
-                ),
+                "human_reviews": len(dataset.reviews_in(dataset.current)),
             },
             "excluded": excluded,
             "location_sources": {

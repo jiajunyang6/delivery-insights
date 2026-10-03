@@ -95,7 +95,7 @@ def values(prs: Sequence[PrData], field: str) -> list[float]:
 
 def measures(dataset: Dataset, window: Window) -> dict[str, Measure]:
     prs, lost = merged(dataset, window), closed(dataset, window)
-    counts = Counter(r.reviewer for r in dataset.reviews if window.contains(r.occurred_at))
+    counts = Counter(r.reviewer for r in dataset.reviews_in(window))
     review_count = sum(counts.values())
     pairs = []
     for pr in prs:
@@ -105,7 +105,7 @@ def measures(dataset: Dataset, window: Window) -> dict[str, Measure]:
         pairs.append((numerator, denominator))
     eligible = [
         p
-        for p in dataset.flow
+        for p in dataset.flow_in(window)
         if p.facts.ready_at is not None
         and window.start <= p.facts.ready_at <= window.end - timedelta(days=t.N_DAYS_MERGED)
     ]
@@ -203,7 +203,7 @@ def build_efficiency(dataset: Dataset, params_hash: str) -> dict[str, Any]:
 
 def survival_cohort(dataset: Dataset, window: Window) -> dict[str, Any] | None:
     samples = []
-    for pr in dataset.flow:
+    for pr in dataset.flow_in(window):
         f = pr.facts
         if f.ready_at is None or not window.contains(f.ready_at):
             continue
@@ -231,7 +231,7 @@ def predictability(dataset: Dataset, params_hash: str) -> dict[str, Any]:
 
     def weekly_cv(window: Window) -> Measure:
         counts = [
-            len(merged(dataset, week))
+            len(merged(dataset, week, scope=window))
             for week in weeks(window)
             if week.end - week.start == timedelta(days=7)
         ]

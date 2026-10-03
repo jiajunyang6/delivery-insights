@@ -1,10 +1,10 @@
 # Delivery Insights
 
-Delivery Insights helps engineering managers and directors see where pull requests wait,
-which process changes are worth investigating, and what evidence supports an explanation.
-`GET /v1/insights/delivery` returns deterministic metrics and bottlenecks.
-`GET /v1/snapshots/{snapshot_id}/narrative` explains the same snapshot through validated
-English or Chinese prose, hypotheses, evidence chains and next actions.
+Delivery Insights helps engineering managers and directors see where PRs wait and what evidence supports an explanation. `GET /v1/insights/delivery` returns deterministic metrics and bottlenecks; `GET /v1/snapshots/{snapshot_id}/narrative` explains the same snapshot. The API supports English or Chinese prose, hypotheses and evidence chains. The dashboard uses English.
+
+All sections select PRs opened **or with recorded human activity** during the selected UTC period; comparisons apply the same rule to the previous period.
+Known human comments/reviews/state/label actions qualify; bot/unknown actors, CI and `updatedAt` alone do not. Commit actors are currently unavailable.
+Historical baselines and lifecycle durations keep their meaning. Risk lists start with five rows and offer **Load more**; there is no dashboard language selector.
 
 The implementation covers P0 and P1 in [the implementation plan](docs/plan/00-overview.md).
 Automated checks, real Bedrock evaluation and 30-day GitHub acceptance pass. The user limited
@@ -307,10 +307,10 @@ Latest local verification: 2026-10-02 Pacific time. On Windows without GNU make,
 | Check | Observed result |
 |---|---|
 | Ruff check/format and strict mypy | Pass; 122 formatted files, 77 typed source/eval files |
-| Unit suite | 288 passed |
-| Full suite | 338 passed, including 50 integration tests |
+| Unit suite | 300 passed |
+| Full suite | 351 passed, including 51 integration tests |
 | Frontend `npm ci`, typecheck and build | Pass with Node 24; npm audit: 0 findings |
-| Real local HTTP / browser | Health, templates, Bedrock, ETags, drilldown, audience/language, citations and pending UI checked |
+| Real local HTTP / browser | Health, templates, Bedrock, ETags, drilldown, audience, English default, five-row pagination and period scope checked |
 | Real GitHub stored timelines | 3,541 PRs; 0 invariant violations; three PR page timestamp checks match |
 | Real 30-day ledger reconciliation | 533 merged PRs; relative rounding error 0.0000004833 |
 | Real 30-day worker cold compute | 1,376.95 ms; 533 merged PRs; 90 days excluded by request |
@@ -398,7 +398,7 @@ This section is a factual draft for the submitter to review before publication.
 - **Tools:** <confirm: tools used for the design document and the implementation plan, e.g. "Claude (Anthropic) in Cowork">; Codex, a GPT-6-based coding agent, implemented the project from `AGENTS.md` and `docs/plan/`. A more specific model variant is not claimed.
 - **What AI did:** Implemented backend, frontend, migrations, tests, evaluation, containers, CI configuration and this README; inspected synthetic and real GitHub HTTP/browser behavior. <confirm: what AI did for the design and the plan>.
 - **What I did:** <confirm: decisions you made and what you reviewed, e.g. the metric, the demo repo, the trade-offs, plan reviews, diff reviews>.
-- **How the output was checked:** Exact Makefile uv gates, 338 tests, 20-case offline and real Bedrock evals, npm ci/typecheck/build/audit, fresh-clone Compose checks, synthetic and real GitHub invariants/reconciliation/performance, three PR page checks, browser interactions and submission archive checks. Details are in `docs/ACCEPTANCE.md` and the delivery report.
+- **How the output was checked:** Exact Makefile uv gates, 351 tests, 20-case offline and real Bedrock evals, npm ci/typecheck/build/audit, fresh-clone Compose checks, synthetic and real GitHub invariants/reconciliation/performance, three PR page checks, browser interactions and submission archive checks. Details are in `docs/ACCEPTANCE.md` and the delivery report.
 - **Not verified:** 90/180-day live checks (excluded by request), human golden/UI review, calibrated causal accuracy, remote CI, production deployment or public submission. No person is claimed to have reviewed or approved the generated work.
 
 ### With one more day

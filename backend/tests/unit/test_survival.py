@@ -68,7 +68,9 @@ def test_weekly_cv_uses_only_complete_calendar_weeks_population_std():
     start = at(96)  # Monday January 5.
     prs = [
         replace(
-            p := pr(w * 10 + i), facts=replace(p.facts, merged_at=start + timedelta(days=7 * w + 1))
+            p := pr(w * 10 + i),
+            facts=replace(p.facts, merged_at=start + timedelta(days=7 * w + 1)),
+            human_activity_at=(start + timedelta(days=7 * w + 1),),
         )
         for w in range(4)
         for i in range(w + 1)

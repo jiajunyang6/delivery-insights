@@ -9,7 +9,6 @@ import {
 import { dateRange } from "./format";
 import type {
   Audience,
-  Lang,
   Params,
   Pending,
   RepoStatus,
@@ -35,9 +34,6 @@ export default function App() {
   });
   const [audience, setAudience] = useState<Audience>(
     initial.get("audience") === "director" ? "director" : "manager",
-  );
-  const [lang, setLang] = useState<Lang>(
-    initial.get("lang") === "zh" ? "zh" : "en",
   );
   const [repos, setRepos] = useState<RepoStatus[]>([]);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -76,9 +72,9 @@ export default function App() {
     return () => controller.abort();
   }, [refresh]);
   useEffect(() => {
-    const query = new URLSearchParams({ ...params, audience, lang });
+    const query = new URLSearchParams({ ...params, audience });
     window.history.replaceState(null, "", "?" + query);
-  }, [params, audience, lang]);
+  }, [params, audience]);
   useEffect(() => {
     const controller = new AbortController();
     setSnapshot(null);
@@ -132,8 +128,6 @@ export default function App() {
           repos={repos}
           audience={audience}
           setAudience={setAudience}
-          lang={lang}
-          setLang={setLang}
           invalid={invalid}
           refresh={() => setRefresh((r) => r + 1)}
         />
@@ -200,7 +194,7 @@ export default function App() {
             <NarrativePanel
               snapshotId={snapshot.snapshot_id}
               audience={audience}
-              lang={lang}
+              lang="en"
             />
             <footer className="report-footer">
               <span>Delivery Insights · Evidence before conclusions.</span>

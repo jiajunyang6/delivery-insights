@@ -52,6 +52,7 @@ def dataset_from_repo(
                 record.is_draft,
                 record.created_at,
                 ci_intervals,
+                tuple(e.occurred_at for e in record.events if e.actor.login and not e.actor.is_bot),
             )
         )
         if is_flow(facts):

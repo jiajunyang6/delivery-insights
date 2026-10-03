@@ -2,383 +2,381 @@
   "as_of": "2026-03-02T00:00:00Z",
   "at_risk_prs": [
     {
-      "age_hours": 4116.24,
-      "author": "dev18",
+      "age_hours": 928.93,
+      "author": "dev33",
       "baseline_source": "90d",
       "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
-        "area-D"
+        "area-C"
       ],
-      "number": 1029,
+      "number": 2604,
       "repo": "synthetic/repo",
       "severity": "critical",
-      "size_lines": 51,
+      "size_lines": 24,
       "state": "waiting_merge",
       "threshold_hours": 11.71,
-      "title": "Change 1029 in area-D",
-      "url": "https://github.com/synthetic/repo/pull/1029"
+      "title": "Change 2604 in area-C",
+      "url": "https://github.com/synthetic/repo/pull/2604"
     },
     {
-      "age_hours": 3984.28,
-      "author": "ext11",
+      "age_hours": 905.87,
+      "author": "dev40",
+      "baseline_source": "90d",
+      "critical_threshold_hours": 20.96,
+      "external_contributor": false,
+      "locations": [
+        "area-A"
+      ],
+      "number": 2647,
+      "repo": "synthetic/repo",
+      "severity": "critical",
+      "size_lines": 135,
+      "state": "waiting_merge",
+      "threshold_hours": 11.71,
+      "title": "Change 2647 in area-A",
+      "url": "https://github.com/synthetic/repo/pull/2647"
+    },
+    {
+      "age_hours": 892.72,
+      "author": "ext21",
       "baseline_source": "90d",
       "critical_threshold_hours": 20.96,
       "external_contributor": true,
       "locations": [
-        "area-E"
+        "area-B"
       ],
-      "number": 1085,
+      "number": 2661,
       "repo": "synthetic/repo",
       "severity": "critical",
-      "size_lines": 914,
+      "size_lines": 11,
       "state": "waiting_merge",
       "threshold_hours": 11.71,
-      "title": "Change 1085 in area-E",
-      "url": "https://github.com/synthetic/repo/pull/1085"
+      "title": "Change 2661 in area-B",
+      "url": "https://github.com/synthetic/repo/pull/2661"
     },
     {
-      "age_hours": 3943.78,
-      "author": "dev26",
+      "age_hours": 848.39,
+      "author": "dev37",
       "baseline_source": "90d",
       "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
         "area-B"
       ],
-      "number": 1136,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "size_lines": 26,
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 1136 in area-B",
-      "url": "https://github.com/synthetic/repo/pull/1136"
-    },
-    {
-      "age_hours": 3829.54,
-      "author": "dev04",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "external_contributor": false,
-      "locations": [
-        "area-A",
-        "area-E"
-      ],
-      "number": 1159,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "size_lines": 146,
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 1159 in area-A",
-      "url": "https://github.com/synthetic/repo/pull/1159"
-    },
-    {
-      "age_hours": 3828.04,
-      "author": "dev18",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "external_contributor": false,
-      "locations": [
-        "area-C"
-      ],
-      "number": 1172,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "size_lines": 72,
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 1172 in area-C",
-      "url": "https://github.com/synthetic/repo/pull/1172"
-    },
-    {
-      "age_hours": 3431.89,
-      "author": "ext13",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "external_contributor": true,
-      "locations": [
-        "area-A"
-      ],
-      "number": 1352,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "size_lines": 127,
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 1352 in area-A",
-      "url": "https://github.com/synthetic/repo/pull/1352"
-    },
-    {
-      "age_hours": 3379.64,
-      "author": "dev29",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "external_contributor": false,
-      "locations": [
-        "area-D"
-      ],
-      "number": 1373,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "size_lines": 195,
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 1373 in area-D",
-      "url": "https://github.com/synthetic/repo/pull/1373"
-    },
-    {
-      "age_hours": 3285.84,
-      "author": "dev32",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "external_contributor": false,
-      "locations": [
-        "area-A"
-      ],
-      "number": 1431,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "size_lines": 14,
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 1431 in area-A",
-      "url": "https://github.com/synthetic/repo/pull/1431"
-    },
-    {
-      "age_hours": 3174.91,
-      "author": "dev35",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "external_contributor": false,
-      "locations": [
-        "area-A"
-      ],
-      "number": 1488,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "size_lines": 649,
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 1488 in area-A",
-      "url": "https://github.com/synthetic/repo/pull/1488"
-    },
-    {
-      "age_hours": 3127.11,
-      "author": "dev09",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "external_contributor": false,
-      "locations": [
-        "area-B",
-        "area-C"
-      ],
-      "number": 1532,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "size_lines": 29,
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 1532 in area-C",
-      "url": "https://github.com/synthetic/repo/pull/1532"
-    },
-    {
-      "age_hours": 3082.66,
-      "author": "dev08",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "external_contributor": false,
-      "locations": [
-        "area-C"
-      ],
-      "number": 1558,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "size_lines": 171,
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 1558 in area-C",
-      "url": "https://github.com/synthetic/repo/pull/1558"
-    },
-    {
-      "age_hours": 3077.42,
-      "author": "dev38",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "external_contributor": false,
-      "locations": [
-        "area-A"
-      ],
-      "number": 1554,
+      "number": 2658,
       "repo": "synthetic/repo",
       "severity": "critical",
       "size_lines": 15,
       "state": "waiting_merge",
       "threshold_hours": 11.71,
-      "title": "Change 1554 in area-A",
-      "url": "https://github.com/synthetic/repo/pull/1554"
+      "title": "Change 2658 in area-B",
+      "url": "https://github.com/synthetic/repo/pull/2658"
     },
     {
-      "age_hours": 3061.26,
-      "author": "dev26",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "external_contributor": false,
-      "locations": [
-        "area-A"
-      ],
-      "number": 1552,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "size_lines": 108,
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 1552 in area-A",
-      "url": "https://github.com/synthetic/repo/pull/1552"
-    },
-    {
-      "age_hours": 2950.89,
-      "author": "dev15",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "external_contributor": false,
-      "locations": [
-        "area-B"
-      ],
-      "number": 1600,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "size_lines": 123,
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 1600 in area-B",
-      "url": "https://github.com/synthetic/repo/pull/1600"
-    },
-    {
-      "age_hours": 2937.92,
-      "author": "ext19",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "external_contributor": true,
-      "locations": [
-        "area-A"
-      ],
-      "number": 1612,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "size_lines": 52,
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 1612 in area-A",
-      "url": "https://github.com/synthetic/repo/pull/1612"
-    },
-    {
-      "age_hours": 2857.02,
-      "author": "ext15",
+      "age_hours": 830.81,
+      "author": "ext20",
       "baseline_source": "90d",
       "critical_threshold_hours": 20.96,
       "external_contributor": true,
       "locations": [
         "area-B"
       ],
-      "number": 1634,
+      "number": 2669,
       "repo": "synthetic/repo",
       "severity": "critical",
-      "size_lines": 45,
+      "size_lines": 278,
       "state": "waiting_merge",
       "threshold_hours": 11.71,
-      "title": "Change 1634 in area-B",
-      "url": "https://github.com/synthetic/repo/pull/1634"
+      "title": "Change 2669 in area-B",
+      "url": "https://github.com/synthetic/repo/pull/2669"
     },
     {
-      "age_hours": 2845.53,
+      "age_hours": 817.43,
+      "author": "ext01",
+      "baseline_source": "90d",
+      "critical_threshold_hours": 20.96,
+      "external_contributor": true,
+      "locations": [
+        "area-A"
+      ],
+      "number": 2670,
+      "repo": "synthetic/repo",
+      "severity": "critical",
+      "size_lines": 611,
+      "state": "waiting_merge",
+      "threshold_hours": 11.71,
+      "title": "Change 2670 in area-A",
+      "url": "https://github.com/synthetic/repo/pull/2670"
+    },
+    {
+      "age_hours": 747.15,
       "author": "dev18",
       "baseline_source": "90d",
       "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
-        "dir:src/C"
+        "area-D"
       ],
-      "number": 1638,
+      "number": 2716,
       "repo": "synthetic/repo",
       "severity": "critical",
-      "size_lines": 85,
+      "size_lines": 173,
       "state": "waiting_merge",
       "threshold_hours": 11.71,
-      "title": "Change 1638 in area-C",
-      "url": "https://github.com/synthetic/repo/pull/1638"
+      "title": "Change 2716 in area-D",
+      "url": "https://github.com/synthetic/repo/pull/2716"
     },
     {
-      "age_hours": 2777.18,
-      "author": "dev14",
+      "age_hours": 957.02,
+      "author": "dev20",
+      "baseline_source": "90d",
+      "critical_threshold_hours": 37.5,
+      "external_contributor": false,
+      "locations": [
+        "area-B"
+      ],
+      "number": 2622,
+      "repo": "synthetic/repo",
+      "severity": "critical",
+      "size_lines": 182,
+      "state": "waiting_reviewer",
+      "threshold_hours": 17.37,
+      "title": "Change 2622 in area-B",
+      "url": "https://github.com/synthetic/repo/pull/2622"
+    },
+    {
+      "age_hours": 629.72,
+      "author": "dev30",
       "baseline_source": "90d",
       "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
-        "area-C"
+        "area-A"
       ],
-      "number": 1670,
+      "number": 2796,
       "repo": "synthetic/repo",
       "severity": "critical",
-      "size_lines": 16,
+      "size_lines": 142,
       "state": "waiting_merge",
       "threshold_hours": 11.71,
-      "title": "Change 1670 in area-C",
-      "url": "https://github.com/synthetic/repo/pull/1670"
+      "title": "Change 2796 in area-A",
+      "url": "https://github.com/synthetic/repo/pull/2796"
     },
     {
-      "age_hours": 4112.52,
-      "author": "dev15",
+      "age_hours": 891.96,
+      "author": "dev23",
+      "baseline_source": "90d",
+      "critical_threshold_hours": 37.5,
+      "external_contributor": false,
+      "locations": [
+        "area-B"
+      ],
+      "number": 2663,
+      "repo": "synthetic/repo",
+      "severity": "critical",
+      "size_lines": 153,
+      "state": "waiting_reviewer",
+      "threshold_hours": 17.37,
+      "title": "Change 2663 in area-B",
+      "url": "https://github.com/synthetic/repo/pull/2663"
+    },
+    {
+      "age_hours": 838.6,
+      "author": "dev10",
+      "baseline_source": "90d",
+      "critical_threshold_hours": 37.5,
+      "external_contributor": false,
+      "locations": [
+        "area-E"
+      ],
+      "number": 2676,
+      "repo": "synthetic/repo",
+      "severity": "critical",
+      "size_lines": 40,
+      "state": "waiting_reviewer",
+      "threshold_hours": 17.37,
+      "title": "Change 2676 in area-E",
+      "url": "https://github.com/synthetic/repo/pull/2676"
+    },
+    {
+      "age_hours": 542.34,
+      "author": "dev07",
+      "baseline_source": "90d",
+      "critical_threshold_hours": 20.96,
+      "external_contributor": false,
+      "locations": [
+        "area-A"
+      ],
+      "number": 2838,
+      "repo": "synthetic/repo",
+      "severity": "critical",
+      "size_lines": 220,
+      "state": "waiting_merge",
+      "threshold_hours": 11.71,
+      "title": "Change 2838 in area-A",
+      "url": "https://github.com/synthetic/repo/pull/2838"
+    },
+    {
+      "age_hours": 738.84,
+      "author": "dev16",
       "baseline_source": "90d",
       "critical_threshold_hours": 37.5,
       "external_contributor": false,
       "locations": [
         "area-A"
       ],
-      "number": 1046,
+      "number": 2729,
       "repo": "synthetic/repo",
       "severity": "critical",
-      "size_lines": 91,
+      "size_lines": 1078,
       "state": "waiting_reviewer",
       "threshold_hours": 17.37,
-      "title": "Change 1046 in area-A",
-      "url": "https://github.com/synthetic/repo/pull/1046"
+      "title": "Change 2729 in area-A",
+      "url": "https://github.com/synthetic/repo/pull/2729"
     },
     {
-      "age_hours": 2761.32,
-      "author": "ext17",
+      "age_hours": 705.77,
+      "author": "dev24",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "external_contributor": true,
+      "critical_threshold_hours": 37.5,
+      "external_contributor": false,
       "locations": [
         "area-B"
       ],
-      "number": 1681,
+      "number": 2756,
       "repo": "synthetic/repo",
       "severity": "critical",
-      "size_lines": 293,
+      "size_lines": 7,
+      "state": "waiting_reviewer",
+      "threshold_hours": 17.37,
+      "title": "Change 2756 in area-B",
+      "url": "https://github.com/synthetic/repo/pull/2756"
+    },
+    {
+      "age_hours": 465.11,
+      "author": "dev31",
+      "baseline_source": "90d",
+      "critical_threshold_hours": 20.96,
+      "external_contributor": false,
+      "locations": [
+        "area-A"
+      ],
+      "number": 2844,
+      "repo": "synthetic/repo",
+      "severity": "critical",
+      "size_lines": 51,
       "state": "waiting_merge",
       "threshold_hours": 11.71,
-      "title": "Change 1681 in area-B",
-      "url": "https://github.com/synthetic/repo/pull/1681"
+      "title": "Change 2844 in area-A",
+      "url": "https://github.com/synthetic/repo/pull/2844"
+    },
+    {
+      "age_hours": 460.34,
+      "author": "dev12",
+      "baseline_source": "90d",
+      "critical_threshold_hours": 20.96,
+      "external_contributor": false,
+      "locations": [
+        "area-E"
+      ],
+      "number": 2869,
+      "repo": "synthetic/repo",
+      "severity": "critical",
+      "size_lines": 50,
+      "state": "waiting_merge",
+      "threshold_hours": 11.71,
+      "title": "Change 2869 in area-E",
+      "url": "https://github.com/synthetic/repo/pull/2869"
+    },
+    {
+      "age_hours": 456.69,
+      "author": "dev13",
+      "baseline_source": "90d",
+      "critical_threshold_hours": 20.96,
+      "external_contributor": false,
+      "locations": [
+        "area-E"
+      ],
+      "number": 2872,
+      "repo": "synthetic/repo",
+      "severity": "critical",
+      "size_lines": 76,
+      "state": "waiting_merge",
+      "threshold_hours": 11.71,
+      "title": "Change 2872 in area-E",
+      "url": "https://github.com/synthetic/repo/pull/2872"
+    },
+    {
+      "age_hours": 769.1,
+      "author": "dev18",
+      "baseline_source": "90d",
+      "critical_threshold_hours": 40.28,
+      "external_contributor": false,
+      "locations": [
+        "area-B"
+      ],
+      "number": 2714,
+      "repo": "synthetic/repo",
+      "severity": "critical",
+      "size_lines": 196,
+      "state": "waiting_author",
+      "threshold_hours": 20.73,
+      "title": "Change 2714 in area-B",
+      "url": "https://github.com/synthetic/repo/pull/2714"
+    },
+    {
+      "age_hours": 599.18,
+      "author": "dev30",
+      "baseline_source": "90d",
+      "critical_threshold_hours": 37.5,
+      "external_contributor": false,
+      "locations": [
+        "area-D"
+      ],
+      "number": 2823,
+      "repo": "synthetic/repo",
+      "severity": "critical",
+      "size_lines": 148,
+      "state": "waiting_reviewer",
+      "threshold_hours": 17.37,
+      "title": "Change 2823 in area-D",
+      "url": "https://github.com/synthetic/repo/pull/2823"
+    },
+    {
+      "age_hours": 381.22,
+      "author": "dev30",
+      "baseline_source": "90d",
+      "critical_threshold_hours": 20.96,
+      "external_contributor": false,
+      "locations": [
+        "area-C"
+      ],
+      "number": 2924,
+      "repo": "synthetic/repo",
+      "severity": "critical",
+      "size_lines": 14,
+      "state": "waiting_merge",
+      "threshold_hours": 11.71,
+      "title": "Change 2924 in area-C",
+      "url": "https://github.com/synthetic/repo/pull/2924"
     }
   ],
   "at_risk_summary": {
     "by_state": {
-      "waiting_author": 17,
+      "waiting_author": 5,
       "waiting_ci": 0,
-      "waiting_merge": 51,
-      "waiting_reviewer": 47
+      "waiting_merge": 16,
+      "waiting_reviewer": 19
     },
-    "critical": 113,
-    "total": 115
+    "critical": 38,
+    "total": 40
   },
   "bottleneck_analysis": {
     "ci": null,
     "locations": [
       {
-        "at_risk_prs": 41,
+        "at_risk_prs": 14,
         "inflow": 152,
         "location": "area-A",
         "merged_prs": 126,
@@ -391,7 +389,7 @@
         "waiting_reviewer_share": 0.2702
       },
       {
-        "at_risk_prs": 30,
+        "at_risk_prs": 12,
         "inflow": 118,
         "location": "area-B",
         "merged_prs": 94,
@@ -404,7 +402,7 @@
         "waiting_reviewer_share": 0.2188
       },
       {
-        "at_risk_prs": 21,
+        "at_risk_prs": 4,
         "inflow": 114,
         "location": "area-C",
         "merged_prs": 100,
@@ -417,7 +415,7 @@
         "waiting_reviewer_share": 0.2083
       },
       {
-        "at_risk_prs": 13,
+        "at_risk_prs": 4,
         "inflow": 88,
         "location": "area-D",
         "merged_prs": 76,
@@ -430,7 +428,7 @@
         "waiting_reviewer_share": 0.1518
       },
       {
-        "at_risk_prs": 12,
+        "at_risk_prs": 7,
         "inflow": 54,
         "location": "area-E",
         "merged_prs": 45,
@@ -443,7 +441,7 @@
         "waiting_reviewer_share": 0.0738
       },
       {
-        "at_risk_prs": 2,
+        "at_risk_prs": 1,
         "inflow": 12,
         "location": "dir:src/D",
         "merged_prs": 11,
@@ -456,7 +454,7 @@
         "waiting_reviewer_share": 0.0468
       },
       {
-        "at_risk_prs": 3,
+        "at_risk_prs": 0,
         "inflow": 16,
         "location": "other",
         "merged_prs": 14,
@@ -589,47 +587,47 @@
       "reviews": 967
     },
     "review_queue": {
-      "open_growth_rel": 0.4412,
+      "open_growth_rel": 2.5,
       "weeks": [
         {
           "days": 7,
           "inflow": 94,
-          "open_at_week_end": 34,
+          "open_at_week_end": 6,
           "outflow": 88,
           "week_start": "2026-01-19"
         },
         {
           "days": 7,
           "inflow": 86,
-          "open_at_week_end": 36,
+          "open_at_week_end": 8,
           "outflow": 80,
           "week_start": "2026-01-26"
         },
         {
           "days": 7,
           "inflow": 73,
-          "open_at_week_end": 38,
+          "open_at_week_end": 10,
           "outflow": 69,
           "week_start": "2026-02-02"
         },
         {
           "days": 7,
           "inflow": 109,
-          "open_at_week_end": 49,
+          "open_at_week_end": 21,
           "outflow": 93,
           "week_start": "2026-02-09"
         },
         {
           "days": 7,
           "inflow": 80,
-          "open_at_week_end": 41,
+          "open_at_week_end": 13,
           "outflow": 84,
           "week_start": "2026-02-16"
         },
         {
           "days": 7,
           "inflow": 90,
-          "open_at_week_end": 49,
+          "open_at_week_end": 21,
           "outflow": 80,
           "week_start": "2026-02-23"
         }
@@ -671,7 +669,7 @@
           "label": "Open queue growth",
           "ref": "/bottleneck_analysis/review_queue/open_growth_rel",
           "unit": "change",
-          "value": 0.4412
+          "value": 2.5
         }
       ],
       "id": "review_queue_growth",
@@ -680,7 +678,7 @@
       "location": null,
       "rank": 1,
       "recommendation": "Review demand exceeds capacity: rebalance review load or temporarily limit work in progress until the queue stops growing.",
-      "severity": "medium",
+      "severity": "high",
       "title": "Review queue is growing",
       "type": "review_queue_growth",
       "what_if": null
@@ -1209,11 +1207,11 @@
   },
   "headline": "Median cycle time is 40.0h (-2% vs previous period, not significant); the main bottleneck is review queue is growing (51% of PR time waits on reviewers).",
   "links": {
-    "narrative": "/v1/snapshots/s_0a5ef79a77db7a6a/narrative",
-    "self": "/v1/snapshots/s_0a5ef79a77db7a6a"
+    "narrative": "/v1/snapshots/s_07746dc26a4beed1/narrative",
+    "self": "/v1/snapshots/s_07746dc26a4beed1"
   },
   "meta": {
-    "analytics_version": "1.2.0",
+    "analytics_version": "1.3.0",
     "ci_source": "none",
     "comparison_available": true,
     "data_freshness": [
@@ -1241,7 +1239,7 @@
       "closed_unmerged_prs": 48,
       "human_reviews": 967,
       "merged_prs": 448,
-      "open_prs_at_as_of": 120,
+      "open_prs_at_as_of": 45,
       "ready_prs": 532
     },
     "schema_version": "1",
@@ -1551,16 +1549,16 @@
   },
   "signals": {
     "at_risk_reviewer_top_location_share": {
-      "change_abs": 0.0301,
-      "change_rel": 0.0969,
+      "change_abs": 0.0957,
+      "change_rel": 0.3509,
       "extra": {},
-      "n": 47,
-      "n_previous": 29,
-      "previous": 0.3103,
+      "n": 19,
+      "n_previous": 11,
+      "previous": 0.2727,
       "significant": null,
       "status": "ok",
       "unit": "share",
-      "value": 0.3404
+      "value": 0.3684
     },
     "external_pickup_ratio": {
       "change_abs": 0.29,
@@ -1620,7 +1618,7 @@
       "value": null
     }
   },
-  "snapshot_id": "s_0a5ef79a77db7a6a",
+  "snapshot_id": "s_07746dc26a4beed1",
   "time_ledger": {
     "ci_coverage": 0.0,
     "ci_data_available": false,
