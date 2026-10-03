@@ -7,11 +7,14 @@ import {
   pendingText,
 } from "./api";
 import { dateRange } from "./format";
+import { periodError } from "./period";
 import type {
   Audience,
+  DateLimits,
   Params,
   Pending,
   RepoStatus,
+  RepoList,
   Snapshot,
 } from "./types";
 import { Controls } from "./components/Controls";
@@ -36,21 +39,21 @@ export default function App() {
     initial.get("audience") === "director" ? "director" : "manager",
   );
   const [repos, setRepos] = useState<RepoStatus[]>([]);
+  const [dateLimits, setDateLimits] = useState<DateLimits | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<ApiProblem | null>(null);
   const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
-  const validDate = (value: string) =>
-    /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value));
-  const invalid =
-    !validDate(params.from) || !validDate(params.to) || params.from > params.to;
+  const validationError = periodError(params, dateLimits);
+  const invalid = validationError !== null;
   useEffect(() => {
     const controller = new AbortController();
-    fetchJson<{ items: RepoStatus[] }>("/v1/repos", controller.signal)
+    fetchJson<RepoList>("/v1/repos", controller.signal)
       .then((r) => {
         if (controller.signal.aborted) return;
         setRepos(r.data.items);
+        setDateLimits(r.data.date_limits);
         setParams((p) => ({
           ...p,
           repo: r.data.items.some((repo) => repo.repo === p.repo)
@@ -79,7 +82,8 @@ export default function App() {
     const controller = new AbortController();
     setSnapshot(null);
     setPending(null);
-    if (!params.repo || invalid) {
+    if (!params.repo || invalid || !dateLimits) {
+      if (params.repo && invalid) setError(null);
       setLoading(false);
       return () => controller.abort();
     }
@@ -109,7 +113,7 @@ export default function App() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [params.repo, params.from, params.to, refresh, invalid]);
+  }, [params.repo, params.from, params.to, refresh, invalid, dateLimits]);
   return (
     <>
       <a className="skip-link" href="#main">
@@ -133,13 +137,21 @@ export default function App() {
           repos={repos}
           audience={audience}
           setAudience={setAudience}
-          invalid={invalid}
+          dateLimits={dateLimits}
+          validationError={validationError}
           refresh={() => setRefresh((r) => r + 1)}
         />
         {error && (
           <div className="error-banner" role="alert">
             <strong>{error.title}</strong>
             <p>{error.detail}</p>
+            {error.errors.length > 0 && (
+              <ul>
+                {error.errors.map((item, index) => (
+                  <li key={index}>{item.param}: {item.message}</li>
+                ))}
+              </ul>
+            )}
             {error.request_id && <small>Request {error.request_id}</small>}
           </div>
         )}
@@ -179,6 +191,10 @@ export default function App() {
           <div className="report">
             <Headline snapshot={snapshot} />
             <KpiGrid snapshot={snapshot} />
+            <NarrativePanel
+              snapshotId={snapshot.snapshot_id}
+              audience={audience}
+            />
             <TimeLedgerChart snapshot={snapshot} />
             <Bottlenecks snapshot={snapshot} audience={audience} />
             {audience === "manager" && (
@@ -197,10 +213,6 @@ export default function App() {
                 />
               </>
             )}
-            <NarrativePanel
-              snapshotId={snapshot.snapshot_id}
-              audience={audience}
-            />
             <footer className="report-footer">
               <span>Delivery Insights · Evidence before conclusions.</span>
               <code>{snapshot.snapshot_id}</code>

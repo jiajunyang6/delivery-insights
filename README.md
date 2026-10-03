@@ -28,7 +28,18 @@ Open [the dashboard](http://localhost:5173) or [the API docs](http://localhost:8
 On PowerShell, use `if (!(Test-Path .env)) { Copy-Item .env.example .env }`; keep existing credentials.
 The API and UI bind to loopback. Postgres and Redis have no published host ports.
 
-The worker backfills `dotnet/runtime` in 7-, 30- and 180-day stages by default.
+The dashboard reads supported UTC dates from `/v1/repos` and disables presets outside
+the configured `BACKFILL_DAYS` horizon. The default period is Last 30 days; presets are
+Last 7 days, Last 30 days, and Last 60 days. With `BACKFILL_DAYS=30`, Last 60 days is unavailable;
+use a horizon of at least 60 days and allow the worker to backfill before requesting it.
+Configured dates are distinct from collected coverage: incomplete coverage returns `202`.
+
+Delivery Overview shows outcomes and the top three bottlenecks. PR & Review Details also
+shows all bottlenecks, review queues, areas, and at-risk PRs. Both place the evidence
+narrative immediately after Delivery outcomes; the dashboard omits the Quality guardrail panel.
+
+The worker backfills `dotnet/runtime` in 7-, 30-day stages and then the configured
+`BACKFILL_DAYS` horizon (120 days in `.env.example`).
 Until a requested period is covered, the API returns `202` with `Retry-After` and the UI
 shows progress. For the verified 30-day demo, set `BACKFILL_DAYS=30` and `PRECOMPUTE_DAYS=7,30`.
 
@@ -424,6 +435,7 @@ uv run pytest
 uv run python -m insights_eval.run --llm stub
 cd ../frontend
 npm ci
+npm test
 npm run typecheck
 npm run build
 npm run dev

@@ -341,40 +341,6 @@ main {
 .kpi small {
   font-size: 10px;
 }
-.guardrail {
-  display: flex;
-  align-items: center;
-  gap: 35px;
-  padding: 17px 20px;
-  background: #e7eee4;
-  border: 1px solid #d9e3d4;
-  border-radius: 8px;
-  margin-top: 13px;
-  font-size: 12px;
-}
-.guardrail > div {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-right: auto;
-}
-.guardrail > div span {
-  color: #5b715a;
-  font-size: 11px;
-}
-.guardrail p {
-  margin: 0;
-}
-.guardrail b {
-  margin-left: 6px;
-}
-.guardrail.warning {
-  background: #fff3dc;
-  border-color: #efd298;
-}
-.guardrail.warning > div span {
-  color: #946324;
-}
 .panel {
   padding: 25px 27px;
   background: white;
@@ -884,9 +850,6 @@ tbody tr:hover {
   .kpi {
     padding: 18px;
   }
-  .guardrail {
-    gap: 20px;
-  }
 }
 @media (max-width: 720px) {
   main {
@@ -925,13 +888,6 @@ tbody tr:hover {
   }
   .kpi-value {
     font-size: 28px;
-  }
-  .guardrail {
-    gap: 10px 20px;
-    flex-wrap: wrap;
-  }
-  .guardrail > div {
-    width: 100%;
   }
   .section-heading {
     align-items: flex-start;

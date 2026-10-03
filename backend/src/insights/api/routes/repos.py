@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from insights.api.deps import get_arq, get_now, get_redis, get_session, get_settings
 from insights.api.errors import ProblemError
 from insights.api.params import parse_repo_path
-from insights.api.schemas import RepoList, RepoStatus, SyncJobResponse
+from insights.api.schemas import DateLimits, RepoList, RepoStatus, SyncJobResponse
 from insights.config import Settings
 from insights.db.models import Repository, SyncJob
 from insights.redis import sync_cooldown_key
@@ -85,7 +85,14 @@ async def repositories(
                 latest_job=job_response(job, name) if job else None,
             )
         )
-    return RepoList(items=items)
+    return RepoList(
+        items=items,
+        date_limits=DateLimits(
+            earliest_from=now.date() - timedelta(days=settings.backfill_days),
+            latest_to=now.date(),
+            max_days=366,
+        ),
+    )
 
 
 def validated_repo_path(
