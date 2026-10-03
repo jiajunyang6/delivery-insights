@@ -3,9 +3,9 @@
 Final local acceptance was performed on 2026-10-02 Pacific time.
 The identifiers below map one-to-one to the supplied `docs/plan/12-acceptance-checklist.md`.
 That supplied file is preserved as the original requirements source.
-"Pending credentials" and "Pending human" are explicit exclusions, never implicit passes.
-Synthetic results do not establish live GitHub behavior or causal validity. Bedrock was called
-with real credentials, using only synthetic evidence; all eight evaluation gates passed.
+The user limited live backfill to 30 days; original 90/180-day checks are explicitly excluded.
+Real dotnet/runtime and Bedrock checks are recorded in live-acceptance.json. Human review
+and causal validity remain unverified; all eight synthetic Bedrock evaluation gates passed.
 
 ## Functional checks
 
@@ -13,25 +13,25 @@ with real credentials, using only synthetic evidence; all eight evaluation gates
 |---|---|---|
 | A1 | Passed locally | Fresh clone of 8971fdf, empty example credentials and fresh volume: build/start succeeded, migrate exited 0, API healthy, worker running, UI 200. |
 | A2 | Passed locally | Real Redis stop produced readiness 503 with checks.redis=error; restart restored 200. Worker restarted automatically; checked two startup records and its running process. |
-| A3 | Pending credentials | Live dotnet/runtime staged 7/30/180-day backfill and open sweep. Mocked-source real-database checkpoint tests pass. |
-| A4 | Pending credentials | Live 7/30/90-day snapshots and 304. Synthetic 42/90-day HTTP snapshots and ETag behavior pass. |
-| A5 | Passed locally | Real Postgres/Redis tests cover all five readiness reasons; browser showed `rederive` and `stale` Pending progress. |
-| A6 | Pending credentials | Nine live curl groups require synchronized dotnet/runtime. Equivalent local status/header paths have automated and synthetic HTTP evidence. |
-| A7 | Pending credentials | Real-repo drilldown totals pending. Synthetic merged rows=427 and at-risk rows=97 exactly match snapshot totals. |
+| A3 | Passed for requested scope | Real 7-day then 30-day checkpoints and open sweep observed. Final target=30, backfill_complete=true, last_sync_status=ok. User stopped the continuing 180-day stage; extra fetched rows retained. |
+| A4 | Passed for requested scope | Real 7/30-day snapshots return 200 with all fields, conditional 304 and immutable by-ID bodies. The 90-day request now returns 422 outside the configured 30-day horizon; not claimed as a 90-day pass. |
+| A5 | Passed locally and live | Five readiness reasons covered by integration tests. Live initial backfill returned 202/Retry-After/Location; codeowners restart showed rederive readiness before publication. |
+| A6 | Passed for requested scope | Live health/ready/repos, 7/30-day insight, snapshot/304, narrative/304, drilldown, manual job/cooldown, org identity and input rejection checked. Original 90-day request excluded. |
+| A7 | Passed with real GitHub | All 533 merged rows and 321 at-risk rows reconcile to the 30-day snapshot totals. |
 | A8 | Passed locally | All four synthetic template variants return 200/304 and `llm_disabled`; integration verifies persistent `model_id=template`. HTTP success cache is exactly `private, max-age=3600`. |
-| A9 | Pending credentials | Four real Bedrock HTTP variants on a synthetic 42-day snapshot pass, including three evidence-value checks each and 304. The specified dotnet/runtime 30-day narrative and human spot check still require GitHub data. |
-| A10 | Passed locally | Isolated stack returned 202 + Location, readable job, then 429 + Retry-After. |
-| A11 | Passed locally | Integration and synthetic HTTP confirm one-repo `org=` and `repo=` identities are equal. |
+| A9 | Passed with real GitHub and Bedrock | Four director/manager x en/zh variants return llm, validation=passed and 304, after one repair each. Cited values checked against snapshot refs; e.g. E1 34.17h -> 34h, E6 0.58 -> 58%, E25 -> 321. |
+| A10 | Passed locally and live | Real manual sync returned 202 plus readable Location; repeat returned 429 and Retry-After. The resulting 30-day job succeeded. |
+| A11 | Passed locally and live | One-repo org=dotnet and repo=dotnet/runtime produce the same real snapshot ID. |
 | A12 | Passed locally | Live local `/docs` 200 and OpenAPI contains all nine paths and typed response contracts. |
 
 ## Correctness and code quality
 
 | Item | State | Evidence |
 |---|---|---|
-| B1 | Passed locally | 336 tests: 287 unit, 49 integration. All 22 timeline cases, 200 randomized invariant sequences, shuffled-input byte determinism and golden checks pass. |
-| B2 | Pending credentials | Live repository invariants pending. Stored synthetic data: 2,172 PRs, zero violations. |
-| B3 | Pending credentials | A person must compare three real PRs against GitHub timestamps; no invented PR numbers or spot-check claims. |
-| B4 | Pending credentials | Real ledger reconciliation pending. Synthetic 427-row reconciliation has relative rounding error 0.00000765 (<0.1%). |
+| B1 | Passed locally | 338 tests: 288 unit, 50 integration. All 22 timeline cases, 200 randomized invariant sequences, shuffled-input byte determinism and golden checks pass. |
+| B2 | Passed with real GitHub | Invariants CLI: 3541 PRs, 0 violations after CI/ownership rederivation. |
+| B3 | Passed by agent | Compared GitHub pages for #135083, #135101 and #135130 with DB ready/first-human-review/merged times. All nine differences are zero seconds. These were opened ready; no draft transition appears. This is agent verification, not human signoff. |
+| B4 | Passed with real GitHub | 533 rows sum to 62070.04h; snapshot=62070.01h. Relative rounding error=0.0000004833, below 0.1%. |
 | B5 | Passed locally | Quantile/rate/location/driver/cohort sample gates return null with explicit status where required. |
 | B6 | Pending human | Review `backend/tests/golden/snapshot_seed42.json` key values. Independent arithmetic is tested, but the agent cannot claim human review. M5/M8/M9/M10 commits explain golden changes. |
 | C1 | Passed locally | Ruff check and format: pass (122 files); strict mypy: pass (77 source/eval files). Exact Makefile uv subcommands ran on Windows without GNU make. |
@@ -47,7 +47,7 @@ with real credentials, using only synthetic evidence; all eight evaluation gates
 |---|---|---|
 | D1 | Passed locally | Full `git log -p --all`, excluding supplied plan, has zero matches for the required credential patterns. Final archive procedure repeats the check. |
 | D2 | Passed locally | `.env` is ignored; both example token variables are empty. |
-| D3 | Pending credentials | After real Bedrock HTTP calls, the literal Bedrock key occurs zero times in captured API/worker logs; GitHub token scan still needs a real GitHub call. Exception regression tests prove untrusted exception text is omitted from JSON logs. |
+| D3 | Passed with real credentials | After actual GitHub sync and Bedrock calls, literal GitHub and Bedrock key matches in captured API/worker logs are both zero. Exception regression tests pass. |
 | D4 | Passed locally | Integration and live local malformed repo/date/cursor return 422; untracked repo returns 403. Error details do not echo raw invalid input. |
 | D5 | Passed locally | No request-controlled upstream host; REST rejects absolute URLs; adapter/client tests pass. |
 | D6 | Passed locally | Every SQL text call reviewed: static schema defaults, `SELECT 1` or `SET TRANSACTION READ ONLY`; application data uses SQLAlchemy binding. |
@@ -55,10 +55,10 @@ with real credentials, using only synthetic evidence; all eight evaluation gates
 | D8 | Passed locally | Sanitized 500 response tests pass; exception messages/tracebacks are excluded. |
 | D9 | Passed locally | Container UIDs: api=10001, worker=10001, web=101. |
 | D10 | Passed locally | No dangerous HTML rendering. React text plus strict HTTPS GitHub hostname/userinfo/port checks for external links. |
-| E1 | Pending credentials | dotnet/runtime 90-day cold compute threshold unverified. Synthetic cold HTTP: 526.27 ms, 894 merged PRs. |
-| E2 | Pending credentials | Real-repo warm p95 unverified. Synthetic 50-request warm HTTP p95: 35.83 ms through nginx. |
+| E1 | 90-day scope excluded | User limited collection to 30 days. Observed 30-day worker cold computation=1376.95ms for 533 merged PRs; no claim of passing the original 90-day gate. |
+| E2 | Passed with real GitHub | 30-day cached API HTTP: 50 requests, p95=32.32ms, below 300ms. Local loopback measurement, not a production load test. |
 | E3 | Passed locally | API import isolation test confirms no `insights.sources` modules loaded. |
-| E4 | Passed locally / live pending | Batched upserts/events/files and bounded GraphQL pagination reviewed/tested. Live quota remaining above 1,000 requires GitHub. |
+| E4 | Passed locally and live | Batching and bounded pagination tested. Lowest captured GraphQL rate_limit_remaining=4671, above 1000. |
 | E5 | Passed locally | Linkage uses keyed lookup; author concurrency uses sorted timestamps/bisect, without pairwise PR scans. |
 | E6 | Passed locally | Snapshot/PR-row computation and boto3 use `asyncio.to_thread`. |
 
@@ -66,12 +66,12 @@ with real credentials, using only synthetic evidence; all eight evaluation gates
 
 | Item | State | Evidence |
 |---|---|---|
-| F1 | Passed locally / live pending | Final code started from a clean clone using the README Compose/copy commands (PowerShell copy equivalent). Real Bedrock eval passed; GitHub curl/smoke remain pending. Final-commit clean-clone evidence is included in the external delivery report. |
+| F1 | Passed locally and live | Clean-clone startup/Redis recovery tested at 4019880; subsequent fixes built and run in the live Compose stack. Final archive comes from a fresh clean clone. Guarded Quickstart copy preserves .env. No claim of rerunning every old check on each later commit. |
 | F2 | Passed locally | All 28 captured API/worker lines parsed as JSON, including the outage; 11 access records contain all required fields. Three exception regressions and worker recovery pass. |
 | F3 | Passed locally | Empty token: API/UI start, repos reports `missing_token`, insights return 503 `data-unavailable`. |
-| F4 | Pending credentials | Full `make smoke` needs live data; shell syntax and underlying local HTTP contracts are checked. |
-| F5 | Pending credentials | Live worker restart/backfill-resume demonstration pending; real-DB mocked-source interrupted phase/rederive tests pass. |
-| G1 | Passed locally | README has all 12 required sections within 300–450 lines; commands match Compose/Makefile. Measured numbers are explicitly synthetic/local. |
+| F4 | Passed with real GitHub and Bedrock | Unmodified Python body of scripts/smoke.sh ran on Windows with API=127.0.0.1:8000: all five endpoints 200; narrative generated_by=llm, validation=passed; exit 0. |
+| F5 | Passed with real GitHub | Restarted worker during 30-day phase. Same job resumed, start timestamp advanced, saved cursor advanced, rows retained 1787 -> 2032 and 7-day checkpoint was not restarted. |
+| G1 | Passed locally | README includes required sections within 300-450 lines. Commands preserve existing credentials; measured real/synthetic values and excluded scope are distinguished. |
 | G2 | Passed locally | Trade-offs, omissions, completed extras and limitations match implementation; uncalibrated confidence and deferred chain time are explicit. |
 | G3 | Prepared by delivery step | The accompanying delivery report records milestone gates, tests/eval, deviations, pending items, packaging checks and limitations. |
 | G4 | Pending human finalization | No agent placeholders remain. Three supplied confirm placeholders remain verbatim for the human; no human ownership/review is fabricated. |
@@ -84,11 +84,11 @@ with real credentials, using only synthetic evidence; all eight evaluation gates
 |---|---|---|
 | H1 | Passed offline | 20 runs, all gates pass, exit 0. Root-cause=14/16; no-signal abstention=4/4; high precision=14/14; validity/numeric/citation/hedge=20/20; fallback=0/20. |
 | H2 | Passed with real Bedrock | Prompt v3: 20 cases; first-attempt 18/20; numeric/citation/hedge 19/19; root-cause 14/16; abstention 4/4; high precision 14/14; fallback 1/20. All gates pass, exit 0. Earlier v1/v2 failures retained. |
-| H3 | Passed by agent / human pending | npm ci/typecheck/build pass, npm audit zero; UI/proxied health 200. Browser checked audience, language, citation highlighting, 20→50→97 pagination, date presets and 202 progress. Human visual signoff is pending. |
-| H4 | Pending credentials | Live area owner counts and CODEOWNERS-mode rederivation pending. Parser and ownership-invalidation integration tests pass. |
-| H5 | Passed locally | CI object/coverage contract, mapping and overlap accounting tested; default incomplete-CI hypothesis cap tested at 0.50. |
+| H3 | Passed by agent / human pending | npm ci/typecheck/build pass; final nginx image builds and nginx -t passes. Real dashboard/proxy return 200 after API recreation; director/manager and EN/Chinese show validated output. Earlier citation/pagination/pending checks retained. Human visual signoff pending. |
+| H4 | Passed with real GitHub | 83 CODEOWNERS plus 134 area-owner rules loaded. 11 displayed area locations have owners_count; missing mappings remain null. Restart in codeowners mode rederived 3541 PRs: 267 merged PRs attributed by rules, 266 directory fallbacks. Restored label mode and verified rederivation. |
+| H5 | Passed locally and live | 1171 Actions runs loaded; 30-day CI coverage=36.77%. CI_COMPLETE=false retained; incomplete-CI hypothesis cap tested at 0.50. Azure Pipelines is outside the source. |
 | H6 | Passed locally | Drivers, survival, historical predictability are typed and tested; intentional golden update described in M9. |
-| H7 | Passed locally | Director/manager × English/Chinese templates and real Bedrock variants pass validators and local HTTP evidence/ETag checks. |
+| H7 | Passed locally and live | All four real dotnet/runtime narrative variants pass validation and 304 after one repair each. Offline/template and synthetic Bedrock tests also pass. |
 
 ## Interpreting these results
 
@@ -100,11 +100,14 @@ synthetic fixture assumption, not an inferred real-world mechanism.
 
 The full suite reports nine upstream deprecation warnings (Testcontainers and pathspec).
 Recharts 2 emits a deprecation notice; its current locked npm tree has zero audit findings.
-Real Bedrock calls used the user-provided key without committing it. Live GitHub, remote CI,
-production deployment, human review and public submission remain unverified. The pending rows above are the handoff checklist.
+Real GitHub and Bedrock calls used restored user credentials without printing or committing them.
+Remote CI, production deployment, human review and public submission remain unverified.
+90/180-day live checks are excluded by user request, not represented as passes.
 
 The real model evaluation uses the same synthetic cases during prompt refinement, not a
 held-out set. Its first-attempt rate is exactly the minimum gate; variation on future calls
 is expected. The remaining fallback is a chain-citation violation, not a hidden success.
 `eval-bedrock-v1.json` and `eval-bedrock-v2.json` retain the failed baselines; `bedrock-http.json`
-records final-version endpoint behavior and literal-key log scanning. Root `.env` is preserved.
+records synthetic endpoint behavior; live-acceptance.json records the real-repository run.
+The user overwrote .env with the example and restored both tokens; guarded setup now avoids this.
+The local .env retains the requested 30-day horizon and 7/30-day precompute settings.
