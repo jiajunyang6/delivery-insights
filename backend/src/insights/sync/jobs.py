@@ -236,7 +236,11 @@ class SyncRun:
             now_for(self.ctx) - timedelta(minutes=self.settings.open_sweep_minutes)
         ):
             await self.open_sweep()
-        await self.checkpoint(last_sync_status="ok", last_sync_error=None)
+        await self.checkpoint(
+            last_sync_status="ok",
+            last_sync_error=None,
+            backfill_target_days=self.settings.backfill_days,
+        )
 
 
 async def sync_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
