@@ -18,14 +18,14 @@ repository permissions. The commands below are for a POSIX shell.
 Image builds and initial backfill take longer than the setup steps.
 
 ```bash
-cp .env.example .env
+[ -f .env ] || cp .env.example .env
 # Edit .env: set GITHUB_TOKEN; optionally set AWS_BEARER_TOKEN_BEDROCK.
 docker compose up --build -d
 docker compose ps -a
 ```
 
 Open [the dashboard](http://localhost:5173) or [the API docs](http://localhost:8000/docs).
-On Windows, `Copy-Item .env.example .env` replaces the first command; Compose is unchanged.
+On PowerShell, use `if (!(Test-Path .env)) { Copy-Item .env.example .env }`; keep existing credentials.
 The API and UI bind to loopback. Postgres and Redis have no published host ports.
 
 The worker backfills `dotnet/runtime` in 7-, 30- and 180-day stages by default.

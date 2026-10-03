@@ -172,3 +172,38 @@ async def test_incremental_runs_before_resumed_backfill(context, github_page):
     assert seen[:2] == [None, "resume"]
     repo, _ = await load_state(context)
     assert repo.covered_since == NOW - timedelta(days=180)
+
+
+async def test_reduced_backfill_target_preserves_coverage_without_resuming_history(
+    context, github_page
+):
+    import orjson
+
+    context["settings"] = context["settings"].model_copy(update={"backfill_days": 30})
+    job, _ = await queued(context)
+    covered_since = NOW - timedelta(days=30)
+    async with context["session_factory"]() as session, session.begin():
+        await session.execute(
+            update(Repository).values(
+                covered_since=covered_since,
+                backfill_cursor="unfinished-180-day-cursor",
+                backfill_target_days=180,
+                sync_watermark=NOW - timedelta(hours=2),
+                last_open_sweep_at=NOW,
+            )
+        )
+    seen = []
+
+    def respond(request):
+        variables = orjson.loads(request.content)["variables"]
+        seen.append(variables["cursor"])
+        return httpx.Response(200, json=response_page(github_page, 1, 1))
+
+    context["router"].post("https://api.github.com/graphql").mock(side_effect=respond)
+    assert await sync_repo(context, "a/b", "backfill", str(job.id)) == "succeeded"
+    repo, jobs = await load_state(context)
+    assert seen and all(cursor is None for cursor in seen)
+    assert repo.covered_since == covered_since
+    assert repo.backfill_cursor == "unfinished-180-day-cursor"
+    assert repo.backfill_target_days == 30 and repo.last_sync_status == "ok"
+    assert jobs[0].status == "succeeded"
