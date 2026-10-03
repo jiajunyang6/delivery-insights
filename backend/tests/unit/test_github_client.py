@@ -173,3 +173,30 @@ async def test_rest_etag_cache(client):
 async def test_rest_rejects_absolute_urls(client, path):
     with pytest.raises(ValueError):
         await client.rest_get(path)
+
+
+async def test_public_repo_token_retains_team_request_without_org_scope(client, github_page):
+    node = github_page["data"]["repository"]["pullRequests"]["nodes"][0]
+    node["timelineItems"]["nodes"].append(
+        {
+            "__typename": "ReviewRequestedEvent",
+            "id": "team-request",
+            "createdAt": "2026-01-01T12:00:00Z",
+            "actor": {"__typename": "User", "login": "requester"},
+            "requestedReviewer": {"__typename": "Team"},
+        }
+    )
+
+    def public_repo_only(request):
+        query = orjson.loads(request.content)["query"]
+        if "slug" in query:
+            return httpx.Response(200, json={"errors": [{"type": "INSUFFICIENT_SCOPES"}]})
+        return httpx.Response(200, json=github_page)
+
+    client.router.post(URL).mock(side_effect=public_repo_only)
+    page = await GitHubAdapter(client).pull_requests_page(
+        RepoRef("a", "b"), cursor=None, page_size=25
+    )
+    team = next(e for e in page.prs[0].events if e.payload.get("reviewer_type") == "Team")
+    assert team.payload["reviewer"] is None
+    assert team.occurred_at.isoformat() == "2026-01-01T12:00:00+00:00"

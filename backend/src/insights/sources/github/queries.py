@@ -1,187 +1,111 @@
-FRAGMENTS = (
-    "fragment ActorFields on Actor {\n"
-    "  __typename\n"
-    "  login\n"
-    "}\n"
-    "\n"
-    "fragment TimelineFields on PullRequestTimelineItems {\n"
-    "  __typename\n"
-    "  ... on Node { id }\n"
-    "  ... on ReadyForReviewEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on ConvertToDraftEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on ReviewRequestedEvent {\n"
-    "    createdAt\n"
-    "    actor { ...ActorFields }\n"
-    "    requestedReviewer { __typename ... on User { login } ... on Team { slug } "
-    "}\n"
-    "  }\n"
-    "  ... on ReviewRequestRemovedEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on PullRequestReview { id state submittedAt author { ...ActorFields } }\n"
-    "  ... on ReviewDismissedEvent { createdAt actor { ...ActorFields } previousRev"
-    "iewState review { id author { ...ActorFields } } }\n"
-    "  ... on PullRequestCommit { commit { oid authoredDate committedDate messageHe"
-    "adline messageBody } }\n"
-    "  ... on HeadRefForcePushedEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on IssueComment { createdAt author { ...ActorFields } }\n"
-    "  ... on LabeledEvent { createdAt actor { ...ActorFields } label { name } }\n"
-    "  ... on UnlabeledEvent { createdAt actor { ...ActorFields } label { name } }\n"
-    "  ... on ClosedEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on ReopenedEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on MergedEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on CrossReferencedEvent {\n"
-    "    createdAt\n"
-    "    willCloseTarget\n"
-    "    source {\n"
-    "      __typename\n"
-    "      ... on PullRequest { number state mergedAt author { ...ActorFields } rep"
-    "ository { nameWithOwner } }\n"
-    "    }\n"
-    "  }\n"
-    "}\n"
-    "\n"
-)
+FRAGMENTS = """fragment ActorFields on Actor {
+  __typename
+  login
+}
+
+fragment TimelineFields on PullRequestTimelineItems {
+  __typename
+  ... on Node { id }
+  ... on ReadyForReviewEvent { createdAt actor { ...ActorFields } }
+  ... on ConvertToDraftEvent { createdAt actor { ...ActorFields } }
+  ... on ReviewRequestedEvent {
+    createdAt
+    actor { ...ActorFields }
+    requestedReviewer { __typename ... on User { login } }
+  }
+  ... on ReviewRequestRemovedEvent { createdAt actor { ...ActorFields } }
+  ... on PullRequestReview { id state submittedAt author { ...ActorFields } }
+  ... on ReviewDismissedEvent { createdAt actor { ...ActorFields } previousReviewState review {
+    id author { ...ActorFields } } }
+  ... on PullRequestCommit { commit { oid authoredDate committedDate messageHeadline messageBody
+    } }
+  ... on HeadRefForcePushedEvent { createdAt actor { ...ActorFields } }
+  ... on IssueComment { createdAt author { ...ActorFields } }
+  ... on LabeledEvent { createdAt actor { ...ActorFields } label { name } }
+  ... on UnlabeledEvent { createdAt actor { ...ActorFields } label { name } }
+  ... on ClosedEvent { createdAt actor { ...ActorFields } }
+  ... on ReopenedEvent { createdAt actor { ...ActorFields } }
+  ... on MergedEvent { createdAt actor { ...ActorFields } }
+  ... on CrossReferencedEvent {
+    createdAt
+    willCloseTarget
+    source {
+      __typename
+      ... on PullRequest { number state mergedAt author { ...ActorFields } repository {
+    nameWithOwner } }
+    }
+  }
+}
+
+"""
+
 PULL_REQUESTS_PAGE = (
-    "fragment ActorFields on Actor {\n"
-    "  __typename\n"
-    "  login\n"
-    "}\n"
-    "\n"
-    "fragment TimelineFields on PullRequestTimelineItems {\n"
-    "  __typename\n"
-    "  ... on Node { id }\n"
-    "  ... on ReadyForReviewEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on ConvertToDraftEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on ReviewRequestedEvent {\n"
-    "    createdAt\n"
-    "    actor { ...ActorFields }\n"
-    "    requestedReviewer { __typename ... on User { login } ... on Team { slug } "
-    "}\n"
-    "  }\n"
-    "  ... on ReviewRequestRemovedEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on PullRequestReview { id state submittedAt author { ...ActorFields } }\n"
-    "  ... on ReviewDismissedEvent { createdAt actor { ...ActorFields } previousRev"
-    "iewState review { id author { ...ActorFields } } }\n"
-    "  ... on PullRequestCommit { commit { oid authoredDate committedDate messageHe"
-    "adline messageBody } }\n"
-    "  ... on HeadRefForcePushedEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on IssueComment { createdAt author { ...ActorFields } }\n"
-    "  ... on LabeledEvent { createdAt actor { ...ActorFields } label { name } }\n"
-    "  ... on UnlabeledEvent { createdAt actor { ...ActorFields } label { name } }\n"
-    "  ... on ClosedEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on ReopenedEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on MergedEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on CrossReferencedEvent {\n"
-    "    createdAt\n"
-    "    willCloseTarget\n"
-    "    source {\n"
-    "      __typename\n"
-    "      ... on PullRequest { number state mergedAt author { ...ActorFields } rep"
-    "ository { nameWithOwner } }\n"
-    "    }\n"
-    "  }\n"
-    "}\n"
-    "\n"
-    "query PullRequestsPage($owner: String!, $name: String!, $pageSize: Int!, $curs"
-    "or: String, $states: [PullRequestState!]) {\n"
-    "  rateLimit { cost remaining resetAt }\n"
-    "  repository(owner: $owner, name: $name) {\n"
-    "    nameWithOwner\n"
-    "    isArchived\n"
-    "    defaultBranchRef { name }\n"
-    "    pullRequests(first: $pageSize, after: $cursor, states: $states, orderBy: {"
-    "field: UPDATED_AT, direction: DESC}) {\n"
-    "      pageInfo { hasNextPage endCursor }\n"
-    "      nodes {\n"
-    "        id\n"
-    "        number\n"
-    "        title\n"
-    "        body\n"
-    "        url\n"
-    "        state\n"
-    "        isDraft\n"
-    "        createdAt\n"
-    "        updatedAt\n"
-    "        closedAt\n"
-    "        mergedAt\n"
-    "        additions\n"
-    "        deletions\n"
-    "        changedFiles\n"
-    "        baseRefName\n"
-    "        headRefName\n"
-    "        authorAssociation\n"
-    "        author { ...ActorFields }\n"
-    "        mergedBy { ...ActorFields }\n"
-    "        mergeCommit { oid }\n"
-    "        labels(first: 30) { nodes { name } }\n"
-    "        files(first: 100) { pageInfo { hasNextPage } nodes { path } }\n"
-    "        timelineItems(first: 100, itemTypes: [READY_FOR_REVIEW_EVENT, CONVERT_"
-    "TO_DRAFT_EVENT, REVIEW_REQUESTED_EVENT, REVIEW_REQUEST_REMOVED_EVENT, PULL_REQ"
-    "UEST_REVIEW, REVIEW_DISMISSED_EVENT, PULL_REQUEST_COMMIT, HEAD_REF_FORCE_PUSHE"
-    "D_EVENT, ISSUE_COMMENT, LABELED_EVENT, UNLABELED_EVENT, CLOSED_EVENT, REOPENED"
-    "_EVENT, MERGED_EVENT, CROSS_REFERENCED_EVENT]) {\n"
-    "          pageInfo { hasNextPage endCursor }\n"
-    "          nodes { ...TimelineFields }\n"
-    "        }\n"
-    "      }\n"
-    "    }\n"
-    "  }\n"
-    "}\n"
-    "\n"
+    FRAGMENTS
+    + """query PullRequestsPage($owner: String!, $name: String!, $pageSize: Int!, $cursor: String,
+    $states: [PullRequestState!]) {
+  rateLimit { cost remaining resetAt }
+  repository(owner: $owner, name: $name) {
+    nameWithOwner
+    isArchived
+    defaultBranchRef { name }
+    pullRequests(first: $pageSize, after: $cursor, states: $states, orderBy: {field: UPDATED_AT,
+    direction: DESC}) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        id
+        number
+        title
+        body
+        url
+        state
+        isDraft
+        createdAt
+        updatedAt
+        closedAt
+        mergedAt
+        additions
+        deletions
+        changedFiles
+        baseRefName
+        headRefName
+        authorAssociation
+        author { ...ActorFields }
+        mergedBy { ...ActorFields }
+        mergeCommit { oid }
+        labels(first: 30) { nodes { name } }
+        files(first: 100) { pageInfo { hasNextPage } nodes { path } }
+        timelineItems(first: 100, itemTypes: [READY_FOR_REVIEW_EVENT, CONVERT_TO_DRAFT_EVENT,
+    REVIEW_REQUESTED_EVENT, REVIEW_REQUEST_REMOVED_EVENT, PULL_REQUEST_REVIEW,
+    REVIEW_DISMISSED_EVENT, PULL_REQUEST_COMMIT, HEAD_REF_FORCE_PUSHED_EVENT, ISSUE_COMMENT,
+    LABELED_EVENT, UNLABELED_EVENT, CLOSED_EVENT, REOPENED_EVENT, MERGED_EVENT,
+    CROSS_REFERENCED_EVENT]) {
+          pageInfo { hasNextPage endCursor }
+          nodes { ...TimelineFields }
+        }
+      }
+    }
+  }
+}
+
+"""
 )
+
 PULL_REQUEST_TIMELINE = (
-    "fragment ActorFields on Actor {\n"
-    "  __typename\n"
-    "  login\n"
-    "}\n"
-    "\n"
-    "fragment TimelineFields on PullRequestTimelineItems {\n"
-    "  __typename\n"
-    "  ... on Node { id }\n"
-    "  ... on ReadyForReviewEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on ConvertToDraftEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on ReviewRequestedEvent {\n"
-    "    createdAt\n"
-    "    actor { ...ActorFields }\n"
-    "    requestedReviewer { __typename ... on User { login } ... on Team { slug } "
-    "}\n"
-    "  }\n"
-    "  ... on ReviewRequestRemovedEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on PullRequestReview { id state submittedAt author { ...ActorFields } }\n"
-    "  ... on ReviewDismissedEvent { createdAt actor { ...ActorFields } previousRev"
-    "iewState review { id author { ...ActorFields } } }\n"
-    "  ... on PullRequestCommit { commit { oid authoredDate committedDate messageHe"
-    "adline messageBody } }\n"
-    "  ... on HeadRefForcePushedEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on IssueComment { createdAt author { ...ActorFields } }\n"
-    "  ... on LabeledEvent { createdAt actor { ...ActorFields } label { name } }\n"
-    "  ... on UnlabeledEvent { createdAt actor { ...ActorFields } label { name } }\n"
-    "  ... on ClosedEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on ReopenedEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on MergedEvent { createdAt actor { ...ActorFields } }\n"
-    "  ... on CrossReferencedEvent {\n"
-    "    createdAt\n"
-    "    willCloseTarget\n"
-    "    source {\n"
-    "      __typename\n"
-    "      ... on PullRequest { number state mergedAt author { ...ActorFields } rep"
-    "ository { nameWithOwner } }\n"
-    "    }\n"
-    "  }\n"
-    "}\n"
-    "\n"
-    "query PullRequestTimeline($id: ID!, $cursor: String) {\n"
-    "  rateLimit { cost remaining resetAt }\n"
-    "  node(id: $id) {\n"
-    "    ... on PullRequest {\n"
-    "      timelineItems(first: 100, after: $cursor, itemTypes: [READY_FOR_REVIEW_E"
-    "VENT, CONVERT_TO_DRAFT_EVENT, REVIEW_REQUESTED_EVENT, REVIEW_REQUEST_REMOVED_E"
-    "VENT, PULL_REQUEST_REVIEW, REVIEW_DISMISSED_EVENT, PULL_REQUEST_COMMIT, HEAD_R"
-    "EF_FORCE_PUSHED_EVENT, ISSUE_COMMENT, LABELED_EVENT, UNLABELED_EVENT, CLOSED_E"
-    "VENT, REOPENED_EVENT, MERGED_EVENT, CROSS_REFERENCED_EVENT]) {\n"
-    "        pageInfo { hasNextPage endCursor }\n"
-    "        nodes { ...TimelineFields }\n"
-    "      }\n"
-    "    }\n"
-    "  }\n"
-    "}"
+    FRAGMENTS
+    + """query PullRequestTimeline($id: ID!, $cursor: String) {
+  rateLimit { cost remaining resetAt }
+  node(id: $id) {
+    ... on PullRequest {
+      timelineItems(first: 100, after: $cursor, itemTypes: [READY_FOR_REVIEW_EVENT,
+    CONVERT_TO_DRAFT_EVENT, REVIEW_REQUESTED_EVENT, REVIEW_REQUEST_REMOVED_EVENT,
+    PULL_REQUEST_REVIEW, REVIEW_DISMISSED_EVENT, PULL_REQUEST_COMMIT,
+    HEAD_REF_FORCE_PUSHED_EVENT, ISSUE_COMMENT, LABELED_EVENT, UNLABELED_EVENT, CLOSED_EVENT,
+    REOPENED_EVENT, MERGED_EVENT, CROSS_REFERENCED_EVENT]) {
+        pageInfo { hasNextPage endCursor }
+        nodes { ...TimelineFields }
+      }
+    }
+  }
+}
+"""
 )
