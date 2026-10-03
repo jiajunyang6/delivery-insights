@@ -9,7 +9,10 @@ SUBJECTS = {
     "H_quality_tradeoff": ("Lighter review in exchange for speed", "放松 review 换来的提速"),
 }
 FINDINGS = {
-    "review_queue_growth": ("a growing review queue", "review 队列积压"),
+    "review_queue_growth": (
+        "review demand exceeding first reviews",
+        "review 新进需求超过首次 review",
+    ),
     "review_concentration": ("reviews concentrated on a few people", "review 集中在少数人"),
     "merge_blocked": ("approved PRs waiting to merge", "批准后迟迟不合并"),
     "ci_wait": ("waiting on CI", "等待 CI"),

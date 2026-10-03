@@ -75,6 +75,11 @@ def test_ci_cap_exact_example_and_missing_sources():
 def test_evidence_refs_baselines_and_no_source_text_in_pack():
     snapshot = golden()
     full = extract_evidence(snapshot)
+    queue = next(e for e in full if e["id"] == "E23")
+    assert queue["key"] == "queue_unserved_share"
+    assert queue["unit"] == "share"
+    assert queue["ref"] == "/bottleneck_analysis/review_queue/net_inflow_share"
+    assert queue["value"] == snapshot["bottleneck_analysis"]["review_queue"]["net_inflow_share"]
     assert len({e["id"] for e in full}) == len(full)
     for e in full:
         assert resolve_pointer(snapshot, e["ref"]) is not None

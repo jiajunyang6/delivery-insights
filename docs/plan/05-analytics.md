@@ -46,8 +46,8 @@ REVIEW_CAPACITY_PICKUP_RATIO = 1.5
 REVIEW_CAPACITY_MIN_WAIT_SHARE = 0.15
 REVIEW_CAPACITY_HIGH_WAIT_SHARE = 0.30
 QUEUE_GROWTH_WEEK_SHARE = 0.5
-QUEUE_GROWTH_MIN_RELATIVE = 0.20
-QUEUE_GROWTH_HIGH_RELATIVE = 0.50
+QUEUE_GROWTH_MIN_UNSERVED_SHARE = 0.20
+QUEUE_GROWTH_HIGH_UNSERVED_SHARE = 0.50
 CONCENTRATION_SHARE = 0.60
 CONCENTRATION_HIGH_SHARE = 0.75
 MERGE_BLOCKED_SHARE = 0.15
@@ -64,7 +64,7 @@ GUARDRAIL_REVERT_RATE_DELTA = 0.01   # revert 率绝对上升 0.01，即 1 个�
 EXTERNAL_PICKUP_RATIO = 2.0
 ```
 
-`insights/analytics/__init__.py` 定义 `ANALYTICS_VERSION = "1.0.0"` 和推导标识函数 `derive_key(location_dimension: str, directory_depth: int) -> str`，返回 `f"{ANALYTICS_VERSION}|{THRESHOLDS_VERSION}|{location_dimension}|depth={directory_depth}"`。worker 写 `pr_facts.derive_key`、`repositories.derived_key` 和 API 的就绪检查（`06` §5.1）都只调用这个函数，不各自拼字符串。
+`insights/analytics/__init__.py` 定义 `ANALYTICS_VERSION = "1.4.0"` 和推导标识函数 `derive_key(location_dimension: str, directory_depth: int) -> str`，返回 `f"{ANALYTICS_VERSION}|{THRESHOLDS_VERSION}|{location_dimension}|depth={directory_depth}"`。worker 写 `pr_facts.derive_key`、`repositories.derived_key` 和 API 的就绪检查（`06` §5.1）都只调用这个函数，不各自拼字符串。
 
 ## 2. 状态机（`insights/analytics/timeline.py`）
 
@@ -397,7 +397,7 @@ PR 是 **revert PR**，当满足任一：
 
 ### 9.2 review 队列（周粒度）
 
-周从周一开始，裁剪到 `[from_dt, end_dt)`。令每个 PR 的"有效首次 review 时间" `fr = max(first_review_at, ready_at)`（draft 期间就被 review 的 PR 在 ready 时刻离开队列）；没有 review 时 `fr` 为空。对每周 `[ws, we)`，在流程 PR（含未合并）上：
+本期使用本期新建或有人类活动的流程 PR 集合，周序列使用同一个本期集合。周从周一开始，裁剪到 `[from_dt, end_dt)`。令每个 PR 的"有效首次 review 时间" `fr = max(first_review_at, ready_at)`（draft 期间就被 review 的 PR 在 ready 时刻离开队列）；没有 review 时 `fr` 为空。对每周 `[ws, we)`，在流程 PR（含未合并）上：
 
 - `inflow` = `ready_at ∈ [ws, we)` 的数量；
 - `outflow` = `fr ∈ [ws, we)` 的数量；
@@ -407,6 +407,8 @@ PR 是 **revert PR**，当满足任一：
 
 - `weeks_total` = 周数；`weeks_inflow_exceeds_outflow` = `inflow > outflow` 的周数；
 - `open_growth_rel` = 最后一周的 `open_at_week_end` / 第一周的 `open_at_week_end` − 1（第一周为 0 时为 `null`）。
+- `net_inflow_share` = `(Σinflow − Σoutflow) / Σinflow`，Σinflow 为 0 时为 `null`。outflow 可以服务期初需求，因此值可以为负。它是本期流量的净缺口，不是某批新 PR 的未 review 比例。
+- `open_at_week_end` 和 `open_growth_rel` 只用于图表；本期集合缺少长期无活动旧 PR，不能据此判断完整积压增长。发现使用流入/首次 review 的净缺口。
 
 ### 9.3 合并阻塞
 
@@ -512,7 +514,7 @@ change_rel 为 None 的 what-if 不输出（列表里没有这一项，发现的
 | 类型（id） | 条件 | 严重程度 | `impact_pr_hours` | 建议（英文模板） |
 |---|---|---|---|---|
 | `review_capacity:{location}` | 位置 `pickup_ratio_vs_rest >= 1.5`、`waiting_reviewer_share >= 0.15`、`merged_prs >= 10` | share ≥ 0.30 为 high，否则 medium | 该位置 `waiting_reviewer_pr_hours` | "Add reviewers or code owners for {location}, enable team auto-assignment, and set a one-business-day first-review SLA." |
-| `review_queue_growth` | `weeks_inflow_exceeds_outflow / 周数 >= 0.5` 且最后一周 `open_at_week_end` 比第一周增长 ≥ 20% | 增长 ≥ 50% 为 high | 时间账 `waiting_reviewer.pr_hours` | "Review demand exceeds capacity: rebalance review load or temporarily limit work in progress until the queue stops growing." |
+| `review_queue_growth` | `weeks_inflow_exceeds_outflow / 周数 >= 0.5` 且 `net_inflow_share >= 0.20` | `net_inflow_share >= 0.50` 为 high | 时间账 `waiting_reviewer.pr_hours` | "New PRs arrive faster than they get a first review: rebalance review load or limit work in progress until first reviews keep up." |
 | `review_concentration` | `review_concentration_top_k >= 0.60` | ≥ 0.75 为 high | 0 | "Spread reviews through a rotation or CODEOWNERS so a few reviewers are not a single point of failure." |
 | `merge_blocked` | `waiting_merge.share >= 0.15` 或 `stage_p50_hours.merge >= 24` | share ≥ 0.30 为 high | `waiting_merge.pr_hours` | `second_approval_share >= 0.5` 时："Review whether two approvals are needed for low-risk changes."；否则："Reduce post-approval rebase friction, for example with a merge queue." |
 | `ci_wait`（P1） | `ci_data_available` 且 `waiting_ci.share >= 0.15` | ≥ 0.30 为 high | `waiting_ci.pr_hours` | `queue_p50_minutes >= run_p50_minutes` 时："Add CI capacity or reduce queued jobs."，否则："Speed up the slowest workflows."；`flaky_rerun_rate >= 0.10` 时再追加 " Fix flaky tests that pass only on rerun." |
@@ -526,7 +528,7 @@ change_rel 为 None 的 what-if 不输出（列表里没有这一项，发现的
 | 类型 | `title` | `evidence`（label → ref） |
 |---|---|---|
 | `review_capacity` | `First-review wait concentrated in {location}` | `First-review wait vs rest of repo` → `/bottleneck_analysis/locations/{i}/pickup_ratio_vs_rest`；`Share of reviewer-waiting time` → `/bottleneck_analysis/locations/{i}/waiting_reviewer_share`；`Median first-review wait` → `/bottleneck_analysis/locations/{i}/pickup_p50_hours` |
-| `review_queue_growth` | `Review queue is growing` | `Weeks with inflow above outflow` → `/bottleneck_analysis/review_queue/weeks_inflow_exceeds_outflow`；`Open queue growth` → `/bottleneck_analysis/review_queue/open_growth_rel` |
+| `review_queue_growth` | `Review demand exceeds first reviews` | `Weeks with inflow above outflow` → `/bottleneck_analysis/review_queue/weeks_inflow_exceeds_outflow`；`Share of new review demand not yet served` → `/bottleneck_analysis/review_queue/net_inflow_share` |
 | `review_concentration` | `Reviews concentrated on a few people` | `Share of reviews by top K reviewers` → `/efficiency/review_concentration_top_k` |
 | `merge_blocked` | `Approved PRs wait long to merge` | `Share of PR time waiting to merge` → `/time_ledger/states/waiting_merge/share`；`Median approval-to-merge time` → `/efficiency/stage_p50_hours/merge`；`Share with a second approval` → `/bottleneck_analysis/merge_blockers/second_approval_share` |
 | `ci_wait` | `CI waiting is a large share of PR time` | `Share of PR time waiting on CI` → `/time_ledger/states/waiting_ci/share`；`Median CI queue time` → `/bottleneck_analysis/ci/queue_p50_minutes`；`Median CI run time` → `/bottleneck_analysis/ci/run_p50_minutes` |

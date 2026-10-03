@@ -96,13 +96,13 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
     if ratio(
         queue["weeks_inflow_exceeds_outflow"], queue["weeks_total"]
     ) >= t.QUEUE_GROWTH_WEEK_SHARE and above(
-        "/bottleneck_analysis/review_queue/open_growth_rel", t.QUEUE_GROWTH_MIN_RELATIVE
+        "/bottleneck_analysis/review_queue/net_inflow_share", t.QUEUE_GROWTH_MIN_UNSERVED_SHARE
     ):
         add(
             "review_queue_growth",
-            "Review queue is growing",
-            "Review demand exceeds capacity: rebalance review load or "
-            "temporarily limit work in progress until the queue stops growing.",
+            "Review demand exceeds first reviews",
+            "New PRs arrive faster than they get a first review: rebalance review load or "
+            "limit work in progress until first reviews keep up.",
             states["waiting_reviewer"]["pr_hours"],
             [
                 (
@@ -111,12 +111,12 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
                     "count",
                 ),
                 (
-                    "Open queue growth",
-                    "/bottleneck_analysis/review_queue/open_growth_rel",
-                    "change",
+                    "Share of new review demand not yet served",
+                    "/bottleneck_analysis/review_queue/net_inflow_share",
+                    "share",
                 ),
             ],
-            high=queue["open_growth_rel"] >= t.QUEUE_GROWTH_HIGH_RELATIVE,
+            high=queue["net_inflow_share"] >= t.QUEUE_GROWTH_HIGH_UNSERVED_SHARE,
         )
     if above("/efficiency/review_concentration_top_k", t.CONCENTRATION_SHARE):
         add(

@@ -1,4 +1,5 @@
 from dataclasses import replace
+from datetime import date
 
 import pytest
 from tests.analytics_factory import dataset, pr
@@ -104,7 +105,38 @@ def test_week_clipping_and_shift_boundary():
     d = dataset([])
     queue = review_queue(d, d.current)
     assert len(queue["weeks"]) == 1 and queue["weeks"][0]["days"] == 1
+    assert queue["net_inflow_share"] is None
     ledger = time_ledger(d)
     assert trend(d, ledger, [])["bottleneck_shift"] is None
     ledger["states"]["waiting_ci"]["change_pp"] = 5
     assert trend(d, ledger, [])["bottleneck_shift"].startswith("waiting_ci share +5.0pp")
+
+
+def half_unreviewed_dataset():
+    prs = []
+    for week in range(4):
+        for index in range(20):
+            p = pr(week * 20 + index, offset=96 + week * 168)
+            if index >= 10:
+                p = replace(
+                    p,
+                    facts=replace(p.facts, first_review_at=None, merged_at=None, end_at=None),
+                    intervals=(Interval("waiting_reviewer", p.facts.ready_at, None),),
+                    human_activity_at=(),
+                )
+            prs.append(p)
+    return dataset(
+        prs,
+        repos=(RepoData("a/b", 1, at(-5000), at(744)),),
+        period_from=date(2026, 1, 5),
+        period_to=date(2026, 2, 1),
+    )
+
+
+def test_review_queue_half_of_new_prs_are_unserved():
+    d = half_unreviewed_dataset()
+    queue = review_queue(d, d.current)
+    assert [week["inflow"] for week in queue["weeks"]] == [20] * 4
+    assert [week["outflow"] for week in queue["weeks"]] == [10] * 4
+    assert queue["net_inflow_share"] == 0.5
+    assert queue["weeks_inflow_exceeds_outflow"] == 4

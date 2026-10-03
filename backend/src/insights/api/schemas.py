@@ -160,6 +160,7 @@ class ReviewQueue(Contract):
     weeks_total: int
     weeks_inflow_exceeds_outflow: int
     open_growth_rel: float | None
+    net_inflow_share: float | None
 
 
 class Location(Contract):

@@ -62,7 +62,7 @@ snapshot ──▶ evidence pack (§2) ──▶ hypothesis scoring (§3–§4)
 | E20 | `ledger_waiting_ci` | Share of PR time waiting on CI | `/time_ledger/states/waiting_ci` | share | bottleneck | 周序列 `waiting_ci_share`；`ci_data_available = false` 时不进入证据包 |
 | E21 | `ledger_waiting_merge` | Share of PR time waiting to merge after approval | `/time_ledger/states/waiting_merge` | share | bottleneck | |
 | E22 | `queue_weeks_imbalanced` | Weeks in which review demand exceeded first reviews | `/bottleneck_analysis/review_queue/weeks_inflow_exceeds_outflow` | count | bottleneck | `extra.weeks_total` |
-| E23 | `queue_open_growth` | Growth of the open review queue over the period | `/bottleneck_analysis/review_queue/open_growth_rel` | change | bottleneck | |
+| E23 | `queue_unserved_share` | Share of this period's review demand not yet served | `/bottleneck_analysis/review_queue/net_inflow_share` | share | bottleneck | |
 | E24 | `review_concentration` | Share of reviews done by the top K reviewers | `/efficiency/review_concentration_top_k` | share | bottleneck | `extra.k` |
 | E25 | `at_risk_total` | Open PRs waiting longer than usual | `/at_risk_summary/total` | count | bottleneck | `team_history`；`extra.critical` |
 | E26 | `at_risk_top_location_share` | Share of reviewer-waiting at-risk PRs in the top location | `/signals/at_risk_reviewer_top_location_share` | share | bottleneck | |
@@ -587,7 +587,7 @@ messages += [
 | `H_pr_size_growth` | `Larger pull requests` | `PR 变大` |
 | `H_quality_tradeoff` | `Lighter review in exchange for speed` | `放松 review 换来的提速` |
 | `review_capacity` | `the first-review wait in {location}` | `{location} 的首次 review 等待` |
-| `review_queue_growth` | `a growing review queue` | `review 队列积压` |
+| `review_queue_growth` | `review demand exceeding first reviews` | `review 新进需求超过首次 review` |
 | `review_concentration` | `reviews concentrated on a few people` | `review 集中在少数人` |
 | `merge_blocked` | `approved PRs waiting to merge` | `批准后迟迟不合并` |
 | `ci_wait` | `waiting on CI` | `等待 CI` |
