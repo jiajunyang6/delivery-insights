@@ -85,5 +85,5 @@ cd frontend && npm ci && npm test && npm run typecheck && npm run build
 | [NOTES.md](NOTES.md) | Submission notes: run, architecture, next steps, AI use |
 | [docs/REFERENCE.md](docs/REFERENCE.md) | Metric definitions, confidence scoring, operations, security, test results, limitations |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Implementation decisions and their reasons |
-| [docs/EVALUATION.md](docs/EVALUATION.md), [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) | Evaluation runs and acceptance evidence |
+| [docs/EVALUATION.md](docs/EVALUATION.md) | Narrative evaluation runs, per case |
 | [docs/plan/](docs/plan/00-overview.md) | The design and implementation plan the code was built from |
