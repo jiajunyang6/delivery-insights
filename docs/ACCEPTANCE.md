@@ -1,5 +1,32 @@
 # Acceptance evidence
 
+## Pre-delivery review (2026-10-03, analytics 1.4.0)
+
+### Pagination recovery after sync
+
+Agent-operated browser acceptance against the rebuilt local Compose stack:
+
+1. Opened the 30-day dotnet/runtime manager report (2026-09-04 through 2026-10-03).
+   Snapshot `s_ce54abc139296b38` showed 5 of 150 risks; Load more loaded 50 rows.
+2. Requested a real manual sync, job `cbdd8ace-1bd7-4143-9d19-725cde124b76`.
+   It succeeded at 2026-10-03T17:51:09Z: 2 pages, 50 PR occurrences fetched,
+   0 changed PRs, 0 skipped PRs and 0 timeline invariant violations.
+3. Load more with the previous cursor returned HTTP 422 (API request
+   `7c0466338b50efb95dee32faa7d9a625`). The table cleared all 50 rows and removed
+   Load more, showing "Data changed since this report. Refresh the report to load
+   matching PRs." and a Refresh report button.
+4. Clicking that button loaded snapshot `s_fb42eb48c813c9b2`, reset to 5 of 150,
+   and removed the alert. Load more then loaded 50 matching rows without errors.
+   The new current-day as_of changed snapshot identity even without changed PR content.
+
+Screenshots: [stale report](review-pagination-stale.png),
+[recovered pagination](review-pagination-recovered.png).
+The production API client also passed four isolated Node checks: HTML HTTP 502,
+HTML HTTP 503, structured cursor parameter errors and no-cache propagation.
+The same rebuilt stack generated a real English Bedrock manager narrative with
+validation passed. The full 20-case Bedrock eval was not rerun for analytics 1.4.0.
+This is automated/agent evidence; human UI sign-off remains pending.
+
 ## Period-scope update (2026-10-03, analytics 1.3.0)
 
 The user replaced the original all-open scope with PRs created or having identified

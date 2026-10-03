@@ -5,17 +5,28 @@ import type { Params, PrPage, RiskPr, Snapshot } from "../types";
 export function AtRiskTable({
   snapshot: s,
   params,
+  onRefresh,
 }: {
   snapshot: Snapshot;
   params: Params;
+  onRefresh: () => void;
 }) {
   const [extra, setExtra] = useState<RiskPr[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [total, setTotal] = useState(s.at_risk_summary.total);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [dataChanged, setDataChanged] = useState(false);
   const controller = useRef<AbortController>();
   useEffect(() => () => controller.current?.abort(), []);
+  function invalidate() {
+    setExtra([]);
+    setCursor(null);
+    setDataChanged(true);
+    setError(
+      "Data changed since this report. Refresh the report to load matching PRs.",
+    );
+  }
   async function load() {
     controller.current?.abort();
     const current = new AbortController();
@@ -28,15 +39,16 @@ export function AtRiskTable({
         query(params) +
         "&at_risk=true&limit=50" +
         (cursor ? "&cursor=" + encodeURIComponent(cursor) : "");
-      const response = await fetchJson<PrPage>(path, current.signal);
+      const response = await fetchJson<PrPage>(path, current.signal, "no-cache");
+      if (current.signal.aborted) return;
       if (response.status !== 200)
         throw new Error(
           "Data is syncing. Refresh the report before loading more.",
         );
-      if (response.data.snapshot_id !== s.snapshot_id)
-        throw new Error(
-          "Data changed since this report. Refresh it to load matching PRs.",
-        );
+      if (response.data.snapshot_id !== s.snapshot_id) {
+        invalidate();
+        return;
+      }
       const items: RiskPr[] = response.data.items.flatMap((p) =>
         p.at_risk && p.current_state && p.current_state_age_hours != null
           ? [
@@ -60,7 +72,21 @@ export function AtRiskTable({
       setCursor(response.data.next_cursor);
       setTotal(response.data.total);
     } catch (e) {
-      if (!current.signal.aborted) setError(message(e).detail);
+      if (!current.signal.aborted) {
+        const problem = message(e);
+        if (
+          problem.status === 422 &&
+          problem.errors.some((p) => p.param === "cursor")
+        ) {
+          invalidate();
+        } else {
+          setError(
+            problem.status === 422
+              ? (problem.errors[0]?.message ?? problem.detail)
+              : problem.detail,
+          );
+        }
+      }
     } finally {
       if (!current.signal.aborted) setBusy(false);
     }
@@ -80,7 +106,7 @@ export function AtRiskTable({
         </div>
         <span>{s.at_risk_summary.critical} critical</span>
       </div>
-      {!rows.length ? (
+      {dataChanged ? null : !rows.length ? (
         <p className="empty">
           No PRs opened or active this period exceed the waiting-time threshold.
         </p>
@@ -130,7 +156,8 @@ export function AtRiskTable({
           {error}
         </p>
       )}
-      {total > 0 && (
+      {dataChanged && <button onClick={onRefresh}>Refresh report</button>}
+      {!dataChanged && total > 0 && (
         <div className="table-footer">
           <span>
             Showing {rows.length} of {total}
