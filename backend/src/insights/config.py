@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     tracked_repos: str = "dotnet/runtime"
     location_dimension: str = "label:area-"
     directory_depth: int = Field(default=2, ge=1, le=3)
-    backfill_days: int = Field(default=180, ge=30, le=365)
+    backfill_days: int = Field(default=120, ge=30, le=365)
     sync_interval_minutes: int = Field(default=15, ge=1, le=60)
     open_sweep_minutes: int = Field(default=60, ge=1)
     graphql_page_size: int = Field(default=25, ge=5, le=50)
