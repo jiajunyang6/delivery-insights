@@ -14,7 +14,7 @@ Use pydantic-settings `BaseSettings`, reading environment variables with `model_
 | `TRACKED_REPOS` | `str` (comma-separated) | `dotnet/runtime` | `tracked_repo_list: list[str]`; validate repository pattern (`06` §3.1), compare lowercase, retain display casing |
 | `LOCATION_DIMENSION` | `str` | `label:area-` | `label:<prefix>`, `codeowners`, or `directory` |
 | `DIRECTORY_DEPTH` | `int` | `2` | Leading path segments for directory dimension, 1–3 |
-| `BACKFILL_DAYS` | `int` | `180` | 30–365; stages `[7, 30, BACKFILL_DAYS]`, deduplicated and sorted |
+| `BACKFILL_DAYS` | `int` | `120` | 30–365; stages `[7, 30, BACKFILL_DAYS]`, deduplicated and sorted |
 | `SYNC_INTERVAL_MINUTES` | `int` | `15` | Must divide 60 |
 | `OPEN_SWEEP_MINUTES` | `int` | `60` | Full open-PR sweep interval; multiple of `SYNC_INTERVAL_MINUTES` |
 | `GRAPHQL_PAGE_SIZE` | `int` | `25` | 5–50; automatically halved on runtime failures (`04` §4.3) |
@@ -273,7 +273,7 @@ AWS_REGION=us-west-2
 BEDROCK_MODEL_ID=us.anthropic.claude-sonnet-4-6
 TRACKED_REPOS=dotnet/runtime
 LOCATION_DIMENSION=label:area-
-BACKFILL_DAYS=180
+BACKFILL_DAYS=120
 SYNC_INTERVAL_MINUTES=15
 CORS_ORIGINS=http://localhost:5173
 LOG_LEVEL=INFO

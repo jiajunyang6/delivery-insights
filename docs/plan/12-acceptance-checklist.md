@@ -11,7 +11,7 @@
 
 - [ ] **A1** `[P0]` Clean clone: cp .env.example .env → docker compose up --build -d; migrate exits0, api healthy, worker running. Inspect docker compose ps -a (without -a hides exited migration).
 - [ ] **A2** `[P0]` healthz {status:ok}, readyz200; docker compose stop redis →readyz503 with checks.redis=error; docker compose start redis restores readiness.
-- [ ] **A3** `[P0][Credentials]` dotnet/runtime backfill: repo covered_since advances7→30→180days, first-stage open sweep timestamp, sync status ok.
+- [ ] **A3** `[P0][Credentials]` dotnet/runtime backfill: repo covered_since advances 7→30→120 days, first-stage open sweep timestamp, sync status ok.
 - [ ] **A4** `[P0][Credentials]` 7/30/90-day insights200 with headline/efficiency/ledger/bottlenecks/analysis/risks/waste/rework/guardrail/trend/meta; If-None-Match304.
 - [ ] **A5** `[P0]` Unready202 Retry-After/Pending, all reasons never_synced/backfill/open_sweep/rederive/stale in integration; credentialed initial-backfill90-day request confirms.
 - [ ] **A6** `[P0][Credentials]` All nine curl groups in `06` §8 match descriptions.

@@ -43,7 +43,7 @@ docker compose up --build -d
 open http://localhost:5173    # UI   (API docs: http://localhost:8000/docs)
 ```
 
-The worker starts backfilling `dotnet/runtime` immediately (7 days first, then 30 and 180).
+The worker starts backfilling `dotnet/runtime` immediately (7 days first, then 30 and 120).
 Until the requested period is covered the API answers `202 Accepted` with `Retry-After`,
 and the UI shows sync progress.
 
