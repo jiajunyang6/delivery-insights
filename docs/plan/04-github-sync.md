@@ -386,7 +386,7 @@ async def enqueue_sync(arq: ArqRedis, session: AsyncSession, repo_full_name: str
 
 | kind | arq function | `_job_id` |
 |---|---|---|
-| `backfill`、`incremental`、`manual` | `sync_repo` | `sync:{repo_lower}` |
+| `backfill`, `incremental`, `manual` | `sync_repo` | `sync:{repo_lower}` |
 | `rederive` | `rederive_repo` | `rederive:{repo_lower}` |
 | `ci_runs`(P1) | `sync_ci_runs` | `ci:{repo_lower}` |
 | `ownership`(P1) | `sync_ownership` | `owners:{repo_lower}` |

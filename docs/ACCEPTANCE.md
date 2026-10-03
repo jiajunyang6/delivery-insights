@@ -1,5 +1,40 @@
 # Acceptance evidence
 
+## English-only narrative contract (2026-10-03, prompt v6)
+
+The narrative endpoint defaults to English and accepts only `lang=en`. Other values
+return 422 problem+json with `errors[].param=lang`. The response keeps `lang: "en"`.
+Chinese output examples, templates, action text, hedge keywords, causal/directional
+vocabulary and numeric-unit rules have been removed. Frontend requests use the
+English default, with no varying-language props or language type.
+
+PROMPT_VERSION is v6. Stored-row and Redis language identities stay fixed to en;
+no database migration is needed. Integration tests cover both audiences' default
+and explicit en bytes/ETags, OpenAPI restrictions, rejection before generation,
+and isolation from v3 bilingual and v4 English caches in Redis and Postgres.
+Unit tests reject CJK text across generated fields and retain English confidence,
+abstention, downgrade and evidence validation.
+
+Required checks passed: Ruff check/format (123 files), strict mypy (77 files),
+312 unit tests, 369 total tests including 57 Docker integrations, all eight
+20-case English stub gates, frontend typecheck and production build. Twenty
+obsolete positive Chinese tests were removed, five English cases and three
+integration cases added. The analytics golden snapshot is unchanged.
+
+The v6 stub suite started at 2026-10-03T20:13:23.231274+00:00; all 20 first attempts passed.
+The v6 real Bedrock suite started at 2026-10-03T20:12:19.851387+00:00; 20/20 first attempts
+passed, 20/20 final LLM responses passed numeric/citation/hedge checks,
+and 0/20 used fallback. Both suites passed all eight gates, with 14/16
+root-cause hits, 4/4 no-signal abstentions and 14/14 high-precision hits.
+The v4 and v5 trials failed first-attempt validity at 70% and 85%, respectively;
+all results remain in [evaluation records](EVALUATION.md). No thresholds were relaxed.
+
+The API and web images were rebuilt locally. Through the nginx proxy at 5173,
+lang=zh returned 422; default/en requests returned identical bytes and ETags.
+The real manager narrative for s_ce54abc139296b38 at 2026-10-03T20:13:47.008117+00:00
+used v6, passed validation after 2 attempt(s), and had
+no template fallback. This was an HTTP smoke test, not a new visual browser audit.
+
 ## English documentation and submission cleanup (2026-10-03)
 
 All 13 plan chapters and AGENTS are now in English. Section numbering, code-fence

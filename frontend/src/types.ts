@@ -1,5 +1,4 @@
 export type Audience = "director" | "manager";
-export type Lang = "en" | "zh";
 export type State =
   "waiting_reviewer" | "waiting_author" | "waiting_ci" | "waiting_merge";
 export type Params = { repo: string; from: string; to: string };

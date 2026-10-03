@@ -6,8 +6,8 @@ from tests.narrative_factory import entry, validation_fixture
 from insights.narrative.validator import check_numbers, sentences, validate
 
 
-def codes(output, pack, snapshot, lang="en"):
-    return {v.code for v in validate(output, pack, snapshot, audience="director", lang=lang)}
+def codes(output, pack, snapshot):
+    return {v.code for v in validate(output, pack, snapshot, audience="director")}
 
 
 def test_valid_and_abbreviation_decimal_splitting():
@@ -38,7 +38,6 @@ def test_valid_and_abbreviation_decimal_splitting():
         ("It was 63 hours [E53].", "V5:unit_mismatch"),
         ("There were 30 days [E1].", None),
         ("example/repo and area-Foo had 41.3 h [E1].", None),
-        ("交付周期下降至 41.3 小时 [E1]。", "V5:direction_mismatch"),
     ],
 )
 def test_sentence_local_numbers_units_rounding_and_direction(text, expected):
@@ -57,7 +56,7 @@ def test_sentence_local_numbers_units_rounding_and_direction(text, expected):
         ("null", "V1:schema"),
         ("length", "V2:length"),
         ("sentences", "V2:sentence_count"),
-        ("zh", "V3:language"),
+        ("non_english", "V3:language"),
         ("personal", "V10:personal_name"),
         ("login", "V10:personal_name"),
         ("unknown_h", "V6:unknown_hypothesis"),
@@ -84,8 +83,8 @@ def test_validation_rules(mutation, expected):
         output["narrative"] += "a" * 1201
     elif mutation == "sentences":
         output["narrative"] = "One [E1]."
-    elif mutation == "zh":
-        output["hypotheses"][0]["statement"] += "中文"
+    elif mutation == "non_english":
+        output["hypotheses"][0]["statement"] += chr(0x4E00)
     elif mutation == "personal":
         output["narrative"] += " @someone [E1]."
     elif mutation == "login":
@@ -192,7 +191,6 @@ def test_extra_number_units_labels_and_multiple_direction_entries():
         "Share was 42% [E82].",
         "It was 2.4x vs. the rest [E83].",
         "Merged within 3 days [E5].",
-        "在 3 天内合并 [E5]。",
     ],
 )
 def test_explicit_plan_numeric_examples(text):
@@ -260,38 +258,42 @@ def test_abstention_words_do_not_exempt_claims_with_a_low_hypothesis(sentence):
     assert codes(output, pack, snapshot) == {"V7b:overclaim"}
 
 
-@pytest.mark.parametrize(
-    ("text", "bad"),
-    [
-        ("这一定会导致周期变长 [E1]。", True),
-        ("这些数据证明了原因 [E1]。", True),
-        ("周期在一定程度上与流程有关 [E1]。", False),
-        ("周期不一定与流程有关 [E1]。", False),
-        ("没有证据证明流程变慢 [E1]。", False),
-    ],
-)
-def test_chinese_definite_language_exceptions(text, bad):
-    from insights.narrative.validator import DEFINITE
-
-    assert bool(DEFINITE.search(text)) is bad
-
-
-def test_chinese_medium_cannot_use_high_language_and_same_level_downgrade():
-    snapshot, pack, output = validation_fixture()
-    pack["hypotheses"][0]["level"] = "medium"
-    output["narrative"] = "交付周期中位数为 41.3 小时 [E1]。review 人手不足可能是原因 [E15]。"
-    output["hypotheses"][0]["statement"] = "review 人手不足很可能是原因 [E15]。"
-    assert "V7:hedge_mismatch" in codes(output, pack, snapshot, "zh")
-    output["hypotheses"][0]["statement"] = "review 人手不足可能是原因 [E15]。"
-    assert not codes(output, pack, snapshot, "zh")
-    output["hypotheses"][0]["downgrade"] = {"level": "medium", "reason": "信号有限 [E15]。"}
-    assert "V8:invalid_downgrade" in codes(output, pack, snapshot, "zh")
-
-
 def test_schema_repair_feedback_identifies_field_and_limit_without_echoing_input():
     snapshot, pack, output = validation_fixture()
     output["hypotheses"][0]["statement"] = "untrusted-payload" * 30
-    errors = validate(output, pack, snapshot, audience="director", lang="en")
+    errors = validate(output, pack, snapshot, audience="director")
     schema = [v.message for v in errors if v.code == "V1:schema"]
     assert any("hypotheses.0.statement" in message and "400" in message for message in schema)
     assert all("untrusted-payload" not in message for message in schema)
+
+
+def test_medium_wording_and_same_level_downgrade():
+    snapshot, pack, output = validation_fixture()
+    pack["hypotheses"][0]["level"] = "medium"
+    output["narrative"] = "Cycle time was 41.3 h [E1]. Review capacity may be the cause [E15]."
+    assert "V7:hedge_mismatch" in codes(output, pack, snapshot)
+    output["hypotheses"][0]["statement"] = "Review capacity may be the cause [E15]."
+    assert not codes(output, pack, snapshot)
+    output["hypotheses"][0]["downgrade"] = {"level": "medium", "reason": "Limited signals [E15]."}
+    assert "V8:invalid_downgrade" in codes(output, pack, snapshot)
+
+
+@pytest.mark.parametrize("field", ["narrative", "statement", "downgrade", "outside"])
+def test_non_english_text_is_rejected_in_every_generated_field(field):
+    snapshot, pack, output = validation_fixture()
+    unsupported_character = chr(0x4E00)
+    if field == "narrative":
+        output["narrative"] += unsupported_character
+    elif field == "statement":
+        output["hypotheses"][0]["statement"] += unsupported_character
+    elif field == "downgrade":
+        output["hypotheses"][0]["downgrade"] = {
+            "level": "medium",
+            "reason": unsupported_character + " [E15].",
+        }
+    else:
+        output["llm_hypothesis"] = {
+            "statement": "Early signs of " + unsupported_character + " [E1][E15].",
+            "evidence_ids": ["E1", "E15"],
+        }
+    assert "V3:language" in codes(output, pack, snapshot)

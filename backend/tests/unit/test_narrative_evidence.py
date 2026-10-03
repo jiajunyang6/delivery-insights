@@ -85,14 +85,14 @@ def test_evidence_refs_baselines_and_no_source_text_in_pack():
         assert resolve_pointer(snapshot, e["ref"]) is not None
         assert len(e["examples"]) <= 3
         assert all(url.startswith("https://github.com/") for url in e["examples"])
-    pack, _ = build_evidence_pack(snapshot, "director", "en", False)
+    pack, _ = build_evidence_pack(snapshot, "director", False)
     raw = canonical(pack).decode()
     assert not any(key in raw for key in ('"examples"', '"ref"', '"confidence"', '"salience"'))
     assert all(p["title"] not in raw and p["author"] not in raw for p in snapshot["at_risk_prs"])
     assert "E20" not in {e["id"] for e in full}
     assert pack["data_gaps"] == ["ci_data_incomplete"]
     assert canonical(pack) == canonical(
-        build_evidence_pack(deepcopy(snapshot), "director", "en", False)[0]
+        build_evidence_pack(deepcopy(snapshot), "director", False)[0]
     )
 
 
@@ -105,7 +105,7 @@ def test_malicious_locations_are_sanitized_everywhere():
         if f["location"] == old:
             f["location"] = malicious
             f["id"] = f["id"].replace(old, malicious)
-    pack, _ = build_evidence_pack(snapshot, "director", "en", False)
+    pack, _ = build_evidence_pack(snapshot, "director", False)
     assert malicious not in canonical(pack).decode()
     assert "location-1" in canonical(pack).decode()
 

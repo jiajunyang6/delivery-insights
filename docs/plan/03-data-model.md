@@ -157,7 +157,7 @@ CREATE TABLE pr_facts (
   ci_covered                BOOLEAN NOT NULL DEFAULT FALSE,
   author_open_prs_at_ready  INTEGER,                  -- P1
   ready_weekday             SMALLINT,                 -- 0=Monday … 6=Sunday (UTC)
-  ready_hour                SMALLINT,                 -- 0–23（UTC）
+  ready_hour                SMALLINT,                 -- 0–23(UTC)
   derive_key                TEXT,                     -- 04 §6.2: "{ANALYTICS_VERSION}|{THRESHOLDS_VERSION}|{LOCATION_DIMENSION}|depth={DIRECTORY_DEPTH}"; cleared after owner-rule changes (04 §10) to require rederivation
   computed_at               TIMESTAMPTZ NOT NULL
 );
@@ -244,7 +244,7 @@ CREATE TABLE narratives (
   id             BIGSERIAL PRIMARY KEY,
   snapshot_id    TEXT NOT NULL REFERENCES snapshots(snapshot_id) ON DELETE CASCADE,
   audience       TEXT NOT NULL,      -- director | manager
-  lang           TEXT NOT NULL,      -- en | zh
+  lang           TEXT NOT NULL,      -- en for new requests; legacy rows are not served by prompt v6
   prompt_version TEXT NOT NULL,
   pack_hash      TEXT NOT NULL,      -- First 16 hex digits of canonical evidence-pack JSON SHA256 (07 §9.2); scoring configuration changes such as CI_COMPLETE change the key automatically
   model_id       TEXT NOT NULL,      -- "template" when generated_by = template
@@ -264,7 +264,7 @@ CREATE TABLE narratives (
 CREATE TABLE sync_jobs (
   id          UUID PRIMARY KEY,
   repo_id     INTEGER NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
-  kind        TEXT NOT NULL,   -- backfill | incremental | manual | rederive | ci_runs | ownership（04 §6.8）
+  kind        TEXT NOT NULL,   -- backfill | incremental | manual | rederive | ci_runs | ownership(04 §6.8)
   status      TEXT NOT NULL,   -- queued | running | succeeded | failed
   phase       TEXT,            -- Example: "backfill:30d"
   stats       JSONB NOT NULL DEFAULT '{}',  -- prs_fetched, prs_changed, events, pages, graphql_cost

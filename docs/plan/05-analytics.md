@@ -151,7 +151,7 @@ current = evaluate(ready_at); seg_start = ready_at
 for t in boundaries:
     Apply events with occurred_at == t in fixed kind order: closed, reopened, merged, convert_to_draft,
       ready_for_review, review_dismissed, review, review_requested, review_request_removed, commit, force_push,
-      comment, labeled, unlabeled, cross_referenced）
+      comment, labeled, unlabeled, cross_referenced)
     new = evaluate(t)
     if new == waiting_author and current != waiting_author and not draft and this batch contains reviewer feedback:
         review_rounds += 1        # Reopening or leaving draft does not add a round
@@ -238,7 +238,7 @@ The state machine is causal (state at t depends only on earlier events), so inte
 | ready_weekday, ready_hour | From ready_at in UTC |
 | `state_at_close` | `timeline.state_at_end` |
 | `ci_covered` | `len(ci_intervals) > 0` |
-| `is_bot_author`、`is_backport`、`external_contributor`、`locations`、`location_source` | §4 |
+| `is_bot_author`, `is_backport`, `external_contributor`, `locations`, `location_source` | §4 |
 | Revert / reland / supersession / close_class / late_rejection / author_open_prs_at_ready ("linkage fields") | Repository linking only (§4.3–§4.7). compute_facts sets defaults for new rows; derive_prs **does not overwrite** existing linkage fields in ON CONFLICT DO UPDATE, avoiding cleared intermediate state between linking runs |
 
 Compute durations with timedelta.total_seconds()/3600 without rounding until output.

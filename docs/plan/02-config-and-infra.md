@@ -156,7 +156,7 @@ EXPOSE 8000
 CMD ["uvicorn", "insights.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
 ```
 
-`backend/.dockerignore`:`.venv`、`**/__pycache__`、`.mypy_cache`、`.ruff_cache`、`.pytest_cache`、`tests`、`reports`.
+`backend/.dockerignore`:`.venv`, `**/__pycache__`, `.mypy_cache`, `.ruff_cache`, `.pytest_cache`, `tests`, `reports`.
 
 ## 6. `docker-compose.yml` (final form; migrate added in M1, worker in M3, web in M11)
 

@@ -92,17 +92,8 @@ class Signal:
     available: bool = True
 
 
-def actions(identifier: str, location: str | None, lang: str) -> tuple[str, str]:
+def actions(identifier: str, location: str | None) -> tuple[str, str]:
     if identifier == "H_review_capacity":
-        if lang == "zh":
-            return (
-                f"为 {location} 增加 reviewer 或 code owner，并启用团队自动分配 reviewer。"
-                if location
-                else "为最繁忙的领域增加 reviewer，并启用团队自动分配 reviewer。",
-                f"增加 reviewer 两周后，检查 {location} 的首次 review 等待是否下降。"
-                if location
-                else "增加 reviewer 两周后，检查首次 review 等待是否下降。",
-            )
         return (
             f"Add reviewers or code owners for {location} and enable team auto-assignment."
             if location
@@ -117,44 +108,26 @@ def actions(identifier: str, location: str | None, lang: str) -> tuple[str, str]
             ),
         )
     templates = {
-        "H_ci_bottleneck": {
-            "en": (
-                "Add CI capacity or speed up the slowest workflows, and fix flaky tests.",
-                "After the change, check whether the share of PR time waiting on CI falls.",
+        "H_ci_bottleneck": (
+            "Add CI capacity or speed up the slowest workflows, and fix flaky tests.",
+            "After the change, check whether the share of PR time waiting on CI falls.",
+        ),
+        "H_pr_size_growth": (
+            "Split large changes into smaller PRs and agree on the approach before coding.",
+            (
+                "Over the next month, check whether the share of PRs with 500+ lines "
+                "and the cycle time both fall."
             ),
-            "zh": (
-                "增加 CI 资源或加速最慢的流水线，并修复 flaky 测试。",
-                "调整后检查 PR 等待 CI 的时间占比是否下降。",
+        ),
+        "H_quality_tradeoff": (
+            "Keep the faster flow but restore review depth for large or risky changes.",
+            (
+                "Watch the revert rate over the next two periods; "
+                "it should return to its previous level."
             ),
-        },
-        "H_pr_size_growth": {
-            "en": (
-                "Split large changes into smaller PRs and agree on the approach before coding.",
-                (
-                    "Over the next month, check whether the share of PRs wit"
-                    "h 500+ lines and the cycle time both fall."
-                ),
-            ),
-            "zh": (
-                "把大改动拆成更小的 PR，并在写代码前先对齐方案。",
-                "未来一个月检查 500 行以上 PR 的占比和交付周期是否同时下降。",
-            ),
-        },
-        "H_quality_tradeoff": {
-            "en": (
-                "Keep the faster flow but restore review depth for large or risky changes.",
-                (
-                    "Watch the revert rate over the next two periods; it sho"
-                    "uld return to its previous level."
-                ),
-            ),
-            "zh": (
-                "保留更快的流程，但对大改动或高风险改动恢复充分的 review。",
-                "接下来两个周期关注 revert 率，应回到之前的水平。",
-            ),
-        },
+        ),
     }
-    return templates[identifier][lang]
+    return templates[identifier]
 
 
 def score_hypotheses(

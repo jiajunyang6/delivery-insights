@@ -2,7 +2,7 @@
 
 ## 1. Scope and principles
 
-- Read-only single page: choose repository/period → efficiency, bottlenecks, risks, narrative. English UI text; narrative follows lang.
+- Read-only single page: choose repository/period → efficiency, bottlenecks, risks, narrative. English UI text and narrative output.
 - No router/state/UI libraries; React hooks only, about ten components.
 - Render server text as **plain text**; prohibit dangerouslySetInnerHTML.
 - No frontend unit tests (low styling return per design); gates npm run typecheck/build.
@@ -29,7 +29,7 @@ frontend/
     ├── format.ts          # Number/share/hour formatting; safe links
     ├── styles.css
     └── components/
-        ├── Controls.tsx         # Repository, period, audience, lang
+        ├── Controls.tsx         # Repository, period, audience
         ├── Headline.tsx         # Headline, as_of, freshness
         ├── KpiGrid.tsx          # Efficiency and quality guardrail cards
         ├── TimeLedgerChart.tsx  # Stacked ledger bars
@@ -48,8 +48,8 @@ package.json scripts: dev=vite, build=vite build, typecheck=tsc --noEmit, previe
 
 - Repositories: GET /api/v1/repos items[].repo; default first; show sync status beside options unless ok.
 - Presets Last 7 days/Last 30 days (default)/Last 90 days; UTC today, to=today/from=to-(N-1), matching precompute/cache. Two custom date inputs; disable query if from>to.
-- audience: Director/Manager, default Manager; lang: EN/Chinese, default EN.
-- Synchronize repo/from/to/audience/lang into URL via URLSearchParams/history.replaceState; shareable links; read on load.
+- audience: Director/Manager, default Manager. Narratives always use English; no language selector.
+- Synchronize repo/from/to/audience into URL via URLSearchParams/history.replaceState; shareable links; read on load.
 
 ### 3.2 Loading insights
 
@@ -75,7 +75,7 @@ package.json scripts: dev=vite, build=vite build, typecheck=tsc --noEmit, previe
 
 ### 3.4 Narrative panel
 
-- After snapshot load or audience/lang change, request /api/v1/snapshots/{snapshot_id}/narrative?audience=…&lang=…. First generation may take tens of seconds; show Generating narrative….
+- After snapshot load or audience change, request /api/v1/snapshots/{snapshot_id}/narrative?audience=…. First generation may take tens of seconds; show Generating narrative….
 - Split text with /(\[E\d+\])/; ordinary text nodes, citation buttons E1; clicking highlights/scrolls to evidence entry.
 - Evidence list: label/value/previous/change/ref JSON Pointer/example PR links.
 - Hypothesis cards: title/location/statement citation tags/confidence number+band+bar with "Evidence-strength score, not a calibrated probability"; chain symptom→stage→location→mechanism, counter-evidence, ruled-out alternatives (e.g. H_pr_size_growth ruled out by E30,E31), open alternatives with no data/insufficient sample/below threshold/not in top 3 labels; action/verification; show original band/reason after downgrade; source=llm labeled Outside the hypothesis library.

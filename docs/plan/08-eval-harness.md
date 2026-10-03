@@ -113,7 +113,7 @@ Plant strong effects. If offline gates fail, verify generator against this secti
 python -m insights_eval.run --llm {stub,bedrock} [--seeds 101,202] [--scenarios review_capacity,...] [--out reports]
 ```
 
-- Default seeds 101/202, reserving 42 for golden; all five scenarios; each scenario×seed runs director/en and manager/zh, 20 total.
+- Default seeds 101/202, reserving 42 for golden; all five scenarios; each scenario×seed runs director/en and manager/en, 20 total.
 - Each: generate → build_snapshot_from_repo → narrative.service.generate with ci_complete=True and fixed now.
 - --llm bedrock uses configured region/model; missing key prints AWS_BEARER_TOKEN_BEDROCK is not set, exits 2. Serial, no concurrency.
 - --llm stub uses StubLLMClient.

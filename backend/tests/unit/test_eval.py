@@ -16,7 +16,7 @@ from insights_eval.stub_llm import StubLLMClient
 
 async def test_stub_reads_only_pack_and_produces_valid_tool_output():
     snapshot = golden()
-    pack, _ = build_evidence_pack(snapshot, "manager", "zh", True)
+    pack, _ = build_evidence_pack(snapshot, "manager", True)
     client = StubLLMClient()
     reply = await client.submit(
         system=SYSTEM_PROMPT, messages=[user_message(pack)], tool_spec=TOOL_SPEC
@@ -24,15 +24,15 @@ async def test_stub_reads_only_pack_and_produces_valid_tool_output():
     assert reply == await client.submit(
         system=SYSTEM_PROMPT, messages=[user_message(pack)], tool_spec=TOOL_SPEC
     )
-    assert not validate(reply.tool_input, pack, snapshot, audience="manager", lang="zh")
+    assert not validate(reply.tool_input, pack, snapshot, audience="manager")
     assert reply.tool_use_id and reply.input_tokens == reply.output_tokens == 0
 
 
 async def test_final_recheck_detects_assembly_numeric_and_citation_corruption():
     snapshot = golden()
-    pack, _ = build_evidence_pack(snapshot, "director", "en", True)
+    pack, _ = build_evidence_pack(snapshot, "director", True)
     result = await generate(
-        snapshot, audience="director", lang="en", llm=StubLLMClient(), ci_complete=True, now=AS_OF
+        snapshot, audience="director", llm=StubLLMClient(), ci_complete=True, now=AS_OF
     )
     assert recheck(result.payload, pack, snapshot) == []
     corrupted = deepcopy(result.payload)
@@ -90,6 +90,8 @@ def test_metrics_fail_bad_runs_and_empty_denominators_do_not_pass():
 async def test_default_twenty_run_offline_gates(capsys):
     results = await evaluate(StubLLMClient(), seeds=[101, 202], scenarios=list(SCENARIOS))
     assert len(results) == 20
+    assert {r["lang"] for r in results} == {"en"}
+    assert {r["audience"] for r in results} == {"director", "manager"}
     checked = gates(metrics(results))
     assert all(g["passed"] for g in checked.values()), checked
     assert all(not r["recheck_violations"] for r in results)

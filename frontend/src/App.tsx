@@ -200,7 +200,6 @@ export default function App() {
             <NarrativePanel
               snapshotId={snapshot.snapshot_id}
               audience={audience}
-              lang="en"
             />
             <footer className="report-footer">
               <span>Delivery Insights · Evidence before conclusions.</span>

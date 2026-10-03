@@ -704,7 +704,7 @@ class NarrativeMeta(Contract):
 class Narrative(Contract):
     snapshot_id: str
     audience: Literal["director", "manager"]
-    lang: Literal["en", "zh"]
+    lang: Literal["en"]
     narrative: str
     abstained: bool
     abstain_reason: Literal["no_comparison", "insufficient_signal"] | None
