@@ -1,5 +1,29 @@
 # Acceptance evidence
 
+## English documentation and submission cleanup (2026-10-03)
+
+All 13 plan chapters and AGENTS are now in English. Section numbering, code-fence
+counts and UTF-8 text were checked against the originals; Chinese literals remain
+only where they specify bilingual output or validator behavior. All 18 Markdown
+documents passed local-link, anchor, table-column and code-fence checks.
+
+The docs directory now contains Markdown only. Twelve JSON/screenshot artifacts,
+the redundant PROGRESS journal and the CLAUDE wrapper were removed. Recorded gates
+and all 80 per-case outcomes from the four evaluation suites are retained in
+[EVALUATION.md](EVALUATION.md); original artifacts are recoverable in Git history.
+The README links and packaging anchor were updated. Functional repository files,
+including .gitattributes, ignore files, dependency locks, CI, migrations, scripts,
+test fixtures and golden data, remain part of the deliverable. Ignored local
+environment files, IDE state and dependency/build caches are excluded when packaging.
+
+The complete required gates were rerun after cleanup: Ruff check and format
+(123 files), strict mypy (77 files), 327 unit tests, 381 total tests including
+54 Docker-backed integrations, all eight gates in the 20-case stub eval, and
+frontend typecheck/production build with Node 24.15.0. The stub run at 19:38:06 UTC
+retained 14/16 root-cause hits, 4/4 no-signal abstentions and 0/20 fallbacks.
+No new real Bedrock, GitHub or browser verification was needed for this documentation
+change; their earlier results and limits remain recorded below.
+
 ## Pre-delivery review (2026-10-03, analytics 1.4.0)
 
 The original M0-M12 implementation remains complete; this review adds six focused
@@ -23,7 +47,8 @@ Caching left `snapshot_seed42.json` unchanged, SHA256
 The golden test checks generated output against it, not just its file hash.
 The stub eval passes validity/numeric/citation/hedge consistency 20/20, root-cause
 hits 14/16, no-signal abstention 4/4, high precision 14/14 and fallback 0/20.
-See `eval-offline.json` and `review-fixes-verification.json` for current evidence.
+See [evaluation records](EVALUATION.md) for per-case outcomes; the checks and
+browser steps below retain the review evidence.
 Historical M0-M12 counts, model evaluations and timing measurements below describe
 their original commits. Human golden/UI review, README confirmations, remote CI,
 production release and public submission remain unverified.
@@ -45,8 +70,8 @@ Agent-operated browser acceptance against the rebuilt local Compose stack:
    and removed the alert. Load more then loaded 50 matching rows without errors.
    The new current-day as_of changed snapshot identity even without changed PR content.
 
-Screenshots: [stale report](review-pagination-stale.png),
-[recovered pagination](review-pagination-recovered.png).
+The screenshot files were removed during submission cleanup; the recorded
+steps, snapshot IDs and sync job above retain the browser acceptance result.
 The production API client also passed four isolated Node checks: HTML HTTP 502,
 HTML HTTP 503, structured cursor parameter errors and no-cache propagation.
 The same rebuilt stack generated a real English Bedrock manager narrative with
@@ -74,18 +99,18 @@ actor identity, so commits alone do not establish human activity; see README.
   validation after one repair. E25's value and all example URLs match scoped risks.
 - Browser: legacy lang=zh is removed; no Narrative selector; English displayed;
   Showing 5 of 46; Load more expands to 46; changing to 30 days resets to 5 of 144.
-- Local backfill remains complete at 30 days. Original plan files are unchanged.
+- Local backfill remains complete at 30 days. This implementation change did not alter the original plan.
 
-Evidence: `docs/period-scope-verification.json`. The older milestone results below
+The period-scope measurements above retain the verification summary. Older results below
 are historical checks of analytics 1.2.0; in particular the old 321-risk total and
 language-selector checks no longer describe the current dashboard.
 
 
 Final local acceptance was performed on 2026-10-02 Pacific time.
 The identifiers below map one-to-one to the supplied `docs/plan/12-acceptance-checklist.md`.
-That supplied file is preserved as the original requirements source.
+That checklist is translated into English with the same requirements and item IDs.
 The user limited live backfill to 30 days; original 90/180-day checks are explicitly excluded.
-Real dotnet/runtime and Bedrock checks are recorded in live-acceptance.json. Human review
+Real dotnet/runtime and Bedrock checks are summarized below. Human review
 and causal validity remain unverified; all eight synthetic Bedrock evaluation gates passed.
 
 ## Functional checks
@@ -173,9 +198,9 @@ and causal validity remain unverified; all eight synthetic Bedrock evaluation ga
 
 ## Interpreting these results
 
-`eval-offline.json` is the current analytics 1.4.0 stub report; `eval-bedrock.json` is
-the earlier analytics 1.2.0 prompt-v3 model report. `synthetic-http.json` records
-the standalone local performance/reconciliation run. The latter is not a load benchmark.
+[Evaluation records](EVALUATION.md) retain the analytics 1.4.0 stub suite and the
+earlier analytics 1.2.0 prompt-v3 model suite, with failed v1/v2 baselines.
+The standalone local performance/reconciliation measurements are not a load benchmark.
 The quality-tradeoff seed-101 scenario correctly abstains under the unchanged five-event
 gate; this accounts for the two root-cause misses. Size-duration coupling is an explicit
 synthetic fixture assumption, not an inferred real-world mechanism.
@@ -189,7 +214,7 @@ Remote CI, production deployment, human review and public submission remain unve
 The real model evaluation uses the same synthetic cases during prompt refinement, not a
 held-out set. Its first-attempt rate is exactly the minimum gate; variation on future calls
 is expected. The remaining fallback is a chain-citation violation, not a hidden success.
-`eval-bedrock-v1.json` and `eval-bedrock-v2.json` retain the failed baselines; `bedrock-http.json`
-records synthetic endpoint behavior; live-acceptance.json records the real-repository run.
+Synthetic endpoint and real-repository outcomes are summarized in the tables above.
+Removed raw reports remain recoverable in Git history.
 The user overwrote .env with the example and restored both tokens; guarded setup now avoids this.
 The local .env retains the requested 30-day horizon and 7/30-day precompute settings.

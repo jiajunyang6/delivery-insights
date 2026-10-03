@@ -4,6 +4,9 @@ Deviations and explicit trade-offs relative to `docs/plan/`.
 
 | Date | Topic | Decision | Reason |
 |---|---|---|---|
+| 2026-10-03 | English submission documentation | Translate all 13 plan chapters and AGENTS into English, preserving section numbers, formulas, commands, identifiers and the Chinese literals defining bilingual behavior. Retain later user-approved scope changes in this log rather than silently rewrite the historical plan. | The submitter requested English documentation; language conversion must not change the API or analytics behavior. |
+| 2026-10-03 | Submission artifact cleanup | Remove docs JSON reports, screenshots, the redundant PROGRESS journal and CLAUDE instruction wrapper. Keep acceptance summaries and convert all four eval suites (80 cases) into EVALUATION.md; repair README links. | These artifacts are not runtime/test dependencies; Markdown retains reviewable verification while raw evidence remains recoverable in Git history. |
+| 2026-10-03 | Keep functional repository configuration | Retain .gitattributes, ignore files, lock files, CI, migrations, smoke scripts, test fixtures and golden data. | Windows Git has autocrlf enabled; .gitattributes enforces LF for shell/container files. The other files support reproducible setup, quality checks or secret exclusion, so they are part of the homework deliverable. |
 | 2026-10-02 | Host binding | Bind the demo API and UI to loopback by default | The plan deliberately excludes authentication; localhost is sufficient for the intended demo. |
 | 2026-10-02 | Reopened PR duration | Exclude temporary closed intervals from waiting ledgers, but retain them in elapsed milestone durations | This follows the specified distinction between active waiting and calendar time. |
 | 2026-10-02 | Linked delivery chains | Persist revert, reland and supersession links; defer chain-level elapsed delivery time | Explicit plan deferral; cycle time remains per PR. |

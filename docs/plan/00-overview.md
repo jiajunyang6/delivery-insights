@@ -1,60 +1,64 @@
-# 00 总览
+# 00 Overview
 
-## 1. 产品
+This is the implementation plan, translated from its original Chinese text. Later
+user-approved scope and tooling changes are recorded in `docs/DECISIONS.md`; the
+current behavior and verification status are described in README and `docs/ACCEPTANCE.md`.
 
-**Delivery Insights** 从 GitHub 同步 PR 协作数据，为工程管理者回答四个问题：工作卡在哪、为什么慢、风险在哪、该介入什么。
+## 1. Product
 
-核心指标是 **PR 的交付周期以及其中"在等谁"**：一个改动从开始写代码到合并用了多久，其中多少时间在等 reviewer、等作者修改、等 CI、等合并。选择它的理由（README 中要用英文写清楚）：
+**Delivery Insights** synchronizes GitHub PR collaboration data to answer four questions for engineering managers: where work is stuck, why it is slow, where the risks are, and where to intervene.
 
-- 对应管理者的决策：把周期拆到等待状态和位置（area / 目录）后，每个瓶颈都对应一个具体动作。
-- GitHub 上信号最丰富：PR 时间线同时记录作者、reviewer、CI 和合并动作。
-- 业界通用：对应 DORA 的 Lead Time for Changes；revert 率对应变更失败率。
-- 难以被刷：缩短等待只能靠改善流程；revert 率作为护栏，防止靠放松 review 提速。
+The core metric is **PR delivery cycle time and who the PR is waiting on**: elapsed time from starting a change to merging it, including waiting on reviewers, author updates, CI, or merge. Explain the choice in English in the README:
 
-输出分两部分：
+- It supports management decisions: splitting the cycle by waiting state and location (area / directory) connects each bottleneck to a concrete action.
+- GitHub provides rich signals: PR timelines record author, reviewer, CI, and merge actions.
+- It uses familiar industry measures: cycle time corresponds to DORA's Lead Time for Changes; revert rate approximates change failure rate.
+- It discourages gaming: reducing waiting requires process improvements; revert rate guards against speeding up delivery by weakening review.
 
-- **团队效率（结果）**：交付得快不快、稳不稳、多少投入被浪费，和上一周期比如何。
-- **瓶颈分析（原因）**：时间花在哪 → 卡在哪 → 为什么卡 → 影响多大、先修什么。
+The output has two parts:
 
-headline 把两部分连成一句话：效率怎么变了 → 主要瓶颈 → 建议 → 预期收益。
+- **Team efficiency (outcomes)**: delivery speed, stability, wasted effort, and changes from the previous period.
+- **Bottleneck analysis (causes)**: where time goes → where work is stuck → why → impact and priorities.
 
-Demo 仓库：**`dotnet/runtime`**（大型、活跃、用 `area-*` label 划分负责领域）。
+The headline joins both parts: efficiency change → main bottleneck → recommendation → expected benefit.
 
-## 2. 范围
+Demo repository: **`dotnet/runtime`** (large, active, with ownership areas identified by `area-*` labels).
 
-### P0（必做）
+## 2. Scope
 
-1. GitHub 同步：GraphQL 回填（7 → 30 → 180 天分段）和增量同步，写入 Postgres（arq worker）。
-2. 推导：每个 PR 的"在等谁"状态区间、阶段时长、PR 级事实；关闭 PR 分类；revert / reland / 被替代链；bot 和 backport 识别。
-3. 效率指标：有效吞吐、交付周期（p50/p90）与 N 天内合并比例、等待占比（占整个交付周期）、浪费率、返工率、review 负载集中度、revert 护栏。
-4. 瓶颈：时间账、review 队列流入流出、按位置定位（默认 `area-*` label，回退到目录）、合并阻塞拆解、累计等待排序（Pareto）、what-if、风险 PR（历史 p85）、瓶颈转移、发现（findings）规则引擎、headline。
-5. Endpoint 1：快照、Redis 缓存、ETag/304、problem+json、202 异步流程、PR 明细接口、仓库与同步任务接口、健康检查。
-6. Endpoint 2：证据包、确定性置信度、Bedrock 调用、校验器、重试与模板兜底、缓存。
-7. 核心测试、Docker Compose 一键启动、README（60 秒快速开始）。
+### P0 (required)
 
-### P1（加分，P0 完成后做）
+1. GitHub synchronization: staged GraphQL backfill (7 → 30 → 180 days) and incremental synchronization into Postgres (arq worker).
+2. Derivation: per-PR waiting-state intervals, stage durations, and facts; closed-PR classification; revert / reland / supersession chains; bot and backport detection.
+3. Efficiency metrics: effective throughput, cycle time (p50/p90), share merged within N days, waiting share (of the full cycle), waste rate, rework rate, review-load concentration, and revert guardrail.
+4. Bottlenecks: time ledger, review-queue inflow/outflow, location analysis (default `area-*` labels, directory fallback), merge-block decomposition, cumulative waiting ranking (Pareto), what-if estimates, at-risk PRs (historical p85), bottleneck shifts, findings rule engine, and headline.
+5. Endpoint 1: snapshots, Redis caching, ETag/304, problem+json, asynchronous 202 flow, PR detail endpoint, repository and sync-job endpoints, and health checks.
+6. Endpoint 2: evidence pack, deterministic confidence, Bedrock calls, validator, retries, template fallback, and caching.
+7. Core tests, one-command Docker Compose startup, and README (60-second quickstart).
 
-1. Eval harness（`make eval`）。
-2. React 前端单页。
-3. CODEOWNERS 和 `docs/area-owners.md` 解析，位置级 owner 数量。
-4. CI 等待：GitHub Actions 运行记录的排队、运行时长和 flaky 重跑（dotnet/runtime 的主 CI 在 Azure Pipelines，以 check runs 的形式出现在 GitHub 上，本版不采集；CI 数据不全时 CI 假设的置信度封顶）。
-5. 原因分析（drivers）：指派、review 轮次代价、作者并行 PR、提交时机、最慢 10% 的特征。
-6. 生存分析（Kaplan–Meier）和可预测性指标。
-7. 叙述的 director / manager 两个版本（与 M7 一起实现）。
+### P1 (extras, after P0)
 
-### P2（不做，只在 README 的 "Not done" 中说明）
+1. Eval harness(`make eval`).
+2. Single-page React frontend.
+3. CODEOWNERS and `docs/area-owners.md` parsing, with owner counts by location.
+4. CI waiting: queue/run durations and flaky reruns from GitHub Actions runs (dotnet/runtime's main CI uses Azure Pipelines and appears as GitHub check runs, which this version does not collect; incomplete CI data caps CI-hypothesis confidence).
+5. Drivers: assignment, review-round costs, concurrent author PRs, submission timing, and characteristics of the slowest 10%.
+6. Survival analysis (Kaplan–Meier) and predictability metrics.
+7. Director and manager narrative variants (implemented with M7).
 
-合并到发布的等待、AI 发起的 PR 对 review 的影响、依赖等待（stacked PR、blocked label）、累积流图数据、按工作时间计算、第二个数据源适配器、扩展假设库、webhook 实时更新、API 用户认证。
+### P2 (excluded; describe in README "Not done")
 
-**暂缓**（设计文档提到、本版不做，各在 `docs/DECISIONS.md` 记一条，并写进 README 的 "Not done"）：被替代链和 revert / reland 链的链级交付时长（本版只建立链接，`05` §4.5）；用真实历史回测阈值、校准置信度档位（`08` §5）。
+Merge-to-release waiting, effects of AI-authored PRs on review, dependency waiting (stacked PRs, blocked labels), cumulative flow diagrams, business-hours calculations, a second source adapter, an expanded hypothesis library, real-time webhooks, and API authentication.
 
-### 非目标
+**Deferred** (mentioned in the design but excluded here; record each in `docs/DECISIONS.md` and README "Not done"): chain-level delivery time for supersession and revert / reland chains (links only in this version, `05` §4.5); real-history threshold backtesting and confidence-band calibration (`08` §5).
 
-- 个人生产力指标、个人排行榜、团队之间横向排名。
-- 在请求时调用 GitHub。
-- 让 LLM 计算数字。
+### Non-goals
 
-## 3. 架构
+- Individual productivity metrics, individual leaderboards, or cross-team rankings.
+- Calling GitHub on the request path.
+- Letting the LLM calculate numbers.
+
+## 3. Architecture
 
 ```
                  ┌──────────────┐   GraphQL + REST (read-only token)
@@ -74,97 +78,97 @@ Demo 仓库：**`dotnet/runtime`**（大型、活跃、用 `area-*` label 划分
                         └──────────── validator ◀───────────┘ (retry once, else template)
 ```
 
-要点：
+Key points:
 
-- API **只读** Postgres 和 Redis；所有 GitHub 调用都在 worker 里。
-- 每个 PR 的状态区间和事实在同步时推导一次，请求时只做聚合，所以请求很快。
-- 快照不可变：由参数和数据版本决定 ID，叙述挂在快照下面，保证叙述和数字来自同一份数据。
+- The API **only reads** Postgres and Redis; all GitHub calls run in the worker.
+- PR state intervals and facts are derived once during synchronization; requests only aggregate them for fast responses.
+- Snapshots are immutable: parameters and data versions determine IDs. Narratives attach to snapshots so text and numbers refer to the same data.
 
-## 4. 技术栈（写最低版本，由 uv 锁定具体版本）
+## 4. Technology stack (minimum versions; exact versions locked by uv)
 
-| 层 | 选择 |
+| Layer | Choice |
 |---|---|
-| 语言 | Python 3.12 |
+| Language | Python 3.12 |
 | API | FastAPI ≥ 0.115、uvicorn[standard] ≥ 0.30、Pydantic ≥ 2.8、pydantic-settings ≥ 2.4 |
-| 存储 | Postgres 16、SQLAlchemy[asyncio] ≥ 2.0.30、asyncpg ≥ 0.29、Alembic ≥ 1.13 |
-| 缓存与队列 | Redis 7、redis-py ≥ 5.0（`redis.asyncio`）、arq ≥ 0.26 |
-| 上游客户端 | httpx ≥ 0.27 |
-| LLM | boto3 ≥ 1.40（`bedrock-runtime` Converse API，Bedrock API key 认证） |
-| 计算 | numpy ≥ 2.0 |
-| 其他 | orjson ≥ 3.10、structlog ≥ 24.1、pathspec ≥ 0.12（P1，CODEOWNERS 匹配） |
-| 测试与质量 | pytest ≥ 8、pytest-asyncio ≥ 0.23、respx ≥ 0.21、testcontainers[postgres,redis] ≥ 4.4、ruff ≥ 0.5、mypy ≥ 1.10 |
-| 前端（P1） | Node 20、React 18、Vite 5、TypeScript 5、Recharts 2 |
-| 部署 | Docker、Docker Compose v2、nginx（前端静态文件和 `/api` 反向代理） |
+| Storage | Postgres 16, SQLAlchemy[asyncio] ≥ 2.0.30, asyncpg ≥ 0.29, Alembic ≥ 1.13 |
+| Cache and queue | Redis 7, redis-py ≥ 5.0 (`redis.asyncio`), arq ≥ 0.26 |
+| Upstream client | httpx ≥ 0.27 |
+| LLM | boto3 ≥ 1.40 (`bedrock-runtime` Converse API, Bedrock API key authentication) |
+| Computation | numpy ≥ 2.0 |
+| Other | orjson ≥ 3.10, structlog ≥ 24.1, pathspec ≥ 0.12 (P1, CODEOWNERS matching) |
+| Testing and quality | pytest ≥ 8, pytest-asyncio ≥ 0.23, respx ≥ 0.21, testcontainers[postgres,redis] ≥ 4.4, ruff ≥ 0.5, mypy ≥ 1.10 |
+| Frontend (P1) | Node 20, React 18, Vite 5, TypeScript 5, Recharts 2 |
+| Deployment | Docker, Docker Compose v2, nginx (frontend static files and `/api` reverse proxy) |
 
-不要使用 pandas（numpy 足够，镜像更小）。
+Do not use pandas (numpy is sufficient and keeps the image smaller).
 
-## 5. 仓库结构
+## 5. Repository layout
 
 ```
 delivery-insights/
-├── AGENTS.md  CLAUDE.md  README.md  Makefile
+├── AGENTS.md  README.md  Makefile
 ├── docker-compose.yml  .env.example  .gitignore  .dockerignore
 ├── .github/workflows/ci.yml
-├── scripts/smoke.sh               # 端到端冒烟（02 §7）
+├── scripts/smoke.sh               # End-to-end smoke test (02 §7)
 ├── docs/
-│   ├── plan/                      # 本计划
-│   └── DECISIONS.md               # 实现中偏离计划的记录
+│   ├── plan/                      # This plan
+│   └── DECISIONS.md               # Deviations recorded during implementation
 ├── backend/
 │   ├── pyproject.toml  uv.lock  Dockerfile  alembic.ini
-│   ├── migrations/                # Alembic（async 模板）
+│   ├── migrations/                # Alembic (async template)
 │   ├── src/insights/
 │   │   ├── __init__.py            # __version__
 │   │   ├── main.py                # create_app()
 │   │   ├── config.py              # Settings
-│   │   ├── logging.py             # structlog JSON 日志
+│   │   ├── logging.py             # structlog JSON logging
 │   │   ├── db/
 │   │   │   ├── engine.py          # async engine / session factory
-│   │   │   └── models.py          # SQLAlchemy 模型
-│   │   ├── redis.py               # Redis 连接、键名函数
-│   │   ├── domain.py              # 领域数据类（与来源无关）
-│   │   ├── snapshot_service.py    # 快照服务：就绪检查、缓存、计算、持久化（API 与 worker 共用，06 §5.1）
+│   │   │   └── models.py          # SQLAlchemy models
+│   │   ├── redis.py               # Redis connections and key builders
+│   │   ├── domain.py              # Source-independent domain dataclasses
+│   │   ├── snapshot_service.py    # Shared readiness, cache, computation, persistence (API/worker, 06 §5.1)
 │   │   ├── sources/
 │   │   │   ├── base.py            # SourceAdapter Protocol
 │   │   │   └── github/
-│   │   │       ├── client.py      # httpx 客户端：GraphQL、REST、限流、ETag
-│   │   │       ├── queries.py     # GraphQL 查询文本
-│   │   │       ├── normalize.py   # GitHub JSON → 领域数据类
+│   │   │       ├── client.py      # httpx client: GraphQL, REST, rate limits, ETag
+│   │   │       ├── queries.py     # GraphQL query text
+│   │   │       ├── normalize.py   # GitHub JSON → domain dataclasses
 │   │   │       ├── adapter.py     # GitHubAdapter
-│   │   │       ├── ownership.py   # P1：CODEOWNERS、area-owners 解析
-│   │   │       └── smoke.py       # 冒烟命令（需要凭证）
+│   │   │       ├── ownership.py   # P1: CODEOWNERS and area-owners parsing
+│   │   │       └── smoke.py       # Smoke command (credentials required)
 │   │   ├── sync/
 │   │   │   ├── worker.py          # arq WorkerSettings
-│   │   │   ├── jobs.py            # arq 任务函数
-│   │   │   ├── queue.py           # enqueue_sync（API 与 worker 共用，不导入 sources；04 §6.8）
-│   │   │   ├── store.py           # upsert 与读取
-│   │   │   ├── invariants.py      # 不变式检查命令（读库，调用 timeline.check_invariants）
-│   │   │   └── derive.py          # 推导编排（调用 analytics 的纯函数）
+│   │   │   ├── jobs.py            # arq job functions
+│   │   │   ├── queue.py           # Shared enqueue_sync; no sources imports (04 §6.8)
+│   │   │   ├── store.py           # Upserts and reads
+│   │   │   ├── invariants.py      # Invariant CLI (reads DB, calls timeline.check_invariants)
+│   │   │   └── derive.py          # Derivation orchestration using analytics pure functions
 │   │   ├── analytics/
-│   │   │   ├── thresholds.py      # 所有阈值常量
-│   │   │   ├── timeline.py        # 状态机 → 区间（纯函数）
-│   │   │   ├── facts.py           # PR 级事实（纯函数）
-│   │   │   ├── classify.py        # bot、backport、关闭分类、revert/reland/被替代（纯函数）
-│   │   │   ├── stats.py           # 分位数、bootstrap、KM（纯函数）
-│   │   │   ├── dataset.py         # 从数据库加载某周期所需数据
+│   │   │   ├── thresholds.py      # All threshold constants
+│   │   │   ├── timeline.py        # State machine → intervals (pure function)
+│   │   │   ├── facts.py           # Per-PR facts (pure function)
+│   │   │   ├── classify.py        # Bots, backports, closed PRs, revert/reland/supersession (pure functions)
+│   │   │   ├── stats.py           # Quantiles, bootstrap, KM (pure functions)
+│   │   │   ├── dataset.py         # Load data needed for a period from the database
 │   │   │   ├── efficiency.py
 │   │   │   ├── bottlenecks.py
 │   │   │   ├── findings.py
 │   │   │   ├── drivers.py         # P1
 │   │   │   ├── ci.py              # P1
-│   │   │   ├── snapshot.py        # 组装快照、headline、规范化 JSON、哈希
-│   │   │   └── rows.py            # PR 明细行（/v1/insights/delivery/prs）
+│   │   │   ├── snapshot.py        # Snapshot/headline assembly, canonical JSON, hashing
+│   │   │   └── rows.py            # PR detail rows (/v1/insights/delivery/prs)
 │   │   ├── narrative/
-│   │   │   ├── evidence.py        # 证据包
-│   │   │   ├── hypotheses.py      # 假设库与评分
+│   │   │   ├── evidence.py        # Evidence pack
+│   │   │   ├── hypotheses.py      # Hypothesis library and scoring
 │   │   │   ├── prompt.py          # system prompt、tool schema
 │   │   │   ├── llm.py             # LLMClient Protocol、BedrockClient、FakeLLMClient
 │   │   │   ├── validator.py
-│   │   │   ├── template.py        # 模板叙述
-│   │   │   └── service.py         # 生成、校验、重试、兜底、缓存
+│   │   │   ├── template.py        # Template narrative
+│   │   │   └── service.py         # Generation, validation, retries, fallback, caching
 │   │   └── api/
 │   │       ├── deps.py  errors.py  middleware.py  params.py
-│   │       ├── schemas.py         # Pydantic 响应模型（与 06-api.md 一致）
-│   │       ├── caching.py         # ETag 工具
+│   │       ├── schemas.py         # Pydantic response models (matching 06-api.md)
+│   │       ├── caching.py         # ETag utilities
 │   │       └── routes/  health.py  insights.py  snapshots.py  repos.py  sync_jobs.py
 │   ├── eval/insights_eval/        # generator.py、pipeline.py、scenarios.py（M5）；stub_llm.py、metrics.py、run.py（M10）
 │   └── tests/  unit/  integration/  fixtures/  golden/
@@ -174,30 +178,30 @@ delivery-insights/
     └── src/
 ```
 
-`eval/` 作为独立包 `insights_eval` 放在 `backend/eval/insights_eval/`，在 `pyproject.toml` 中与 `insights` 一起打包（见 02）。
+Package `eval/` separately as `insights_eval` under `backend/eval/insights_eval/`, alongside `insights` in `pyproject.toml` (see 02).
 
-## 6. 术语
+## 6. Terminology
 
-| 术语 | 含义 |
+| Term | Meaning |
 |---|---|
-| ready_at | PR 进入可 review 状态的时间：非 draft 创建则为 `created_at`；draft 创建则为第一次 `ReadyForReviewEvent` |
-| 阶段（stage） | coding（首个 commit → ready）、pickup（ready → 首次人工 review）、review（首次 review → approve）、merge（approve → 合并） |
-| 等待状态（ledger state） | ready 之后每段时间只归入一个：`waiting_reviewer`、`waiting_author`、`waiting_ci`、`waiting_merge`；ready 之前为 `coding`；关闭后又重开之间的关闭期为 `closed`，不属于任何等待状态 |
-| 人工 review | 非作者、非 bot 账号提交的、状态为 APPROVED / CHANGES_REQUESTED / COMMENTED 的 review |
-| 位置（location） | 瓶颈定位维度的取值，例如 `area-System.Net.Http`、`dir:src/coreclr` |
-| 快照（snapshot） | 某组仓库、某周期、某数据版本下计算出的完整 insight，不可变 |
-| data_version | 每个仓库的数据版本号，同步改变了数据时加 1 |
-| as_of | 快照的"观察时刻"：`min(to 的次日零点, 各仓库 last_synced_at 的最小值)`（`05` §6.1）；`period.complete` 表示请求的周期是否被完整观察到 |
-| coverage | 仓库已同步覆盖的最早时间 `covered_since` |
-| 证据包（evidence pack） | 由快照生成、交给 LLM 的结构化证据 |
-| 假设库（hypothesis library） | 预定义的根因假设，每个都要求效率侧"症状"和瓶颈侧"机制" |
+| ready_at | Time the PR becomes reviewable: `created_at` if opened non-draft; otherwise the first `ReadyForReviewEvent` |
+| Stage | coding (first commit → ready), pickup (ready → first human review), review (first review → approval), merge (approval → merge) |
+| Ledger state | Each post-ready interval belongs to exactly one of `waiting_reviewer`, `waiting_author`, `waiting_ci`, `waiting_merge`; pre-ready time is `coding`; temporary closure before reopening is `closed` and is not waiting |
+| Human review | Review by a non-author, non-bot account with APPROVED / CHANGES_REQUESTED / COMMENTED state |
+| Location | Bottleneck-location value, such as `area-System.Net.Http` or `dir:src/coreclr` |
+| Snapshot | Complete immutable insight for repositories, period, and data version |
+| data_version | Per-repository data version, incremented when synchronization changes data |
+| as_of | Snapshot observation time: `min(midnight after to, minimum repository last_synced_at)` (`05` §6.1); `period.complete` indicates full observation of the requested period |
+| Coverage | Earliest synchronized repository time, `covered_since` |
+| Evidence pack | Structured evidence generated from a snapshot and passed to the LLM |
+| Hypothesis library | Predefined root-cause hypotheses, each requiring an efficiency symptom and a bottleneck mechanism |
 
-## 7. 全局约定
+## 7. Global conventions
 
-- **时间**：全部用带时区的 UTC `datetime`。周期 `[from, to]` 按天，对应半开区间 `[from 00:00Z, to+1 00:00Z)`。时长单位为小时（`float`），API 输出保留 2 位小数。
-- **时间口径**：UTC 自然时间，不扣除周末和节假日（取舍写进 README）。
-- **统计范围**：只统计目标分支为仓库默认分支的 PR；backport、bot 作者的 PR 和从未 ready 的 draft 不计入流程指标，只在 `meta.excluded` 中计数。
-- **团队层面**：个人只出现在 `review_load.distribution` 和风险 PR 的 `author` 字段。
-- **确定性**：bootstrap 的随机种子由快照参数哈希得出；所有列表都有明确的排序规则（见各规格）。
-- **时间可注入**：领域代码不直接调用 `datetime.now()`。API 通过依赖 `insights.api.deps.get_now` 获取当前时间，worker 任务和服务函数接收 `now` 参数，测试和合成数据因此可以固定"今天"。
-- **版本号**：`insights.analytics.ANALYTICS_VERSION = "1.0.0"`，`thresholds.THRESHOLDS_VERSION = "1.0.0"`，`narrative.prompt.PROMPT_VERSION = "v1"`。修改算法、阈值或 prompt 时递增，旧快照和叙述不再命中。
+- **Time**: timezone-aware UTC `datetime`. Day-based `[from, to]` maps to `[from 00:00Z, to+1 00:00Z)`. Durations are hours (`float`), rounded to 2 decimals in API output.
+- **Time basis**: UTC wall-clock time, including weekends and holidays (document in README).
+- **Population**: PRs targeting the default branch only; backports, bot-authored PRs, and drafts never made ready are excluded from flow metrics and counted in `meta.excluded`.
+- **Team-level reporting**: individuals appear only in `review_load.distribution` and the at-risk PR `author` field.
+- **Determinism**: bootstrap seeds derive from the snapshot parameter hash; all lists have explicit sort orders (see individual specifications).
+- **Injectable time**: domain code does not call `datetime.now()` directly. The API uses `insights.api.deps.get_now`; worker jobs and services receive `now` so tests and synthetic data can fix "today".
+- **Versions**: `insights.analytics.ANALYTICS_VERSION = "1.0.0"`, `thresholds.THRESHOLDS_VERSION = "1.0.0"`, `narrative.prompt.PROMPT_VERSION = "v1"`. Increment the relevant version when algorithms, thresholds, or prompts change to avoid old cache hits.

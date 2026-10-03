@@ -1,35 +1,35 @@
-# 11 README 与提交说明
+# 11 README and submission notes
 
-## 1. 要求
+## 1. Requirements
 
-- `README.md` 放在仓库根目录，**英文**，评审会像读队友的 PR 一样读它。提交说明就是 README 中的 "Submission notes" 一节，不另建文件。
-- 篇幅控制在 300–450 行；表格优先于长段落；每节先给结论。
-- **不写没有验证过的数字**。耗时、样本量、真实结果等只写实际测到的；没有凭证、没测到的写成不带数字的描述，并在最终报告的"待人工验证"中列出。
-- README 中的命令必须与 Makefile、Compose、`.env.example` 一致，M12 逐条执行一遍。
-- 作业 PDF 对 NOTES / README 的要求：说明取舍和刻意不做的事、**如何使用了 AI（用来做什么、怎么用）**、**再多一天会做什么**；提交形式为公开的 Git 仓库，或包含 `.git` 目录的 zip / tarball（PDF 第 3–4 页）。对应 §7.5、§7.6 和 §9。
+- Root README.md in **English**, written for reviewers reading it like a teammate's PR. Submission notes are a README section, not a separate file.
+- 300–450 lines; prefer tables to long prose; lead each section with its conclusion.
+- **No unverified numbers**: timings/sample sizes/results only from actual measurements. Without credentials/measurements use nonnumeric descriptions and list pending verification in final report.
+- Commands match Makefile/Compose/.env.example; execute every command in M12.
+- Assignment PDF requires trade-offs/deliberate omissions, **AI uses and workflow**, **one more day** priorities; public Git repository or zip/tarball with .git, PDF pages3–4; §7.5/§7.6/§9.
 
-## 2. 章节结构（按顺序）
+## 2. Section order
 
-1. **Delivery Insights**：一段话说明服务做什么、给谁用（engineering managers and directors）、两个 endpoint。
-2. **Quickstart (60 seconds)**：见 §3。
-3. **The insight and why this metric**：见 §4。
-4. **How it works**：Mermaid 架构图（§5）、数据流四步（sync → derive → snapshot → narrative）、组件列表（api、worker、postgres、redis、web、migrate）。
-5. **API**：`06` §1 的 endpoint 表；3–4 个 curl 示例（取自 `06` §8：insight、304、snapshot、narrative）；说明 202 / `Retry-After`、problem+json、ETag；指向 `/docs`。
-6. **Narrative, confidence and evidence chain**：证据包、假设库（4 个假设的症状和机制各一行）、置信度公式和一个算例（`07` §4.5）、档位与措辞、校验器（逐句核对数字来自本句引用的证据、正文措辞不超过假设档位）、重试一次、模板兜底、`generated_by`。明确写出：置信度是确定性的**证据强度分数，没有用真实数据校准过**，不是概率（见 §7.1）。
-7. **Configuration**：环境变量表（`02` §1 中用户需要关心的：`GITHUB_TOKEN`、`AWS_BEARER_TOKEN_BEDROCK`、`AWS_REGION`、`BEDROCK_MODEL_ID`、`TRACKED_REPOS`、`LOCATION_DIMENSION`、`BACKFILL_DAYS`、`SYNC_INTERVAL_MINUTES`、`CI_SOURCE`、`CI_COMPLETE`、`CORS_ORIGINS`、`RATE_LIMIT_PER_MINUTE`），以及如何创建 fine-grained token（Repository access 选 "Public repositories"，不加权限）。
-8. **Operations**：健康检查；结构化日志（字段）；同步状态（`GET /v1/repos`）和手动同步；数据保留（快照 7 天、同步任务 30 天）；限流；重置数据（`docker compose down -v`）；常见问题（202 一直不结束 → 看 Pending 中的 `reason` 和 `job`，以及 `last_sync_status`；`reason = rederive` 表示配置或版本变化后正在整仓重推导，失败的重推导会在下一个同步周期自动重试；叙述总是模板 → 查 `meta.fallback_reason`）。
-9. **Security**：§6。
-10. **Testing and evaluation**：测什么、为什么（`10` §1、§7 的摘要）；命令；最近一次 `make test` 和 `make eval-offline` 的结果（M12 执行后填写真实数字）；`make eval` 需要 Bedrock key。
-11. **Submission notes**：
-    1. Key trade-offs（§7.1）
-    2. Things deliberately not done（§7.2）
-    3. Beyond the brief（§7.3）
-    4. Known limitations and next steps（§7.4）
-    5. AI assistance（§7.5，作业要求）
-    6. With one more day（§7.6，作业要求）
-12. **Development**：`make` 目标、目录结构（一层即可）、`docs/plan/`（实施计划）、`docs/DECISIONS.md`（实现中的决定）。
+1. **Delivery Insights**: purpose, engineering manager/director audience, two endpoints in one paragraph.
+2. **Quickstart (60 seconds)**: §3.
+3. **The insight and why this metric**: §4.
+4. **How it works**: Mermaid (§5), sync→derive→snapshot→narrative, component list api/worker/postgres/redis/web/migrate.
+5. **API**: `06` §1 endpoint table; 3–4 curl examples from §8 (insight/304/snapshot/narrative);202/Retry-After/problem+json/ETag; link /docs.
+6. **Narrative, confidence and evidence chain**: pack, four hypotheses with symptom/mechanism, formula/worked example (`07` §4.5), bands/wording, sentence-local numeric validator and causal-band limits, one repair/template/generated_by. State **deterministic evidence strength, uncalibrated on real data**, not probability (§7.1).
+7. **Configuration**: user-relevant `02` §1 variables: GITHUB_TOKEN/AWS_BEARER_TOKEN_BEDROCK/AWS_REGION/BEDROCK_MODEL_ID/TRACKED_REPOS/LOCATION_DIMENSION/BACKFILL_DAYS/SYNC_INTERVAL_MINUTES/CI_SOURCE/CI_COMPLETE/CORS_ORIGINS/RATE_LIMIT_PER_MINUTE; fine-grained public-repository token, no extra permissions.
+8. **Operations**: health/JSON log fields/repo status/manual sync/7-day snapshots/30-day jobs/rate limits/reset via docker compose down -v. Persistent202: inspect reason/job/status; rederive means version/config reprocessing, retried next cycle after failure. Template-only narratives: inspect fallback_reason.
+9. **Security**:§6.
+10. **Testing and evaluation**: why/what (`10` §1/§7); commands/latest measured make test/eval-offline after M12; real eval needs key.
+11. **Submission notes**:
+    1. Key trade-offs(§7.1)
+    2. Things deliberately not done(§7.2)
+    3. Beyond the brief(§7.3)
+    4. Known limitations and next steps(§7.4)
+    5. AI assistance (§7.5, required)
+    6. With one more day (§7.6, required)
+12. **Development**: make targets, one-level layout, docs/plan requirements, docs/DECISIONS implementation choices.
 
-## 3. Quickstart 模板
+## 3. Quickstart template
 
 ````markdown
 ## Quickstart (60 seconds)
@@ -57,9 +57,9 @@ Without `AWS_BEARER_TOKEN_BEDROCK` everything works; the narrative endpoint uses
 (`meta.generated_by: "template"`).
 ````
 
-如果 M12 实测了首批数据（7 天）就绪的时间，在 "The worker starts backfilling" 一句后补一句实测值（例如 "On our machine the first 7 days were ready after about N minutes."）；没测就不写。
+If M12 measures first-seven-day readiness, add actual time after the backfill sentence, e.g. "On our machine the first 7 days were ready after about N minutes." Otherwise omit timing.
 
-## 4. "The insight and why this metric"（英文草稿，按实现调整）
+## 4. "The insight and why this metric" (English draft; adjust to implementation)
 
 > The core metric is **PR cycle time and who it is waiting on**: how long a change takes from its first commit to merge, and how much of that time is spent waiting on reviewers, on the author, on CI or to merge. The headline waiting share is measured against the whole cycle (coding plus post-ready time) as a proxy for flow efficiency; the time ledger then breaks down the post-ready part by who the PR is waiting on. Every response has two parts: **team efficiency** (the outcome: how fast, how stable, how much work was wasted, compared with the previous period) and **bottleneck analysis** (the cause: where the time goes, where it is stuck, why, and what to fix first, with a what-if estimate). The headline joins them in one sentence.
 >
@@ -69,7 +69,7 @@ Without `AWS_BEARER_TOKEN_BEDROCK` everything works; the narrative endpoint uses
 > - **It is an industry standard.** It corresponds to DORA's lead time for changes; the revert rate approximates the change failure rate.
 > - **It is hard to game.** Waiting only shrinks when the process improves, and the revert rate is shown next to cycle time as a guardrail against buying speed with weaker review.
 
-## 5. 架构图（Mermaid）
+## 5. Architecture diagram (Mermaid)
 
 ```mermaid
 flowchart LR
@@ -87,7 +87,7 @@ flowchart LR
   V -->|fail twice| T[template]
 ```
 
-## 6. Security 小节要点
+## 6. Security section points
 
 - Tokens are read only from environment variables (`SecretStr`) and are never logged; request headers and full upstream responses are not logged either. `.env` is git-ignored.
 - Every input is validated against allow-list patterns; repositories must be in `TRACKED_REPOS`; the GitHub base URL comes only from configuration, so there is no SSRF path.
@@ -97,7 +97,7 @@ flowchart LR
 - The UI renders all server text as plain text; links are limited to `https://github.com/`.
 - Containers run as non-root users.
 
-## 7. Submission notes（英文草稿）
+## 7. Submission notes (English draft)
 
 ### 7.1 Key trade-offs
 
@@ -137,7 +137,7 @@ flowchart LR
 
 ### 7.3 Beyond the brief
 
-列出实际完成的项（没做完的不写）：确定性置信度 + 证据链 + 校验器 + 模板兜底；`org=` 多仓库汇总；可复查的不可变快照与 ETag；PR 级下钻接口；分阶段回填与开着的 PR 扫描；director / manager × en / zh 叙述；eval harness；React 前端；CODEOWNERS 与 area-owners 解析；GitHub Actions 的 CI 等待；drivers；Kaplan–Meier 与可预测性；容器化与 CI 工作流。
+List completed extras only: deterministic confidence/chains/validator/fallback; org multi-repo aggregation; immutable snapshots/ETags; PR drilldown; staged backfill/open sweep; director/manager×en/zh; eval; React; ownership parsing; Actions CI; drivers; KM/predictability; containers/CI workflow.
 
 ### 7.4 Known limitations and next steps
 
@@ -149,9 +149,9 @@ flowchart LR
 - Thresholds and confidence weights are initial, explained values (see `docs/plan/05-analytics.md` §1 and `07-narrative.md` §4); they have not been backtested on real data yet.
 - To verify after the first sync of dotnet/runtime: human review coverage, bot PR share, and the share of PRs with an area label (`meta.location_sources`).
 
-### 7.5 AI assistance（英文模板；agent 起草，提交人定稿）
+### 7.5 AI assistance (agent draft, submitter finalizes)
 
-这一节必须真实。agent 只填写它自己能确认的事实（自己是什么工具和模型、写了哪些部分、实际执行过哪些命令和检查、哪些没有执行）；关于人做了什么的内容一律保留为 `<confirm: …>` 占位符，由提交人填写或删除，agent 不得替人声称"审阅过""做过决定"。最终报告的"待人工验证"中列出这些占位符（`12` G4）。
+Be truthful. Agent writes only confirmed facts: its tool/model, authored components, executed checks/results, unperformed checks. Human actions remain <confirm: …> for submitter to fill/delete; never invent human review/decisions. List placeholders in final pending-human section (`12` G4).
 
 ```markdown
 ### AI assistance
@@ -163,7 +163,7 @@ flowchart LR
 - **Not verified:** <agent: anything that was not run, e.g. the Bedrock eval without credentials>.
 ```
 
-### 7.6 With one more day（英文；按实际剩余工作排序，最多 5 条）
+### 7.6 With one more day (English; actual priorities, at most five)
 
 ```markdown
 ### With one more day
@@ -174,9 +174,9 @@ flowchart LR
 4. Add an optional business-hours mode per repository.
 ```
 
-M12 时把已经完成的项删掉，把实际最重要的剩余工作补上，并按影响从大到小排序。
+In M12 remove completed items, add actual remaining priorities, sort by impact.
 
-## 8. `docs/DECISIONS.md` 格式
+## 8. `docs/DECISIONS.md` format
 
 ```markdown
 # Decisions
@@ -188,21 +188,21 @@ Deviations from `docs/plan/` made during implementation.
 | 2026-10-05 | Snapshot computation lock | No lock; duplicate cold computations are deduplicated by `ON CONFLICT` | Simpler; computation is deterministic and takes seconds |
 ```
 
-每条一行，写清楚"做了什么"和"为什么"，不写过程。上面的示例行就是计划中已经确定的取舍，可以作为第一条；以下暂缓项也要各记一条：置信度和阈值没有用真实数据校准（`08` §5）、链级交付时长（`05` §4.5 末尾的暂缓说明）。
+One row per decision: what/why, not chronology. Example is a planned trade-off suitable as first entry. Also record uncalibrated real-data confidence/thresholds (`08` §5) and chain timing (`05` §4.5).
 
-## 9. 提交形式（PDF 第 3–4 页）
+## 9. Submission format (PDF pages 3–4)
 
-两种方式二选一：公开的 Git 仓库，或包含 `.git` 目录的 zip / tarball。M12 只做**准备和检查**，推送到公开仓库、上传或发送提交都由人完成（`AGENTS.md` §6、§8）：
+Choose public Git repository or zip/tarball containing .git. M12 only **prepares/checks**; human creates remote, pushes, uploads/sends (`AGENTS.md` §6/§8):
 
-- `git status --porcelain` 为空；每个里程碑都有提交；历史中没有密钥（`12` D1）。
-- 如果用压缩包：从一个全新的本地克隆打包，这样只包含已提交的文件和完整的 `.git`，不会带上 `.env`、`node_modules`、`.venv`、`dist`、`reports` 等未跟踪文件。在仓库根目录执行下面的脚本。每一行都只用绝对路径或现算的仓库根目录，作用在克隆上的 git 命令都带 `-C /tmp/di-submission/delivery-insights`，不用变量、不 `cd`，所以无论整体执行还是逐行在新 shell 里执行，都不会改动原仓库：
+- Empty git status --porcelain; commit per milestone; no history secrets (`12` D1).
+- Archive a fresh local clone: committed files and full .git only, no ignored .env/node_modules/.venv/dist/reports. Run below at repo root. Absolute or freshly resolved root paths; clone operations explicitly -C /tmp/di-submission/delivery-insights, no variables/cd; safe for original repository even when executed individually in new shells:
 
   ```bash
   bash -eu <<'SH'
   rm -rf /tmp/di-submission
   git clone --quiet --no-hardlinks "$(git rev-parse --show-toplevel)" /tmp/di-submission/delivery-insights
-  git -C /tmp/di-submission/delivery-insights remote remove origin               # 去掉指向本机路径的远程
-  git -C /tmp/di-submission/delivery-insights reflog expire --expire=now --all   # 去掉 "clone: from <本机路径>"
+  git -C /tmp/di-submission/delivery-insights remote remove origin               # Remove local-path remote
+  git -C /tmp/di-submission/delivery-insights reflog expire --expire=now --all   # Remove local-path clone reflog
   git -C /tmp/di-submission/delivery-insights gc --prune=now --quiet
   tar -C /tmp/di-submission -czf "$(git rev-parse --show-toplevel)/../delivery-insights.tar.gz" delivery-insights
   tar -tzf "$(git rev-parse --show-toplevel)/../delivery-insights.tar.gz" | grep '^delivery-insights/.git/HEAD$' >/dev/null && echo "has .git"
@@ -212,6 +212,6 @@ Deviations from `docs/plan/` made during implementation.
   SH
   ```
 
-  三条检查分别输出 `has .git`、`no local files`、`no local path`，最后一行是压缩包的绝对路径（仓库的上一级目录），写进最终报告。不要用 `git archive`：它不包含 `.git`。打包是 M12 的**最后一步**：在 `12` 的其他条目都完成、README 和 DECISIONS 定稿并提交之后执行；之后再有提交就重新打包。
-- 如果用公开仓库：由人创建远程并推送，之后用 `git ls-remote <url>` 在未登录的环境确认可以访问。
-- 提交人填写 README 中的 `<confirm: …>` 占位符并提交之后，再按上面的命令重新打包（或推送），这样提交物里的 README 是定稿。
+  Checks print has .git / no local files / no local path; final line absolute archive path in parent directory, included in final report. Do not use git archive (omits .git). Packaging is M12's **last step** after other checks and committed finalized README/DECISIONS; repackage after later commits.
+- Public repo: human creates/pushes remote; verify unauthenticated git ls-remote <url> afterward.
+- After human fills/commits README <confirm: …>, repackage (or push) so submission includes finalized disclosure.
