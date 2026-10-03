@@ -17,3 +17,19 @@ The plan is the requirements source. Milestones are accepted only after their ga
 | M10 | Passed offline; live Bedrock completed in M12 | Ruff/strict mypy passed; 283 unit and 332 total tests (49 integration) passed. Default 20-run offline evaluation exits 0: first-attempt validity, numeric/citation/hedge consistency, abstention and high precision 1.0; root-cause hits 0.875 (14/16); fallback 0.0. Report: docs/eval-offline.json. Missing-key Bedrock command exits 2. Generator assumptions and intentional golden refresh are documented. |
 | M11 | Passed locally; human visual review pending | npm ci, TypeScript and Vite build passed; npm audit: zero findings. Docker UI and proxied health returned 200. Agent browser checked manager/director, EN/Chinese, 20-to-50-to-97 risk pagination, citation highlighting, date presets and 202 rederive/stale progress using 2,172 synthetic PRs; console errors absent. Ruff/strict mypy, 283 unit and 332 total tests passed. HTTP narrative cache aligned with the authoritative one-hour contract. |
 | M12 | Local implementation and real Bedrock accepted; archive prepared after commit | README (450 lines), A–H audit, security/history scan, fresh-clone startup and Redis recovery passed. Ruff/format/mypy, 287 unit and 336 total tests pass. Final offline 20-case gates pass; real Bedrock v3: first-valid 18/20, final-LLM 19/20, fallback 1/20, all eight gates pass. All four real Bedrock HTTP variants pass. Earlier failed model baselines are retained. GitHub/human checks remain pending; final commit and archive checks are recorded externally. |
+
+
+## Credentialed follow-up (2026-10-03 UTC)
+
+Historical milestone counts above describe those commits. The follow-up completes live
+acceptance for the user's reduced 30-day scope; original 90/180-day gates were not run.
+
+- Fixed GraphQL Team.slug requesting unnecessary organization permissions; real minimal-scope calls pass.
+- Fixed nginx DNS refresh after API recreation and preserved existing .env on repeated Quickstart.
+- Honored BACKFILL_DAYS=30 / PRECOMPUTE_DAYS=7,30; resume reports target=30 without losing rows or coverage.
+- Final gates: 338 tests (288 unit, 50 integration), Ruff/format and strict mypy pass.
+- 3541 real PRs, zero invariant violations; 533 merged / 321 risk rows reconcile; three PR page timestamps match exactly.
+- 1171 Actions runs and 217 ownership rules loaded; both location modes and restart/resume verified.
+- Four real-repo Bedrock variants pass after one repair each; smoke exits 0. Literal-key log matches=0 for both credentials.
+- 30-day worker cold=1376.95ms; 50-request warm p95=32.32ms. Comparison baseline unavailable for a full previous 30 days.
+- Detailed evidence: live-acceptance.json and ACCEPTANCE.md. Human golden/UI review, three README confirmations, remote CI and submission remain human tasks.

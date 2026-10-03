@@ -7,8 +7,8 @@ which process changes are worth investigating, and what evidence supports an exp
 English or Chinese prose, hypotheses, evidence chains and next actions.
 
 The implementation covers P0 and P1 in [the implementation plan](docs/plan/00-overview.md).
-Local automated checks and real Bedrock evaluation on synthetic data pass. Live GitHub
-checks and human review remain pending. See [acceptance evidence](docs/ACCEPTANCE.md) for the precise boundary.
+Automated checks, real Bedrock evaluation and 30-day GitHub acceptance pass. The user limited
+live backfill to 30 days; 90/180-day checks and human signoff are excluded. See [acceptance evidence](docs/ACCEPTANCE.md).
 
 ## Quickstart (60 seconds)
 
@@ -30,7 +30,7 @@ The API and UI bind to loopback. Postgres and Redis have no published host ports
 
 The worker backfills `dotnet/runtime` in 7-, 30- and 180-day stages by default.
 Until a requested period is covered, the API returns `202` with `Retry-After` and the UI
-shows progress. Backfill duration has not been measured against the live repository.
+shows progress. For the verified 30-day demo, set `BACKFILL_DAYS=30` and `PRECOMPUTE_DAYS=7,30`.
 
 ```bash
 API=http://localhost:8000
@@ -307,18 +307,18 @@ Latest local verification: 2026-10-02 Pacific time. On Windows without GNU make,
 | Check | Observed result |
 |---|---|
 | Ruff check/format and strict mypy | Pass; 122 formatted files, 77 typed source/eval files |
-| Unit suite | 287 passed |
-| Full suite | 336 passed, including 49 integration tests |
+| Unit suite | 288 passed |
+| Full suite | 338 passed, including 50 integration tests |
 | Frontend `npm ci`, typecheck and build | Pass with Node 24; npm audit: 0 findings |
 | Real local HTTP / browser | Health, templates, Bedrock, ETags, drilldown, audience/language, citations and pending UI checked |
-| Synthetic stored timelines | 2,172 PRs; 0 invariant violations |
-| Synthetic ledger reconciliation | 427 merged PRs; relative rounding error 0.00000765 |
-| Synthetic 90-day cold HTTP | 526.27 ms; 894 merged PRs |
-| Synthetic 50-request warm HTTP p95 | 35.83 ms |
+| Real GitHub stored timelines | 3,541 PRs; 0 invariant violations; three PR page timestamp checks match |
+| Real 30-day ledger reconciliation | 533 merged PRs; relative rounding error 0.0000004833 |
+| Real 30-day worker cold compute | 1,376.95 ms; 533 merged PRs; 90 days excluded by request |
+| Real 30-day, 50-request warm HTTP p95 | 32.32 ms at the API loopback endpoint |
 
-These performance numbers are one local synthetic run through nginx, not the required
-live dotnet/runtime benchmark. Nine upstream Testcontainers/pathspec deprecation warnings
-remain in the full test output; they are not test failures.
+These are local dotnet/runtime measurements, not a production load benchmark. The original
+90-day performance gate was not run under the requested 30-day scope. Nine upstream
+Testcontainers/pathspec deprecation warnings remain; they are not test failures.
 
 The harness runs five planted scenarios × two seeds × two audience/language combinations.
 The offline client is a deterministic stub; the live run uses Bedrock Sonnet 4.6, prompt v3.
@@ -337,7 +337,7 @@ outcomes. Numeric/citation/hedge denominators include only final LLM outputs, ex
 Both suites pass all gates. Quality-tradeoff seed 101 abstains because its previous-period
 baseline fails the five-event gate; thresholds are unchanged. Medium/low precision is undefined.
 Prompt v1/v2 failed; their reports are retained. V3 repairs length, citation and hedge guidance.
-One v3 chain-citation failure still falls back safely. Four live HTTP narrative variants pass.
+One v3 eval chain-citation failure falls back safely. Four real-repo HTTP variants pass after one repair each.
 This small synthetic suite was used during prompt development; it is not a held-out benchmark
 or real-world causal calibration. Missing-key evaluation exits 2 with a configuration message.
 
@@ -386,8 +386,8 @@ Private membership prevents expanding some owner teams into people; teams count 
 Small samples suppress p50 below 20, p90 below 30, and rates below 30 cases/5 events.
 Driver/location measures have their own documented gates. Insufficient values remain null.
 Actions telemetry may omit the demo repository's primary Azure Pipelines CI.
-GitHub permissions, quotas, data reconciliation, backfill resume and real-repo latency
-still need credentialed verification; confidence needs historical replay and human labels.
+The live demo covers 30 days, so a full previous 30-day baseline is unavailable. Observed CI
+coverage is 36.77%; confidence still needs historical replay and human labels.
 The plan-selected Recharts 2 branch is deprecated; migration to v3 is a maintenance follow-up.
 The supplied golden fixture still needs a person's numeric review; browser checks here were
 performed by the coding agent, not signed off by a human. Remote CI has not been run.
@@ -396,14 +396,14 @@ performed by the coding agent, not signed off by a human. Remote CI has not been
 
 This section is a factual draft for the submitter to review before publication.
 - **Tools:** <confirm: tools used for the design document and the implementation plan, e.g. "Claude (Anthropic) in Cowork">; Codex, a GPT-6-based coding agent, implemented the project from `AGENTS.md` and `docs/plan/`. A more specific model variant is not claimed.
-- **What AI did:** Implemented backend, frontend, migrations, tests, evaluation, containers, CI configuration and this README; inspected synthetic HTTP and browser behavior. <confirm: what AI did for the design and the plan>.
+- **What AI did:** Implemented backend, frontend, migrations, tests, evaluation, containers, CI configuration and this README; inspected synthetic and real GitHub HTTP/browser behavior. <confirm: what AI did for the design and the plan>.
 - **What I did:** <confirm: decisions you made and what you reviewed, e.g. the metric, the demo repo, the trade-offs, plan reviews, diff reviews>.
-- **How the output was checked:** Exact Makefile uv gates, 336 tests, 20-case offline and real Bedrock evals, npm ci/typecheck/build/audit, fresh-clone Compose checks, synthetic invariants/reconciliation/performance, browser interactions and submission archive checks. Details are in `docs/ACCEPTANCE.md` and the delivery report.
-- **Not verified:** Live GitHub, real PR spot checks, human golden/UI review, calibrated causal accuracy, remote CI, production deployment or public submission. No person is claimed to have reviewed or approved the generated work.
+- **How the output was checked:** Exact Makefile uv gates, 338 tests, 20-case offline and real Bedrock evals, npm ci/typecheck/build/audit, fresh-clone Compose checks, synthetic and real GitHub invariants/reconciliation/performance, three PR page checks, browser interactions and submission archive checks. Details are in `docs/ACCEPTANCE.md` and the delivery report.
+- **Not verified:** 90/180-day live checks (excluded by request), human golden/UI review, calibrated causal accuracy, remote CI, production deployment or public submission. No person is claimed to have reviewed or approved the generated work.
 
 ### With one more day
 
-1. Complete live GitHub acceptance and human review, then replay history with hand-labeled hypotheses.
+1. Complete human review and replay history with hand-labeled hypotheses to calibrate confidence.
 2. Collect Azure Pipelines check runs to improve CI coverage and validate its completeness.
 3. Time superseded and revert/reland delivery chains from their first PR.
 4. Add an optional repository business-hours calendar beside wall-clock durations.
