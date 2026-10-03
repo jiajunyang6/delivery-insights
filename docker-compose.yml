@@ -1,6 +1,5 @@
 name: delivery-insights
 x-backend: &backend
-  build: ./backend
   image: delivery-insights-backend:local
   env_file: .env
 services:
@@ -32,6 +31,7 @@ services:
     restart: "no"
   api:
     <<: *backend
+    build: ./backend
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -44,7 +44,7 @@ services:
       retries: 10
   worker:
     <<: *backend
-    command: ["arq", "insights.sync.worker.WorkerSettings"]
+    command: ["arq", "insights.sync.worker.WorkerSettings", "--custom-log-dict", "insights.logging.LOGGING_CONFIG"]
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }

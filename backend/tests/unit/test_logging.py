@@ -20,3 +20,22 @@ def test_structured_and_standard_logs(capsys):
         assert logging.getLogger("httpx").level == logging.WARNING
     finally:
         root.handlers = old_handlers
+
+
+def test_cli_bootstrap_and_worker_records_are_single_json_lines(capsys):
+    import logging.config
+
+    from insights.logging import LOGGING_CONFIG
+
+    root = logging.getLogger()
+    previous = root.handlers[:]
+    try:
+        logging.config.dictConfig(LOGGING_CONFIG)
+        logging.getLogger("arq.worker").info("startup")
+        configure_logging()
+        logging.getLogger("arq.worker").info("job done")
+        logging.getLogger("uvicorn.error").info("ready")
+        rows = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+        assert [r["event"] for r in rows] == ["startup", "job done", "ready"]
+    finally:
+        root.handlers = previous

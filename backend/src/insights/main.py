@@ -13,6 +13,7 @@ from insights.api.routes import health, insights, repos, snapshots, sync_jobs
 from insights.config import Settings, get_settings, split_list
 from insights.db.engine import create_database
 from insights.logging import configure_logging
+from insights.narrative.llm import BedrockClient
 from insights.redis import create_redis
 
 
@@ -27,6 +28,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.session_factory = sessions
         app.state.redis = redis
         app.state.arq = None
+        app.state.llm = BedrockClient(configuration) if configuration.llm_enabled else None
         try:
             redis_settings = RedisSettings.from_dsn(configuration.redis_url)
             redis_settings.conn_retries = 0
@@ -41,6 +43,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await app.state.arq.aclose()
             await redis.aclose()
             await engine.dispose()
+            if app.state.llm is not None:
+                app.state.llm.client.close()
 
     app = FastAPI(title="Delivery Insights API", version=__version__, lifespan=lifespan)
     app.state.settings = configuration
