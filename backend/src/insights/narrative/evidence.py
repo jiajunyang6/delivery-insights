@@ -91,6 +91,11 @@ def extract_evidence(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
                 ):
                     if field in raw:
                         entry[field] = raw[field]
+        entry["extra"] = {
+            key: value
+            for key, value in entry["extra"].items()
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
+        }
         if entry["value"] is None:
             return
         if identifier == "E13":

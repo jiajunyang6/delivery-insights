@@ -11,6 +11,7 @@ from insights.analytics import bottlenecks as b
 from insights.analytics import thresholds as t
 from insights.analytics.ci import build_ci
 from insights.analytics.dataset import Dataset, SnapshotParams, closed, merged, open_at
+from insights.analytics.drivers import build_drivers
 from insights.analytics.efficiency import build_efficiency
 from insights.analytics.findings import build_findings, headline
 
@@ -58,6 +59,13 @@ def etag(payload: bytes) -> str:
 
 def rounded(value: Any, key: str = "", unit: str = "") -> Any:
     if isinstance(value, dict):
+        if key == "s_at_hours":
+            return {k: rounded(v, k, "share") for k, v in value.items()}
+        if str(value.get("feature", "")).endswith("_share"):
+            return {
+                k: rounded(v, k, "share" if k in {"slowest", "rest"} else "")
+                for k, v in value.items()
+            }
         current_unit = value.get("unit", unit)
         return {
             k: rounded(v, k, current_unit if k in {"value", "previous", "change_abs"} else "")
@@ -148,7 +156,7 @@ def build_snapshot(dataset: Dataset, *, params: SnapshotParams) -> dict[str, Any
             if params.ci_source == "actions"
             else None,
         },
-        "drivers": None,
+        "drivers": build_drivers(dataset, efficiency["stage_p50_hours"]["pickup"]["value"]),
         "at_risk_prs": risks[: t.AT_RISK_MAX_ITEMS],
         "at_risk_summary": b.risk_summary(risks),
         "waste": waste,

@@ -15,7 +15,7 @@ from insights.db.ci import load_ci_data
 from insights.db.dataset import load_dataset
 from insights.db.models import PrFact, PrInterval, Repository, SyncJob
 from insights.domain import OwnershipRule
-from insights.sync.derive import current_key
+from insights.sync.derive import current_key, link_repo
 from insights.sync.enrichment import save_ownership, save_runs, sync_ci_runs, sync_ownership
 from insights.sync.jobs import enqueue_enrichment
 from insights.sync.rederive import rederive_repo
@@ -36,6 +36,7 @@ async def test_ci_number_and_sha_mapping_rederive_idempotency_and_pipeline_parit
     runs = [run(1, 0, 5, pr_numbers=()), run(2, 1, 6, pr_numbers=(2,), head_sha="b" * 40)]
     async with context["session_factory"]() as session, session.begin():
         await save_page(session, repo_id, page, now=NOW, settings=context["settings"])
+        await link_repo(session, repo_id)
         before = await session.scalar(select(Repository.data_version))
         assert await save_runs(session, repo_id, runs, settings=context["settings"], now=NOW) == (
             2,

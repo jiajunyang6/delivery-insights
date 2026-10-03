@@ -778,7 +778,162 @@
       }
     }
   ],
-  "drivers": null,
+  "drivers": {
+    "assignment": {
+      "assigned": {
+        "n": 315,
+        "pickup_p50_hours": 5.85
+      },
+      "ratio": 0.95,
+      "unassigned": {
+        "n": 131,
+        "pickup_p50_hours": 5.54
+      }
+    },
+    "author_wip": {
+      "buckets": [
+        {
+          "n": 67,
+          "waiting_author_p50_hours": 0.0,
+          "wip": "0"
+        },
+        {
+          "n": 245,
+          "waiting_author_p50_hours": 2.28,
+          "wip": "1-2"
+        },
+        {
+          "n": 134,
+          "waiting_author_p50_hours": 2.04,
+          "wip": "3+"
+        }
+      ],
+      "spearman": 0.0389
+    },
+    "review_round_cost": {
+      "buckets": [
+        {
+          "cycle_p50_hours": 25.89,
+          "n": 209,
+          "rounds": "0"
+        },
+        {
+          "cycle_p50_hours": 49.16,
+          "n": 164,
+          "rounds": "1"
+        },
+        {
+          "cycle_p50_hours": 61.37,
+          "n": 55,
+          "rounds": "2"
+        },
+        {
+          "cycle_p50_hours": 90.25,
+          "n": 18,
+          "rounds": "3+"
+        }
+      ],
+      "first_pickup_p50_hours": 5.61,
+      "hours_per_extra_round": 23.28,
+      "re_review_wait_p50_hours": 4.86
+    },
+    "slowest_decile": {
+      "features": [
+        {
+          "feature": "size_lines_p50",
+          "ratio": 1.7,
+          "rest": 76.0,
+          "slowest": 129.0
+        },
+        {
+          "feature": "external_share",
+          "ratio": 0.43,
+          "rest": 0.2045,
+          "slowest": 0.0889
+        },
+        {
+          "feature": "multi_location_share",
+          "ratio": 0.52,
+          "rest": 0.0424,
+          "slowest": 0.0222
+        },
+        {
+          "feature": "review_rounds_p50",
+          "ratio": null,
+          "rest": 0.0,
+          "slowest": 1.0
+        },
+        {
+          "feature": "unrequested_share",
+          "ratio": 0.98,
+          "rest": 0.2943,
+          "slowest": 0.2889
+        }
+      ],
+      "n": 45
+    },
+    "submit_timing": {
+      "by_hour_block": [
+        {
+          "hours": "00-05",
+          "n": 117,
+          "pickup_p50_hours": 5.16
+        },
+        {
+          "hours": "06-11",
+          "n": 112,
+          "pickup_p50_hours": 7.54
+        },
+        {
+          "hours": "12-17",
+          "n": 112,
+          "pickup_p50_hours": 5.26
+        },
+        {
+          "hours": "18-23",
+          "n": 105,
+          "pickup_p50_hours": 5.03
+        }
+      ],
+      "by_weekday": [
+        {
+          "n": 79,
+          "pickup_p50_hours": 6.25,
+          "weekday": 0
+        },
+        {
+          "n": 76,
+          "pickup_p50_hours": 5.62,
+          "weekday": 1
+        },
+        {
+          "n": 88,
+          "pickup_p50_hours": 5.1,
+          "weekday": 2
+        },
+        {
+          "n": 77,
+          "pickup_p50_hours": 6.95,
+          "weekday": 3
+        },
+        {
+          "n": 69,
+          "pickup_p50_hours": 5.74,
+          "weekday": 4
+        },
+        {
+          "n": 27,
+          "pickup_p50_hours": 6.5,
+          "weekday": 5
+        },
+        {
+          "n": 30,
+          "pickup_p50_hours": 4.05,
+          "weekday": 6
+        }
+      ]
+    }
+  },
   "efficiency": {
     "avg_review_rounds": {
       "change_abs": 0.05,
@@ -883,7 +1038,37 @@
       "unit": "lines",
       "value": 84.5
     },
-    "predictability": null,
+    "predictability": {
+      "weekly_throughput_cv": {
+        "change_abs": -0.063,
+        "change_rel": -0.3423,
+        "extra": {},
+        "n": 6,
+        "n_previous": 6,
+        "previous": 0.184,
+        "significant": null,
+        "status": "ok",
+        "unit": "coefficient",
+        "value": 0.121
+      },
+      "within_hist_p85": {
+        "change_abs": -0.0052,
+        "change_rel": -0.0061,
+        "extra": {
+          "baseline_n": 896,
+          "baseline_p85_hours": 80.39,
+          "denominator": 446,
+          "events": 377
+        },
+        "n": 446,
+        "n_previous": 428,
+        "previous": 0.8505,
+        "significant": null,
+        "status": "ok",
+        "unit": "share",
+        "value": 0.8453
+      }
+    },
     "revert_rate": {
       "change_abs": -0.0008,
       "change_rel": -0.0404,
@@ -963,7 +1148,30 @@
         "value": 5.51
       }
     },
-    "survival": null,
+    "survival": {
+      "current": {
+        "events": 439,
+        "median_hours": 26.97,
+        "n": 530,
+        "s_at_hours": {
+          "168": 0.1039,
+          "24": 0.5425,
+          "336": 0.1003,
+          "72": 0.1951
+        }
+      },
+      "previous": {
+        "events": 417,
+        "median_hours": 25.2,
+        "n": 486,
+        "s_at_hours": {
+          "168": 0.0819,
+          "24": 0.5274,
+          "336": 0.0786,
+          "72": 0.1503
+        }
+      }
+    },
     "waiting_share": {
       "change_abs": 0.0009,
       "change_rel": 0.0021,
@@ -1001,11 +1209,11 @@
   },
   "headline": "Median cycle time is 41.0h (+1% vs previous period, not significant); the main bottleneck is review queue is growing (51% of PR time waits on reviewers).",
   "links": {
-    "narrative": "/v1/snapshots/s_0840432d78ed0579/narrative",
-    "self": "/v1/snapshots/s_0840432d78ed0579"
+    "narrative": "/v1/snapshots/s_0a5ef79a77db7a6a/narrative",
+    "self": "/v1/snapshots/s_0a5ef79a77db7a6a"
   },
   "meta": {
-    "analytics_version": "1.1.0",
+    "analytics_version": "1.2.0",
     "ci_source": "none",
     "comparison_available": true,
     "data_freshness": [
@@ -1399,7 +1607,7 @@
       "value": null
     }
   },
-  "snapshot_id": "s_0840432d78ed0579",
+  "snapshot_id": "s_0a5ef79a77db7a6a",
   "time_ledger": {
     "ci_coverage": 0.0,
     "ci_data_available": false,

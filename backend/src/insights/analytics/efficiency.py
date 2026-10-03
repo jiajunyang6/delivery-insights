@@ -4,9 +4,27 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
+import numpy as np
+
 from insights.analytics import thresholds as t
-from insights.analytics.dataset import Dataset, PrData, Window, closed, hours, merged, reverted
-from insights.analytics.stats import Statistic, bootstrap_diff, percentile, ratio, seed_for
+from insights.analytics.dataset import (
+    Dataset,
+    PrData,
+    Window,
+    closed,
+    hours,
+    merged,
+    reverted,
+    weeks,
+)
+from insights.analytics.stats import (
+    Statistic,
+    bootstrap_diff,
+    kaplan_meier,
+    percentile,
+    ratio,
+    seed_for,
+)
 
 Samples = tuple[float, ...] | tuple[tuple[float, float], ...]
 
@@ -143,7 +161,16 @@ def measures(dataset: Dataset, window: Window) -> dict[str, Measure]:
 def build_efficiency(dataset: Dataset, params_hash: str) -> dict[str, Any]:
     current = measures(dataset, dataset.current)
     previous = measures(dataset, dataset.previous) if dataset.comparison_available else {}
-    result: dict[str, Any] = {"stage_p50_hours": {}, "predictability": None, "survival": None}
+    result: dict[str, Any] = {
+        "stage_p50_hours": {},
+        "predictability": predictability(dataset, params_hash),
+        "survival": {
+            "current": survival_cohort(dataset, dataset.current),
+            "previous": survival_cohort(dataset, dataset.previous)
+            if dataset.comparison_available
+            else None,
+        },
+    }
     for name, measure in current.items():
         unit = "share"
         statistic: Statistic | None = "mean"
@@ -171,4 +198,60 @@ def build_efficiency(dataset: Dataset, params_hash: str) -> dict[str, Any]:
             result["stage_p50_hours"][name] = metric
         else:
             result[name] = metric
+    return result
+
+
+def survival_cohort(dataset: Dataset, window: Window) -> dict[str, Any] | None:
+    samples = []
+    for pr in dataset.flow:
+        f = pr.facts
+        if f.ready_at is None or not window.contains(f.ready_at):
+            continue
+        event = f.merged_at is not None and f.merged_at < window.end
+        end = f.merged_at if event else min(window.end, f.closed_at or window.end)
+        if end is not None:
+            samples.append((max(0, (end - f.ready_at).total_seconds() / 3600), event))
+    return kaplan_meier(samples) if len(samples) >= t.MIN_SAMPLES_P50 else None
+
+
+def predictability(dataset: Dataset, params_hash: str) -> dict[str, Any]:
+    def historical(window: Window) -> Measure:
+        prs = merged(dataset, window)
+        start = window.start - timedelta(days=90)
+        if any(repo.covered_since > start for repo in dataset.repos):
+            return Measure(None, len(prs), extra={"reason": "baseline_not_covered"})
+        history = [cycle for _, at, cycle in dataset.history if start <= at < window.start]
+        baseline = percentile(history, 85, 30)
+        if baseline is None:
+            return Measure(None, len(prs), extra={"baseline_n": len(history)})
+        return rate(
+            [float(cycle <= baseline) for cycle in values(prs, "cycle_hours")],
+            extra={"baseline_p85_hours": baseline, "baseline_n": len(history)},
+        )
+
+    def weekly_cv(window: Window) -> Measure:
+        counts = [
+            len(merged(dataset, week))
+            for week in weeks(window)
+            if week.end - week.start == timedelta(days=7)
+        ]
+        value = (
+            float(np.std(counts) / np.mean(counts))
+            if len(counts) >= 4 and sum(counts) > 0
+            else None
+        )
+        return Measure(value, len(counts))
+
+    result = {}
+    for name, unit, measure in (
+        ("within_hist_p85", "share", historical),
+        ("weekly_throughput_cv", "coefficient", weekly_cv),
+    ):
+        result[name] = compare(
+            measure(dataset.current),
+            measure(dataset.previous) if dataset.comparison_available else None,
+            unit=unit,
+            name=name,
+            params_hash=params_hash,
+        )
     return result
