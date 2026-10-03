@@ -714,7 +714,7 @@ class Narrative(Contract):
     lang: Literal["en"]
     narrative: str
     abstained: bool
-    abstain_reason: Literal["no_comparison", "insufficient_signal"] | None
+    abstain_reason: Literal["no_comparison", "no_slowdown", "insufficient_signal"] | None
     hypotheses: list[NarrativeHypothesis]
     evidence: list[EvidenceEntry]
     links: dict[str, str]

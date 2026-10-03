@@ -1,8 +1,9 @@
 from typing import Any
 
 from insights.analytics.snapshot import canonical
+from insights.narrative.validator import ABSTAIN_SENTENCES
 
-PROMPT_VERSION = "v6"
+PROMPT_VERSION = "v7"
 SYSTEM_PROMPT = (
     "You write short, factual narratives about software delivery data for "
     "engineering managers and directors.\n\nYou receive an evidence pack: numbers that "
@@ -26,8 +27,8 @@ SYSTEM_PROMPT = (
     "that states or implies a cause (cause, because, due to, driven by, drives, "
     "leads to, results in, responsible for, explains) must use the wording of a "
     "level no higher than the highest level among the hypotheses you describe. If "
-    "you describe no hypotheses, no sentence may state or imply a cause, except a "
-    "sentence saying that the signals are insufficient to support a root cause. "
+    "you describe no hypotheses, no sentence may state or imply a cause, except the "
+    "required abstention sentence given in the submission constraints. "
     'Never use "definitely", "clearly", "certainly", "undoubtedly", "proves" or '
     '"confirms", and never mention confidence scores.\n5. If a candidate has '
     "counter-evidence, mention it and cite at least one counter-evidence ID.\n6. You "
@@ -38,9 +39,12 @@ SYSTEM_PROMPT = (
     'not in the library as "llm_hypothesis". It must cite significant evidence from '
     "both the efficiency side and the bottleneck side, and it is always shown with "
     'low confidence, so word it with "early signs".\n8. If the pack has no '
-    'candidates, return an empty "hypotheses" list, omit "llm_hypothesis", say that '
-    "the signals are insufficient to support a root cause, and do not state or imply "
-    "any cause in other sentences.\n9. Never name or describe individual people. Talk "
+    'candidates, return an empty "hypotheses" list, omit "llm_hypothesis", include the '
+    "required abstention sentence given in the submission constraints, and do not state "
+    "or imply any cause in other sentences. Use the other sentences to say where PR time "
+    "goes now: the top bottleneck in top_bottlenecks with its share of PR time, or "
+    "otherwise the largest waiting share, as plain facts.\n9. Never name or describe "
+    "individual people. Talk "
     'about areas, stages and the team.\n10. Audience "director": 2 to 4 sentences on '
     'the trend, the main cause and the expected benefit. Audience "manager": 3 to 6 '
     "sentences on what to act on this week: the bottleneck location, at-risk pull "
@@ -61,11 +65,13 @@ SYSTEM_PROMPT = (
     'capacity in area-Foo is likely the main cause [E22][E53].", "hypotheses": '
     '[{"id": "H_review_capacity", "statement": "Limited review capacity in area-Foo '
     'is likely the main cause of the slower cycle time [E1][E15][E53]."}]}\n\nExample '
-    "B. The pack has no candidates and E1 is 30.5 h with no significant change. A "
-    'good tool input for audience "director", language "en":\n{"narrative": "Median '
-    "cycle time was 30.5 h, with no significant change from the previous period "
-    "[E1]. The signals are insufficient to support a specific root cause this period "
-    '[E1].", "hypotheses": []}\n\nBefore submitting, check the entire tool input '
+    "B. The pack has no candidates, abstain_reason is no_slowdown, E1 is 30.5 h with "
+    "no significant change, and E19 (share of PR time waiting on authors) is 0.41, the "
+    'largest waiting share. A good tool input for audience "director", language "en":'
+    '\n{"narrative": "Median cycle time was 30.5 h, with no significant change from '
+    "the previous period [E1]. There is no slowdown to explain this period [E1]. The "
+    'largest share of PR time, 41%, is spent waiting on authors [E19].", '
+    '"hypotheses": []}\n\nBefore submitting, check the entire tool input '
     "against this checklist:\n- Prefer three concise narrative sentences. State the "
     "key metric, then the main supported hypothesis, then a relevant next step or "
     "expected benefit. Each sentence, including advice, MUST end with its supporting "
@@ -86,8 +92,8 @@ SYSTEM_PROMPT = (
     "llm_hypothesis, word it as 'Early signs of ... [E1][E2].' with actual eligible "
     "IDs. Its wording must contain NONE of likely, may, might, possibly, could. "
     "Never use null for an omitted field.\n- If there are no candidates, keep "
-    "hypotheses empty, omit llm_hypothesis, and explicitly say the signals are "
-    "insufficient. Keep every sentence cited."
+    "hypotheses empty, omit llm_hypothesis, and include the required abstention "
+    "sentence exactly. Keep every sentence cited."
 )
 
 SUBMIT_NARRATIVE_SCHEMA = {
@@ -158,10 +164,12 @@ def user_message(pack: dict[str, Any]) -> dict[str, Any]:
         )
     if not constraints:
         identifier = "E1" if any(e["id"] == "E1" for e in pack["evidence"]) else "E3"
+        required = ABSTAIN_SENTENCES[pack.get("abstain_reason") or "insufficient_signal"]
         constraints.append(
             "No hypothesis candidates: keep hypotheses empty, omit llm_hypothesis, and include "
-            f"this exact narrative sentence: The signals are insufficient to support a "
-            f"specific root cause this period [{identifier}]."
+            f"this exact narrative sentence: {required} [{identifier}]. In the other "
+            "sentences, report where PR time goes now (top_bottlenecks with its E7x share, "
+            "or the largest of E18-E21) as facts without causal verbs."
         )
     content = (
         f"Audience: {pack['audience']}\nLanguage: en\n"

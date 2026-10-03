@@ -210,3 +210,37 @@ def test_location_id_assignment_skips_other_and_null_values():
     assert all(e["value"] is not None for e in full.values())
     snapshot["efficiency"]["cycle_time_p50_hours"]["value"] = None
     assert "E1" not in {e["id"] for e in extract_evidence(snapshot)}
+
+
+def test_abstain_reason_separates_no_slowdown_from_weak_signals():
+    snapshot, evidence = scoring_fixture()
+    evidence["E1"] = entry("E1", 30, 31)
+    evidence["E18"] = entry("E18", 0.35, 0.35, unit="share")
+    hypotheses, reason = score_hypotheses(snapshot, evidence, ci_complete=False)
+    assert not hypotheses and reason == "no_slowdown"
+    evidence["E1"] = entry("E1", 30, 31, n=5)
+    assert score_hypotheses(snapshot, evidence, ci_complete=False)[1] == "insufficient_signal"
+    del evidence["E1"]
+    assert score_hypotheses(snapshot, evidence, ci_complete=False)[1] == "insufficient_signal"
+
+
+def test_chain_names_only_locations_and_stages_that_show_added_time():
+    snapshot, evidence = scoring_fixture()
+    evidence["E37"] = entry("E37", 0.0, unit="share")
+    evidence["E53"] = entry("E53", 0.05, unit="share", location="area-Foo")
+    first = score_hypotheses(snapshot, evidence, ci_complete=False)[0][0]
+    assert first["location"] is None and first["chain"]["location"] == []
+    assert first["chain"]["stage"] == ["E15"]
+    evidence["E15"] = entry("E15", 20, 20, n=61)
+    first = score_hypotheses(snapshot, evidence, ci_complete=False)[0][0]
+    assert first["chain"]["stage"] == []
+
+
+def test_alternative_without_cited_mechanism_evidence_is_open_not_ruled_out():
+    snapshot, evidence = scoring_fixture()
+    evidence["E20"] = entry("E20", 0.2, 0.1, unit="share")
+    snapshot["bottleneck_analysis"]["ci"] = {}
+    snapshot["time_ledger"].update(ci_data_available=True, ci_coverage=0.8)
+    first = score_hypotheses(snapshot, evidence, ci_complete=False)[0][0]
+    assert all(a["evidence"] for a in first["alternatives_ruled_out"])
+    assert {"hypothesis": "H_ci_bottleneck", "reason": "no_data"} in first["alternatives_open"]

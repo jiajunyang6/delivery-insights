@@ -10,7 +10,7 @@ export function Bottlenecks({
   const findings =
     audience === "director" ? s.bottlenecks.slice(0, 3) : s.bottlenecks;
   return (
-    <section>
+    <section id="bottlenecks">
       <div className="section-heading">
         <h2>What to work on next</h2>
         <span>Ranked by impact on PR time</span>
