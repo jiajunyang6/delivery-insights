@@ -1,12 +1,16 @@
+import math
 import re
 from time import perf_counter
 from uuid import uuid4
 
 import structlog
+from redis.exceptions import RedisError
 from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from insights.api.errors import handle_problem
+from insights.api.deps import get_now
+from insights.api.errors import ProblemError, handle_problem, problem_response
+from insights.redis import rate_limit_key
 
 logger = structlog.get_logger(__name__)
 REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
@@ -28,12 +32,24 @@ class RequestMiddleware:
         started = perf_counter()
         status = 500
         response_started = False
+        limit = request.app.state.settings.rate_limit_per_minute
+        remaining = limit
+        limited = request.url.path.startswith("/v1/")
 
         async def wrapped_send(message: Message) -> None:
             nonlocal status, response_started
             if message["type"] == "http.response.start":
                 response_started = True
                 status = message["status"]
+                if not any(k.lower() == b"cache-control" for k, _ in message.get("headers", [])):
+                    message.setdefault("headers", []).append((b"cache-control", b"no-store"))
+                if limited:
+                    message.setdefault("headers", []).extend(
+                        [
+                            (b"x-ratelimit-limit", str(limit).encode()),
+                            (b"x-ratelimit-remaining", str(remaining).encode()),
+                        ]
+                    )
                 message["headers"] = [
                     *message.get("headers", []),
                     (b"x-request-id", request_id.encode()),
@@ -42,6 +58,30 @@ class RequestMiddleware:
             await send(message)
 
         try:
+            if limited:
+                clock = request.app.dependency_overrides.get(get_now, get_now)
+                epoch = clock().timestamp()
+                key = rate_limit_key(
+                    request.client.host if request.client else "unknown", int(epoch // 60)
+                )
+                try:
+                    redis = request.app.state.redis
+                    count = await redis.incr(key)
+                    if count == 1:
+                        await redis.expire(key, 70)
+                    remaining = max(0, limit - count)
+                    if count > limit:
+                        error = ProblemError(
+                            429,
+                            "rate-limited",
+                            "Too many requests",
+                            "The request rate limit has been exceeded.",
+                            headers={"Retry-After": str(max(1, math.ceil(60 - epoch % 60)))},
+                        )
+                        await problem_response(request, error)(scope, receive, wrapped_send)
+                        return
+                except (RedisError, OSError, TimeoutError) as exc:
+                    logger.warning("rate_limit_unavailable", error_type=type(exc).__name__)
             await self.app(scope, receive, wrapped_send)
         except Exception as exc:
             if response_started:

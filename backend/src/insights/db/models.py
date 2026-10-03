@@ -215,7 +215,7 @@ class PrInterval(Base):
 class WorkflowRun(Base):
     __tablename__ = "workflow_runs"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
     repo_id: Mapped[int] = mapped_column(Integer, ForeignKey("repositories.id", ondelete="CASCADE"))
     workflow_name: Mapped[str] = mapped_column(Text)
     event: Mapped[str] = mapped_column(Text)

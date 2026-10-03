@@ -72,7 +72,7 @@ async def handle_problem(request: Request, exc: Exception) -> JSONResponse:
             else ("method-not-allowed", "Method not allowed")
         )
         return problem_response(request, ProblemError(exc.status_code, slug, title, title))
-    if isinstance(exc, SQLAlchemyError):
+    if isinstance(exc, (SQLAlchemyError, OSError, TimeoutError)):
         logger.error("database_unavailable", error_type=type(exc).__name__)
         return problem_response(
             request,

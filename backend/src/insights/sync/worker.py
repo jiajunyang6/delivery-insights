@@ -9,6 +9,7 @@ from insights.logging import configure_logging
 from insights.sources.github.adapter import GitHubAdapter
 from insights.sources.github.client import GitHubClient
 from insights.sync.jobs import incremental_sync_all, reconcile_tracked_repos, sync_repo
+from insights.sync.maintenance import housekeeping, precompute_snapshots
 from insights.sync.rederive import rederive_repo
 
 
@@ -33,9 +34,10 @@ async def shutdown(ctx: dict[str, Any]) -> None:
 
 
 class WorkerSettings:
-    functions: ClassVar[list[Any]] = [sync_repo, rederive_repo]
+    functions: ClassVar[list[Any]] = [sync_repo, rederive_repo, precompute_snapshots, housekeeping]
     cron_jobs: ClassVar[list[Any]] = [
-        cron(incremental_sync_all, minute=set(range(0, 60, Settings().sync_interval_minutes)))
+        cron(incremental_sync_all, minute=set(range(0, 60, Settings().sync_interval_minutes))),
+        cron(housekeeping, hour=3, minute=17),
     ]
     on_startup = startup
     on_shutdown = shutdown

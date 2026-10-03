@@ -10,3 +10,5 @@ Deviations and explicit trade-offs relative to `docs/plan/`.
 | 2026-10-02 | Windows verification | Run the exact uv subcommands from Makefile when GNU make is unavailable | Native PowerShell development uses the same ruff, mypy and pytest gates; Makefile remains the Linux/CI entrypoint. |
 | 2026-10-02 | Dataset I/O boundary | Put load_dataset in db/dataset.py; keep immutable types in analytics/dataset.py | Preserves the explicit requirement that analytics computation has no I/O; API and worker share the same loader. |
 | 2026-10-02 | Synthetic arrival interpretation | Apply area arrival multipliers to the weighted total Poisson arrival rate, then sample areas with adjusted weights | The plan specifies a daily rate and an area mix; this preserves the baseline total daily rate of 15 on weekdays and 5 on weekends. |
+| 2026-10-02 | Concurrent snapshot computation | Allow deterministic duplicate computation and deduplicate in Postgres | Avoids a distributed lock on the read path; same identity has identical canonical content. |
+| 2026-10-02 | API title | Use Delivery Insights API | The authoritative API contract overrides the shorter infrastructure example. |
