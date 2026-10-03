@@ -7,8 +7,8 @@ Known human comments/reviews/state/label actions qualify; bot/unknown actors, CI
 Historical baselines and lifecycle durations keep their meaning. Risk lists start with five rows and offer **Load more**; there is no dashboard language selector.
 
 The implementation covers P0 and P1 in [the implementation plan](docs/plan/00-overview.md).
-Automated checks, real Bedrock evaluation and 30-day GitHub acceptance pass. The user limited
-live backfill to 30 days; 90/180-day checks and human signoff are excluded. See [acceptance evidence](docs/ACCEPTANCE.md).
+Analytics 1.4.0 passes automated checks, offline evaluation and live pagination recovery. The earlier full Bedrock evaluation passed on analytics 1.2.0; this review checked one live English manager narrative.
+Backfill stays at 30 days; human signoff and 90/180-day checks remain pending or excluded. See [acceptance evidence](docs/ACCEPTANCE.md).
 
 ## Quickstart (60 seconds)
 
@@ -82,14 +82,10 @@ flowchart LR
   T --> API
 ```
 
-1. **Sync:** staged backfill, overlapping incremental windows and open-PR sweeps write
-   idempotent batches. Checkpoints advance only after successful phase completion.
-2. **Derive:** a causal state machine creates non-overlapping intervals and per-PR facts.
-   Reverts, relands and superseded PRs are linked; ownership changes trigger rederivation.
-3. **Snapshot:** one repeatable-read database view feeds pure analytics, deterministic
-   bootstrap comparisons and canonical JSON. Parameters, versions and watermarks set identity.
-4. **Narrative:** code selects evidence and scores hypotheses. Bedrock supplies wording;
-   code validates it, repairs once if necessary, then falls back to a checked template.
+1. **Sync:** staged backfill, overlapping incremental windows and open-PR sweeps write idempotent batches. Checkpoints advance only after successful phase completion.
+2. **Derive:** a causal state machine creates non-overlapping intervals and per-PR facts. Reverts, relands and superseded PRs are linked; ownership changes trigger rederivation.
+3. **Snapshot:** one repeatable-read database view feeds pure analytics, deterministic bootstrap comparisons and canonical JSON. Parameters, versions and watermarks set identity.
+4. **Narrative:** code selects evidence and scores hypotheses. Bedrock supplies wording; code validates it, repairs once if necessary, then falls back to a checked template.
 
 | Component | Responsibility |
 |---|---|
@@ -108,8 +104,7 @@ It may call Bedrock for an uncached narrative; heavy analytics and boto3 run in 
 
 OpenAPI is available at `/openapi.json` and `/docs`; the full contract is
 [06-api.md](docs/plan/06-api.md). Dates and timestamps use UTC.
-`from` and `to` are inclusive dates; comparison uses the preceding equal-length period.
-`as_of` is capped by the least recent repository sync watermark.
+`from` and `to` are inclusive dates; comparison uses the preceding equal-length period. `as_of` is capped by the least recent repository sync watermark.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -301,27 +296,23 @@ make eval
 make smoke
 ```
 
-Latest local verification: 2026-10-02 Pacific time. On Windows without GNU make, the exact
-`uv run` subcommands in Makefile were executed directly, using Python 3.12.
+Latest review checks: 2026-10-03 Pacific time, analytics 1.4.0. The Python 3.12 virtualenv ran Makefile's tool commands directly on Windows. Every review commit passed all gates.
 
 | Check | Observed result |
 |---|---|
-| Ruff check/format and strict mypy | Pass; 122 formatted files, 77 typed source/eval files |
-| Unit suite | 300 passed |
-| Full suite | 351 passed, including 51 integration tests |
-| Frontend `npm ci`, typecheck and build | Pass with Node 24; npm audit: 0 findings |
-| Real local HTTP / browser | Health, templates, Bedrock, ETags, drilldown, audience, English default, five-row pagination and period scope checked |
-| Real GitHub stored timelines | 3,541 PRs; 0 invariant violations; three PR page timestamp checks match |
-| Real 30-day ledger reconciliation | 533 merged PRs; relative rounding error 0.0000004833 |
-| Real 30-day worker cold compute | 1,376.95 ms; 533 merged PRs; 90 days excluded by request |
-| Real 30-day, 50-request warm HTTP p95 | 32.32 ms at the API loopback endpoint |
+| Ruff check/format and strict mypy | Pass; 123 formatted files, 77 typed source/eval files |
+| Unit suite | 327 passed |
+| Full suite | 381 passed, including 54 integration tests |
+| Frontend typecheck and build | Pass with Node 24 |
+| Real sync / browser recovery | 50 rows → stale cursor 422 → rows cleared → refresh → 50 matching rows |
+| Golden fixture after cohort caching | Unchanged SHA256; repeat calls reuse tuples; dataset replacements have independent caches |
 
-These are local dotnet/runtime measurements, not a production load benchmark. The original
-90-day performance gate was not run under the requested 30-day scope. Nine upstream
-Testcontainers/pathspec deprecation warnings remain; they are not test failures.
+Earlier acceptance measured 3,541 PRs with no invariant violations, three matching PR pages, 533 merged PRs with ledger rounding error 0.0000004833, cold compute 1,376.95 ms and warm HTTP p95 32.32 ms.
+Those analytics 1.2/1.3 measurements and npm ci/audit checks were not repeated here. They are local measurements, not production load evidence.
+The original 90-day performance gate remains excluded; nine upstream deprecation warnings remain.
 
-The harness runs five planted scenarios × two seeds × two audience/language combinations.
-The offline client is a deterministic stub; the live run uses Bedrock Sonnet 4.6, prompt v3.
+The harness runs five planted scenarios × two seeds × two audience/language combinations. The current offline client is a deterministic stub.
+The earlier live eval used Bedrock Sonnet 4.6, prompt v3, on analytics 1.2.0 and was not rerun for analytics 1.4.0.
 [Offline](docs/eval-offline.json) and [Bedrock](docs/eval-bedrock.json) reports record per-case
 outcomes. Numeric/citation/hedge denominators include only final LLM outputs, excluding fallback.
 
@@ -334,7 +325,7 @@ outcomes. Numeric/citation/hedge denominators include only final LLM outputs, ex
 | High-confidence precision | 14/14 (1.00) | 14/14 (1.00) | ≥ 0.80 |
 | Fallback rate | 0/20 (0.00) | 1/20 (0.05) | ≤ 0.10 |
 
-Both suites pass all gates. Quality-tradeoff seed 101 abstains because its previous-period
+Both recorded suites pass all gates. Quality-tradeoff seed 101 abstains because its previous-period
 baseline fails the five-event gate; thresholds are unchanged. Medium/low precision is undefined.
 Prompt v1/v2 failed; their reports are retained. V3 repairs length, citation and hedge guidance.
 One v3 eval chain-citation failure falls back safely. Four real-repo HTTP variants pass after one repair each.
@@ -395,6 +386,8 @@ Driver/location measures have their own documented gates. Insufficient values re
 Actions telemetry may omit the demo repository's primary Azure Pipelines CI.
 The live demo covers 30 days, so a full previous 30-day baseline is unavailable. Observed CI
 coverage is 36.77%; confidence still needs historical replay and human labels.
+Skipped PRs and anomalous timelines can affect metrics; inspect sync job skipped_prs and invariant_violations counters and their structured warnings before relying on a report.
+Net review-demand share compares arrivals with first reviews, including service of earlier demand; it can be negative and is not an individually tracked unreviewed-PR fraction.
 The plan-selected Recharts 2 branch is deprecated; migration to v3 is a maintenance follow-up.
 The supplied golden fixture still needs a person's numeric review; browser checks here were
 performed by the coding agent, not signed off by a human. Remote CI has not been run.
@@ -405,15 +398,15 @@ This section is a factual draft for the submitter to review before publication.
 - **Tools:** <confirm: tools used for the design document and the implementation plan, e.g. "Claude (Anthropic) in Cowork">; Codex, a GPT-6-based coding agent, implemented the project from `AGENTS.md` and `docs/plan/`. A more specific model variant is not claimed.
 - **What AI did:** Implemented backend, frontend, migrations, tests, evaluation, containers, CI configuration and this README; inspected synthetic and real GitHub HTTP/browser behavior. <confirm: what AI did for the design and the plan>.
 - **What I did:** <confirm: decisions you made and what you reviewed, e.g. the metric, the demo repo, the trade-offs, plan reviews, diff reviews>.
-- **How the output was checked:** Exact Makefile uv gates, 351 tests, 20-case offline and real Bedrock evals, npm ci/typecheck/build/audit, fresh-clone Compose checks, synthetic and real GitHub invariants/reconciliation/performance, three PR page checks, browser interactions and submission archive checks. Details are in `docs/ACCEPTANCE.md` and the delivery report.
+- **How the output was checked:** Current Makefile tool gates, 381 tests, 20-case offline eval, frontend typecheck/build, and real sync/pagination browser checks. Earlier acceptance also ran real Bedrock eval, npm ci/audit, fresh-clone Compose, GitHub invariants/reconciliation/performance and three PR page checks. Submission archive checks follow the final commit. See `docs/ACCEPTANCE.md`.
 - **Not verified:** 90/180-day live checks (excluded by request), human golden/UI review, calibrated causal accuracy, remote CI, production deployment or public submission. No person is claimed to have reviewed or approved the generated work.
 
 ### With one more day
 
-1. Complete human review and replay history with hand-labeled hypotheses to calibrate confidence.
-2. Collect Azure Pipelines check runs to improve CI coverage and validate its completeness.
-3. Time superseded and revert/reland delivery chains from their first PR.
-4. Add an optional repository business-hours calendar beside wall-clock durations.
+1. Optimize repository-wide linking for 180-day backfills: load only required columns, match SHAs with sorted lists, and skip linking when data is unchanged.
+2. Reconcile cancelled/killed sync jobs at startup, mark them failed, and clear stale arq dedup keys.
+3. Retry GraphQL throttling errors returned with HTTP 200 and RemoteProtocolError failures.
+4. Add a point-in-time all-open PR view for backlog and risk stock beside the period-active view.
 
 ## Development
 
