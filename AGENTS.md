@@ -5,7 +5,7 @@
 - `backend/src/insights/`: FastAPI routes, GitHub adapters, sync workers, database access, analytics, and narratives.
 - `backend/migrations/`: Alembic schema revisions. `backend/tests/`: unit/integration suites, fixtures, and golden snapshots. `backend/eval/`: synthetic scenarios and evaluation harness.
 - `frontend/src/`: React/TypeScript dashboard, components, and CSS assets.
-- `docs/plan/`: requirements; `docs/DECISIONS.md`: architectural decisions; `docs/ACCEPTANCE.md` and `docs/EVALUATION.md`: verification records.
+- `docs/plan/`: requirements; `docs/DECISIONS.md`: architectural decisions; `docs/EVALUATION.md`: evaluation records.
 - `scripts/smoke.sh`: HTTP smoke checks; `.github/workflows/ci.yml`: CI gates.
 
 ## Build, Test, and Development Commands
