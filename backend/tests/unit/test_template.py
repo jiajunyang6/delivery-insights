@@ -19,7 +19,8 @@ def snapshot_for(name):
 
 
 @pytest.mark.parametrize(
-    "name", ["golden", "review_capacity", "pr_size_growth", "quality_tradeoff", "no_signal"]
+    "name",
+    ["golden", "review_capacity", "pr_size_growth", "ci_slowdown", "quality_tradeoff", "no_signal"],
 )
 @pytest.mark.parametrize("audience", ["director", "manager"])
 @pytest.mark.parametrize("lang", ["en", "zh"])

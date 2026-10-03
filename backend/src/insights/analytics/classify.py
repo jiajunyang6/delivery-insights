@@ -297,3 +297,14 @@ def link_prs(
             )
         output[item.pr_id] = facts
     return output
+
+
+def ownership_counts(rules: Sequence[OwnershipRule]) -> tuple[tuple[str, int], ...]:
+    areas: dict[str, set[str]] = {}
+    code: dict[str, int] = {}
+    for rule in sorted(rules, key=lambda r: (r.source, r.line_no)):
+        if rule.source == "area_owners":
+            areas.setdefault(rule.pattern, set()).update(rule.owners)
+        elif rule.source == "codeowners":
+            code["codeowners:" + rule.pattern] = len(set(rule.owners))
+    return tuple(sorted({**code, **{key: len(owners) for key, owners in areas.items()}}.items()))

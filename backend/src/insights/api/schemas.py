@@ -186,6 +186,24 @@ class ReviewLoad(Contract):
     distribution: list[Reviewer]
 
 
+class Workflow(Contract):
+    workflow_name: str
+    runs: int
+    run_p50_minutes: float | None
+    rerun_rate: float
+
+
+class CI(Contract):
+    source: Literal["actions"]
+    coverage: float
+    queue_p50_minutes: Metric
+    run_p50_minutes: Metric
+    rerun_rate: Metric
+    flaky_rerun_rate: Metric
+    runs_per_pr_p50: Metric
+    top_workflows: list[Workflow]
+
+
 class BottleneckAnalysis(Contract):
     review_queue: ReviewQueue
     locations: list[Location]
@@ -193,7 +211,7 @@ class BottleneckAnalysis(Contract):
     pareto: list[Pareto]
     what_if: list[WhatIf]
     review_load: ReviewLoad
-    ci: dict[str, Any] | None
+    ci: CI | None
 
 
 class AtRiskPr(Contract):

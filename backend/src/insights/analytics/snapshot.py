@@ -9,6 +9,7 @@ import orjson
 from insights.analytics import ANALYTICS_VERSION
 from insights.analytics import bottlenecks as b
 from insights.analytics import thresholds as t
+from insights.analytics.ci import build_ci
 from insights.analytics.dataset import Dataset, SnapshotParams, closed, merged, open_at
 from insights.analytics.efficiency import build_efficiency
 from insights.analytics.findings import build_findings, headline
@@ -135,11 +136,17 @@ def build_snapshot(dataset: Dataset, *, params: SnapshotParams) -> dict[str, Any
             "pareto": b.pareto(ledger, locations),
             "what_if": [
                 scenario
-                for stage in ("pickup", "merge")
+                for stage in (
+                    ("pickup", "merge", "ci")
+                    if ledger["ci_data_available"]
+                    else ("pickup", "merge")
+                )
                 if (scenario := b.what_if(dataset, stage)) is not None
             ],
             "review_load": b.review_load(dataset),
-            "ci": None,
+            "ci": build_ci(dataset, params_hash, ledger["ci_coverage"])
+            if params.ci_source == "actions"
+            else None,
         },
         "drivers": None,
         "at_risk_prs": risks[: t.AT_RISK_MAX_ITEMS],

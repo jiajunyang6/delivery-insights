@@ -1,7 +1,12 @@
+from datetime import datetime
+from urllib.parse import quote
+
 from insights.config import REPO_RE, split_list
-from insights.domain import PageResult, RepoRef, RepositoryInfo
+from insights.domain import CiRun, OwnershipRule, PageResult, RepoRef, RepositoryInfo
+from insights.sources.github.actions import fetch_runs
 from insights.sources.github.client import GitHubClient, GitHubNotFoundError, GitHubTransientError
 from insights.sources.github.normalize import normalize_pr
+from insights.sources.github.ownership import parse_area_owners, parse_codeowners
 from insights.sources.github.queries import PULL_REQUEST_TIMELINE, PULL_REQUESTS_PAGE
 
 
@@ -70,3 +75,36 @@ class GitHubAdapter:
             max((pr.updated_at for pr in prs), default=None),
             cost,
         )
+
+    async def ci_runs(
+        self, repo: RepoRef, *, created_from: datetime, created_to: datetime
+    ) -> list[CiRun]:
+        if not REPO_RE.fullmatch(repo.full_name):
+            raise ValueError("Invalid repository")
+        return await fetch_runs(self.client, repo, created_from=created_from, created_to=created_to)
+
+    async def ownership_rules(self, repo: RepoRef) -> list[OwnershipRule]:
+        if not REPO_RE.fullmatch(repo.full_name):
+            raise ValueError("Invalid repository")
+        rules: list[OwnershipRule] = []
+        for path in (".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS"):
+            try:
+                response = await self.client.rest_get(
+                    f"/repos/{repo.full_name}/contents/{path}",
+                    accept="application/vnd.github.raw+json",
+                )
+            except GitHubNotFoundError:
+                continue
+            rules.extend(parse_codeowners(response.body))
+            break
+        try:
+            path = quote(self.client.settings.area_owners_path.lstrip("/"), safe="/")
+            response = await self.client.rest_get(
+                f"/repos/{repo.full_name}/contents/{path}",
+                accept="application/vnd.github.raw+json",
+            )
+        except GitHubNotFoundError:
+            pass
+        else:
+            rules.extend(parse_area_owners(response.body))
+        return rules

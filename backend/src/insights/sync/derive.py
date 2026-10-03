@@ -11,12 +11,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
 from insights.analytics import derive_key
+from insights.analytics.ci import union_intervals
 from insights.analytics.classify import LINK_FIELDS, LinkInput, link_prs
 from insights.analytics.facts import compute_facts
 from insights.analytics.timeline import build_timeline, check_invariants, pr_input
 from insights.config import Settings
+from insights.db.ci import load_ci_data
+from insights.db.models import OwnershipRule as StoredRule
 from insights.db.models import PrFact, PrInterval, PullRequest, Repository
 from insights.db.records import facts_from_row, load_records
+from insights.domain import OwnershipRule
 
 
 def current_key(settings: Settings) -> str:
@@ -48,11 +52,20 @@ async def derive_prs(
         )
     }
     records = await load_records(session, prs)
+    ci = await load_ci_data(session, list(repositories), pr_ids=list(pr_ids))
+    rules: dict[int, list[OwnershipRule]] = {identifier: [] for identifier in repositories}
+    for row in await session.scalars(
+        select(StoredRule).where(StoredRule.repo_id.in_(repositories))
+    ):
+        rules[row.repo_id].append(
+            OwnershipRule(row.source, row.pattern, tuple(row.owners), row.line_no)
+        )
     fact_values: list[dict[str, Any]] = []
     interval_values: list[dict[str, Any]] = []
     for pr in prs:
         record = records[pr.id]
-        result = build_timeline(pr_input(record), record.events, (), now)
+        ci_intervals = union_intervals(ci.by_pr.get(pr.id, ()))
+        result = build_timeline(pr_input(record), record.events, ci_intervals, now)
         errors = check_invariants(result, pr_input(record))
         if errors:
             raise ValueError(f"Timeline invariant violation for PR {pr.id}: {','.join(errors)}")
@@ -61,7 +74,8 @@ async def derive_prs(
             record.events,
             result,
             default_branch=repositories[pr.repo_id].default_branch or "",
-            location_rules=(),
+            location_rules=rules[pr.repo_id],
+            ci_covered=bool(ci_intervals),
             now=now,
             location_dimension=settings.location_dimension,
             directory_depth=settings.directory_depth,

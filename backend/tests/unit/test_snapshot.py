@@ -7,7 +7,7 @@ import pytest
 from tests.analytics_factory import dataset, pr
 from tests.factories import at
 
-from insights.analytics import derive_key
+from insights.analytics import ANALYTICS_VERSION, derive_key
 from insights.analytics.dataset import SnapshotParams
 from insights.analytics.findings import resolve_pointer
 from insights.analytics.snapshot import build_snapshot, canonical, etag, identifiers, rounded
@@ -79,7 +79,7 @@ def test_identity_and_rounding():
         != identifiers(d, p)[0]
     )
     assert etag(b"a") != etag(b"b")
-    assert derive_key("label:area-", 3) == "1.0.0|1.0.0|label:area-|depth=3"
+    assert derive_key("label:area-", 3) == f"{ANALYTICS_VERSION}|1.0.0|label:area-|depth=3"
     assert rounded({"hours": 1.23456, "share": 0.123456, "ratio": 1.23456}) == {
         "hours": 1.23,
         "share": 0.1235,
