@@ -129,7 +129,13 @@ export interface Snapshot {
   bottlenecks: Finding[];
   bottleneck_analysis: {
     locations: Location[];
-    review_queue: { weeks: Week[] };
+    review_queue: {
+      weeks: Week[];
+      weeks_total: number;
+      weeks_inflow_exceeds_outflow: number;
+      open_growth_rel: number | null;
+      net_inflow_share: number | null;
+    };
   };
   at_risk_prs: RiskPr[];
   at_risk_summary: { total: number; critical: number };

@@ -161,11 +161,14 @@ def review_queue(dataset: Dataset, window: Window) -> dict[str, Any]:
         if result and result[0]["open_at_week_end"]
         else None
     )
+    inflow = sum(week["inflow"] for week in result)
+    outflow = sum(week["outflow"] for week in result)
     return {
         "weeks": result,
         "weeks_total": len(result),
         "weeks_inflow_exceeds_outflow": sum(w["inflow"] > w["outflow"] for w in result),
         "open_growth_rel": growth,
+        "net_inflow_share": (inflow - outflow) / inflow if inflow else None,
     }
 
 

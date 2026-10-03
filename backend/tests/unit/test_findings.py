@@ -2,6 +2,7 @@ from copy import deepcopy
 
 import pytest
 from tests.analytics_factory import dataset, pr
+from tests.unit.test_bottlenecks import half_unreviewed_dataset
 from tests.unit.test_snapshot import params
 
 from insights.analytics.findings import build_findings, headline, resolve_pointer
@@ -43,7 +44,7 @@ def test_capacity_queue_guardrail_sort_and_pointers():
     loc = s["bottleneck_analysis"]["locations"][0]
     loc.update(pickup_ratio_vs_rest=1.5, waiting_reviewer_share=0.3)
     queue = s["bottleneck_analysis"]["review_queue"]
-    queue.update(weeks_total=4, weeks_inflow_exceeds_outflow=2, open_growth_rel=0.5)
+    queue.update(weeks_total=4, weeks_inflow_exceeds_outflow=2, net_inflow_share=0.5)
     s["guardrail"]["verdict"] = "tradeoff_suspected"
     findings = build_findings(s, d)
     assert {f["type"] for f in findings} == {
@@ -83,3 +84,58 @@ def test_headline_all_efficiency_forms_and_optional_clauses():
     without = deepcopy(s)
     without["bottlenecks"][0]["what_if"] = None
     assert "Capping" not in headline(without)
+
+
+def test_balanced_review_flow_does_not_report_growing_period_queue():
+    d, s = base()
+    s["bottleneck_analysis"]["review_queue"].update(
+        weeks=[
+            {"inflow": 10, "outflow": 10, "open_at_week_end": size} for size in (10, 20, 30, 40)
+        ],
+        weeks_total=4,
+        weeks_inflow_exceeds_outflow=0,
+        open_growth_rel=3,
+        net_inflow_share=0,
+    )
+    assert "review_queue_growth" not in {f["type"] for f in build_findings(s, d)}
+    # Even many imbalanced weeks cannot overcome a balanced total flow.
+    s["bottleneck_analysis"]["review_queue"]["weeks_inflow_exceeds_outflow"] = 3
+    assert "review_queue_growth" not in {f["type"] for f in build_findings(s, d)}
+
+
+@pytest.mark.parametrize(
+    ("unserved", "weeks", "severity"),
+    [
+        (None, 2, None),
+        (-0.1, 2, None),
+        (0.1999, 2, None),
+        (0.2, 1, None),
+        (0.2, 2, "medium"),
+        (0.4999, 2, "medium"),
+        (0.5, 2, "high"),
+    ],
+)
+def test_queue_finding_uses_unserved_demand_boundaries(unserved, weeks, severity):
+    d, s = base()
+    s["bottleneck_analysis"]["review_queue"].update(
+        weeks_total=4,
+        weeks_inflow_exceeds_outflow=weeks,
+        net_inflow_share=unserved,
+        open_growth_rel=None,
+    )
+    queue = [f for f in build_findings(s, d) if f["type"] == "review_queue_growth"]
+    assert (queue[0]["severity"] if queue else None) == severity
+
+
+def test_half_unreviewed_prs_trigger_high_demand_finding():
+    d = half_unreviewed_dataset()
+    snapshot = build_snapshot(d, params=params(d))
+    finding = next(f for f in snapshot["bottlenecks"] if f["type"] == "review_queue_growth")
+    assert finding["severity"] == "high"
+    assert finding["title"] == "Review demand exceeds first reviews"
+    assert finding["evidence"][1] == {
+        "label": "Share of new review demand not yet served",
+        "value": 0.5,
+        "unit": "share",
+        "ref": "/bottleneck_analysis/review_queue/net_inflow_share",
+    }

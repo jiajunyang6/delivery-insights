@@ -311,7 +311,8 @@ NAME_RE  = r"^(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$"
     "weeks": [{"week_start": "2026-09-03", "days": 4, "inflow": 120, "outflow": 98, "open_at_week_end": 410}],
     "weeks_total": 5,
     "weeks_inflow_exceeds_outflow": 4,
-    "open_growth_rel": 0.2195
+    "open_growth_rel": 0.2195,
+    "net_inflow_share": 0.20
   },
   "locations": [
     {"location": "area-System.Net.Http", "merged_prs": 41, "pickup_p50_hours": 30.5, "pickup_ratio_vs_rest": 2.4,
@@ -329,7 +330,7 @@ NAME_RE  = r"^(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$"
 }
 ```
 
-- `review_queue`：`05` §9.2；`locations`：`05` §9.1；`merge_blockers`：`05` §9.3；`pareto`：`05` §9.4（`location` 只在 `cause = waiting_reviewer` 时有值）；`what_if`：`05` §9.5 的全仓库条目（`location = null`）；`review_load`：`05` §9.8；`ci`：P1，本文件 §4.12。
+- `review_queue`：`05` §9.2；`net_inflow_share` 为本期 `(Σinflow − Σoutflow) / Σinflow`（无 inflow 时为 `null`，可以为负）；存量与存量增长仅作本期集合图表，不触发发现。`locations`：`05` §9.1；`merge_blockers`：`05` §9.3；`pareto`：`05` §9.4（`location` 只在 `cause = waiting_reviewer` 时有值）；`what_if`：`05` §9.5 的全仓库条目（`location = null`）；`review_load`：`05` §9.8；`ci`：P1，本文件 §4.12。
 
 ### 4.8 `at_risk_prs`、`at_risk_summary`
 

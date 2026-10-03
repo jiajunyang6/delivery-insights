@@ -163,10 +163,10 @@ CATALOG = (
     ),
     (
         "E23",
-        "queue_open_growth",
-        "Growth of the open review queue over the period",
-        "/bottleneck_analysis/review_queue/open_growth_rel",
-        "change",
+        "queue_unserved_share",
+        "Share of this period's review demand not yet served",
+        "/bottleneck_analysis/review_queue/net_inflow_share",
+        "share",
         "bottleneck",
     ),
     (

@@ -587,6 +587,7 @@
       "reviews": 967
     },
     "review_queue": {
+      "net_inflow_share": 0.0714,
       "open_growth_rel": 2.5,
       "weeks": [
         {
@@ -660,32 +661,6 @@
     {
       "evidence": [
         {
-          "label": "Weeks with inflow above outflow",
-          "ref": "/bottleneck_analysis/review_queue/weeks_inflow_exceeds_outflow",
-          "unit": "count",
-          "value": 5
-        },
-        {
-          "label": "Open queue growth",
-          "ref": "/bottleneck_analysis/review_queue/open_growth_rel",
-          "unit": "change",
-          "value": 2.5
-        }
-      ],
-      "id": "review_queue_growth",
-      "impact_pr_hours": 7186.98,
-      "impact_share": 0.5121,
-      "location": null,
-      "rank": 1,
-      "recommendation": "Review demand exceeds capacity: rebalance review load or temporarily limit work in progress until the queue stops growing.",
-      "severity": "high",
-      "title": "Review queue is growing",
-      "type": "review_queue_growth",
-      "what_if": null
-    },
-    {
-      "evidence": [
-        {
           "label": "Average review rounds",
           "ref": "/efficiency/avg_review_rounds",
           "unit": "rounds",
@@ -702,7 +677,7 @@
       "impact_pr_hours": 4167.99,
       "impact_share": 0.297,
       "location": null,
-      "rank": 2,
+      "rank": 1,
       "recommendation": "Agree on the approach before coding (issue or design note) and keep PRs small to cut review rounds.",
       "severity": "medium",
       "title": "High rework after review",
@@ -728,7 +703,7 @@
       "impact_pr_hours": 3155.39,
       "impact_share": 0.2248,
       "location": null,
-      "rank": 3,
+      "rank": 2,
       "recommendation": "Review late rejections and PRs lost while waiting for review; align on scope earlier and triage stale PRs.",
       "severity": "medium",
       "title": "Significant work never ships",
@@ -760,7 +735,7 @@
       "impact_pr_hours": 2678.79,
       "impact_share": 0.1909,
       "location": null,
-      "rank": 4,
+      "rank": 3,
       "recommendation": "Reduce post-approval rebase friction, for example with a merge queue.",
       "severity": "medium",
       "title": "Approved PRs wait long to merge",
@@ -1205,13 +1180,13 @@
     "revert_rate_change_pp": 0.8122,
     "verdict": "ok"
   },
-  "headline": "Median cycle time is 40.0h (-2% vs previous period, not significant); the main bottleneck is review queue is growing (51% of PR time waits on reviewers).",
+  "headline": "Median cycle time is 40.0h (-2% vs previous period, not significant); the main bottleneck is high rework after review.",
   "links": {
-    "narrative": "/v1/snapshots/s_07746dc26a4beed1/narrative",
-    "self": "/v1/snapshots/s_07746dc26a4beed1"
+    "narrative": "/v1/snapshots/s_9e2c040d610903b0/narrative",
+    "self": "/v1/snapshots/s_9e2c040d610903b0"
   },
   "meta": {
-    "analytics_version": "1.3.0",
+    "analytics_version": "1.4.0",
     "ci_source": "none",
     "comparison_available": true,
     "data_freshness": [
@@ -1618,7 +1593,7 @@
       "value": null
     }
   },
-  "snapshot_id": "s_07746dc26a4beed1",
+  "snapshot_id": "s_9e2c040d610903b0",
   "time_ledger": {
     "ci_coverage": 0.0,
     "ci_data_available": false,
