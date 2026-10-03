@@ -313,7 +313,7 @@ The original 90-day performance gate remains excluded; nine upstream deprecation
 
 The harness runs five planted scenarios × two seeds × two audience/language combinations. The current offline client is a deterministic stub.
 The earlier live eval used Bedrock Sonnet 4.6, prompt v3, on analytics 1.2.0 and was not rerun for analytics 1.4.0.
-[Offline](docs/eval-offline.json) and [Bedrock](docs/eval-bedrock.json) reports record per-case
+[Evaluation records](docs/EVALUATION.md) retain offline and historical Bedrock per-case
 outcomes. Numeric/citation/hedge denominators include only final LLM outputs, excluding fallback.
 
 | Metric | Offline | Real Bedrock | Required |
@@ -443,8 +443,8 @@ It is committed configuration; remote execution is pending a human-created remot
 | `frontend/` | React/TypeScript UI, Vite config and nginx image |
 | `scripts/` | HTTP smoke entrypoint |
 | `docs/plan/` | Supplied authoritative plan |
-| `docs/` | Decisions, milestone progress, acceptance evidence and evaluation reports |
+| `docs/` | Decisions, acceptance evidence and evaluation records in Markdown |
 
 The prepared submission includes full local Git history. No remote was created or pushed.
-Before submitting, complete the three `<confirm: ...>` entries above, review pending acceptance,
-commit your changes, and regenerate the archive using [the packaging instructions](docs/plan/11-readme-and-submission.md#9-提交形式pdf-第-34-页).
+Before submitting, finalize the AI assistance section, review pending acceptance,
+commit your changes, and regenerate the archive using [the packaging instructions](docs/plan/11-readme-and-submission.md#9-submission-format-pdf-pages-34).
