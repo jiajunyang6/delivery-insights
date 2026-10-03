@@ -251,7 +251,7 @@ def narrative_reply(body: bytes, tag: str, conditional: str | None, persist: boo
         304 if matched else 200,
         {
             "ETag": tag,
-            "Cache-Control": "private, max-age=86400, immutable" if persist else "no-store",
+            "Cache-Control": "private, max-age=3600" if persist else "no-store",
         },
     )
 
