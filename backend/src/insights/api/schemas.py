@@ -3,7 +3,9 @@
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
+
+from insights.analytics.snapshot import iso
 
 State = Literal["waiting_reviewer", "waiting_author", "waiting_ci", "waiting_merge"]
 Unit = Literal[
@@ -13,6 +15,10 @@ Unit = Literal[
 
 class Contract(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False, populate_by_name=True)
+
+    @field_serializer("*", when_used="json")
+    def serialize_timestamp(self, value: Any) -> Any:
+        return iso(value) if isinstance(value, datetime) else value
 
 
 class Metric(Contract):
@@ -386,3 +392,111 @@ class Snapshot(Contract):
     per_repo: list[PerRepo] | None
     links: Links
     meta: Meta
+
+
+class PendingJob(Contract):
+    id: str
+    status: str
+    phase: str | None
+    url: str
+
+
+class PendingRepo(Contract):
+    repo: str
+    covered_since: datetime | None
+    required_since: datetime
+    open_sweep_done: bool
+    last_sync_status: str
+    reason: Literal["never_synced", "backfill", "open_sweep", "rederive", "stale"]
+    job: PendingJob | None
+
+
+class Pending(Contract):
+    status: Literal["pending"]
+    detail: str
+    retry_after_seconds: int
+    repos: list[PendingRepo]
+
+
+class SyncJobResponse(Contract):
+    id: str
+    repo: str
+    kind: str
+    status: str
+    phase: str | None
+    stats: dict[str, Any]
+    error: str | None
+    created_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+    url: str
+
+
+class RepoStatus(Contract):
+    repo: str
+    default_branch: str | None
+    covered_since: datetime | None
+    backfill_target_days: int | None
+    backfill_complete: bool
+    sync_watermark: datetime | None
+    last_synced_at: datetime | None
+    last_open_sweep_at: datetime | None
+    last_sync_status: str
+    last_sync_error: str | None
+    data_version: int
+    latest_job: SyncJobResponse | None
+
+
+class RepoList(Contract):
+    items: list[RepoStatus]
+
+
+class RiskDetails(Contract):
+    severity: Literal["critical", "warning"]
+    threshold_hours: float
+    critical_threshold_hours: float
+    baseline_source: Literal["90d", "180d", "default"]
+
+
+class StageHours(Contract):
+    coding: float | None
+    pickup: float | None
+    review: float | None
+    merge: float | None
+
+
+class PrRow(Contract):
+    repo: str
+    number: int
+    title: str
+    url: str
+    author: str | None
+    status: Literal["merged", "closed", "open"]
+    created_at: datetime
+    ready_at: datetime
+    merged_at: datetime | None
+    closed_at: datetime | None
+    size_lines: int
+    size_bucket: str
+    locations: list[str]
+    external_contributor: bool
+    is_revert: bool
+    reverted: bool
+    close_class: str | None
+    review_rounds: int
+    human_reviews: int
+    cycle_hours: float | None
+    stage_hours: StageHours
+    ledger_hours: dict[State, float]
+    current_state: State | None
+    current_state_age_hours: float | None
+    at_risk: RiskDetails | None
+
+
+class PrPage(Contract):
+    snapshot_id: str
+    as_of: datetime
+    status: Literal["merged", "closed", "open"]
+    total: int
+    items: list[PrRow]
+    next_cursor: str | None

@@ -107,4 +107,10 @@ async def rederive_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job
             finished_at=now_for(ctx),
             stats={"prs_derived": processed},
         )
+        if not complete:
+            await ctx["redis"].enqueue_job(
+                "precompute_snapshots",
+                repo_full_name,
+                _job_id=f"precompute:{repo_full_name.lower()}",
+            )
         return "succeeded"

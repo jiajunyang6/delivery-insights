@@ -287,6 +287,16 @@ async def sync_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id:
             log.error("sync_failed", error=error[:500])
             return "failed"
         await set_job(ctx, job_id, status="succeeded", stats=run.stats, finished_at=now_for(ctx))
+        async with sessions_for(ctx)() as session:
+            version = await session.scalar(
+                select(Repository.data_version).where(Repository.id == repo.id)
+            )
+        if version != repo.data_version:
+            await ctx["redis"].enqueue_job(
+                "precompute_snapshots",
+                repo_full_name,
+                _job_id=f"precompute:{repo_full_name.lower()}",
+            )
         log.info("sync_completed", **run.stats)
         return "succeeded"
 
