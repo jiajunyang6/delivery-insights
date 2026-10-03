@@ -2,7 +2,7 @@ from typing import Any
 
 from insights.analytics.snapshot import canonical
 
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v3"
 SYSTEM_PROMPT = (
     "You write short, factual narratives about software delivery data for e"
     "ngineering managers and directors.\n"
@@ -94,6 +94,35 @@ SYSTEM_PROMPT = (
     'rt a specific root cause this period [E1].", "hypotheses": []}'
 )
 
+
+# Keep the operational checklist after the examples so their optional fields do not
+# distract from the constraints applied to the actual response.
+SYSTEM_PROMPT += (
+    "\n\nBefore submitting, check the entire tool input against this checklist:\n"
+    "- Prefer three concise narrative sentences. State the key metric, then the main "
+    "supported hypothesis, then a relevant next step or expected benefit. Each sentence, "
+    "including advice, MUST end with its supporting [E...] citation before punctuation. "
+    "Use one metric per sentence when describing a rise or fall. Do not combine evidence "
+    "with opposite change directions in that sentence.\n"
+    "- Use one short hypothesis statement per required candidate, preferably under 200 "
+    "characters. Give the proposed mechanism and its exact level wording plus citations "
+    "from that candidate's chain. Do not repeat all the numbers. If counter-evidence exists, "
+    "mention and cite it in a short separate clause.\n"
+    "- A next-step sentence such as 'Prioritize review coverage in area-A [E7].' or "
+    "'本周优先检查评审覆盖情况 [E7]。' still needs a citation. Avoid an unhedged causal "
+    "claim inside advice, including the word 原因. Use only IDs actually in this pack.\n"
+    "- Optional fields are truly optional: OMIT downgrade unless lowering a level. "
+    "OMIT llm_hypothesis unless there is a distinct additional mechanism, and you can "
+    "identify an efficiency evidence item AND a bottleneck evidence item that each have "
+    "significant=true or are listed as observations. A large value alone does not mean "
+    "significant. Usually the library candidates already cover the explanation.\n"
+    "- If you include llm_hypothesis, word it as 'Early signs of ... [E1][E2].' or "
+    "'初步迹象显示…… [E1][E2]。' with actual eligible IDs. Its wording must contain NONE "
+    "of likely, may, might, possibly, could, 很可能 or 可能. Never use null for an omitted field.\n"
+    "- If there are no candidates, keep hypotheses empty, omit llm_hypothesis, and "
+    "explicitly say the signals are insufficient (信号不足). Keep every sentence cited."
+)
+
 SUBMIT_NARRATIVE_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -149,6 +178,15 @@ TOOL_SPEC = {
 def user_message(pack: dict[str, Any]) -> dict[str, Any]:
     content = (
         f"Audience: {pack['audience']}\nLanguage: {pack['lang']}\n"
+        "Keep the narrative concise: aim for 450-700 characters in English or 150-350 "
+        "characters in Chinese, and never exceed 1200 characters. Each hypothesis statement "
+        "should be one short sentence under 240 characters (hard limit: 400). "
+        "A downgrade reason must be under 300 characters. Keep numbers sparse and cited. "
+        "For a low-level statement, use only 'early signs' or '初步迹象'; do not add "
+        "may, might, possibly, could, likely, 可能 or 很可能 to that statement. "
+        "The optional outside-library hypothesis must be distinct from listed candidates; "
+        "omit it unless significant cited evidence supports a distinct explanation on both "
+        "sides. Do not add it just to restate a library hypothesis.\n"
         f"Evidence pack (JSON):\n{canonical(pack).decode()}"
     )
     return {"role": "user", "content": [{"text": content}]}

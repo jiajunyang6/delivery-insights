@@ -249,8 +249,10 @@ def validate(
 
     try:
         model = ToolOutput.model_validate(output)
-    except ValidationError:
-        fail("V1:schema", "Tool input does not match the required schema.")
+    except ValidationError as exc:
+        for error in exc.errors(include_input=False, include_url=False):
+            path = ".".join(str(part) for part in error["loc"]) or "output"
+            fail("V1:schema", f"{path}: {error['msg']}.")
         # Semantic checks still run for structurally accessible fields.
         if not isinstance(output, dict):
             return errors
@@ -380,7 +382,10 @@ def validate(
         ):
             fail(
                 "V9:invalid_llm_hypothesis",
-                "Outside hypothesis needs significant evidence from both sides and low language.",
+                "Outside hypothesis needs significant evidence from both sides, all statement "
+                "citations in evidence_ids, and low wording only: early signs / 初步迹象, "
+                "without may, might, possibly, could, likely, 可能 or 很可能. "
+                "Omit this optional hypothesis if those requirements cannot be met.",
             )
         levels.append(0)
     for sentence in body_sentences:

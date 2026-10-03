@@ -12,14 +12,14 @@
       "value": 1.0
     },
     "fallback_rate": {
-      "passed": true,
+      "passed": false,
       "threshold": 0.1,
-      "value": 0.0
+      "value": 0.15
     },
     "first_attempt_valid_rate": {
-      "passed": true,
+      "passed": false,
       "threshold": 0.9,
-      "value": 1.0
+      "value": 0.15
     },
     "hedge_consistency": {
       "passed": true,
@@ -42,7 +42,7 @@
       "value": 0.875
     }
   },
-  "llm": "stub",
+  "llm": "bedrock",
   "metrics": {
     "abstention_rate": 1.0,
     "calibration": {
@@ -52,9 +52,9 @@
         "hypotheses": 14
       },
       "low": {
-        "hit_rate": null,
+        "hit_rate": 0.0,
         "hits": 0,
-        "hypotheses": 0
+        "hypotheses": 1
       },
       "medium": {
         "hit_rate": null,
@@ -63,30 +63,29 @@
       }
     },
     "citation_validity": 1.0,
-    "fallback_rate": 0.0,
-    "first_attempt_valid_rate": 1.0,
+    "fallback_rate": 0.15,
+    "first_attempt_valid_rate": 0.15,
     "hedge_consistency": 1.0,
     "high_precision": 1.0,
     "numeric_consistency": 1.0,
     "root_cause_hit_rate": 0.875
   },
-  "model": "stub",
-  "passed": true,
-  "prompt_version": "v3",
+  "model": "us.anthropic.claude-sonnet-4-6",
+  "passed": false,
+  "prompt_version": "v2",
   "runs": [
     {
       "abstained": false,
-      "attempts": 1,
+      "attempts": 2,
       "audience": "director",
-      "duration_ms": 10.67,
+      "duration_ms": 13365.23,
       "expected": {
         "id": "H_review_capacity",
         "location": "area-B"
       },
-      "fallback_reason": null,
-      "first_attempt_valid": true,
-      "first_attempt_violations": [],
-      "generated_by": "llm",
+      "fallback_reason": "validation_failed",
+      "first_attempt_valid": false,
+      "generated_by": "template",
       "hit": true,
       "hypotheses": [
         {
@@ -95,30 +94,31 @@
           "location": "area-B"
         }
       ],
-      "input_tokens": 0,
+      "input_tokens": 17520,
       "lang": "en",
       "narrative": "Median cycle time was 48.0 h, with no significant change from the previous period [E1]. Limited review capacity in area-B is likely the main cause [E18][E15][E37]. The largest time sink is the first-review wait in area-B, about 33% of PR time [E71].",
-      "output_tokens": 0,
+      "output_tokens": 771,
       "recheck_violations": [],
       "scenario": "review_capacity",
       "seed": 101,
       "top_hypothesis": "H_review_capacity",
       "top_level": "high",
-      "validation": "passed",
-      "violations": []
+      "validation": "failed",
+      "violations": [
+        "V9:invalid_llm_hypothesis"
+      ]
     },
     {
       "abstained": false,
-      "attempts": 1,
+      "attempts": 2,
       "audience": "manager",
-      "duration_ms": 4.17,
+      "duration_ms": 11407.95,
       "expected": {
         "id": "H_review_capacity",
         "location": "area-B"
       },
       "fallback_reason": null,
-      "first_attempt_valid": true,
-      "first_attempt_violations": [],
+      "first_attempt_valid": false,
       "generated_by": "llm",
       "hit": true,
       "hypotheses": [
@@ -128,10 +128,10 @@
           "location": "area-B"
         }
       ],
-      "input_tokens": 0,
+      "input_tokens": 17925,
       "lang": "zh",
-      "narrative": "交付周期中位数为 48.0 小时，与上一周期相比没有显著变化 [E1]。 PR 有 51% 的交付周期在等待 reviewer、CI 或合并 [E6]。 耗时最多的环节是area-B 的首次 review 等待，约占 PR 时间的 33% [E71]。 有 97 个开着的 PR 等待时间超过往常，其中 97 个严重超时 [E25]。 area-B 的 review 人手不足很可能是主要原因 [E18][E15][E37]。",
-      "output_tokens": 0,
+      "narrative": "首要瓶颈在 area-B：该区域首次评审等待时间是其他区域的 4.48 倍 [E51]，占全团队新增等待时长的 88% [E53]。评审需求在 6 周中有 4 周超过首次评审供给，且前 2 名评审者承担了 41% 的评审量 [E22][E24]，area-B 的评审容量不足很可能是周期时间上升的主因。当前有 97 个 PR 等待时间超出历史水位 [E25]，本周应优先为 area-B 补充评审资源或分散评审负载。",
+      "output_tokens": 789,
       "recheck_violations": [],
       "scenario": "review_capacity",
       "seed": 101,
@@ -142,16 +142,15 @@
     },
     {
       "abstained": false,
-      "attempts": 1,
+      "attempts": 2,
       "audience": "director",
-      "duration_ms": 7.63,
+      "duration_ms": 8472.35,
       "expected": {
         "id": "H_review_capacity",
         "location": "area-B"
       },
       "fallback_reason": null,
-      "first_attempt_valid": true,
-      "first_attempt_violations": [],
+      "first_attempt_valid": false,
       "generated_by": "llm",
       "hit": true,
       "hypotheses": [
@@ -161,10 +160,10 @@
           "location": "area-B"
         }
       ],
-      "input_tokens": 0,
+      "input_tokens": 17360,
       "lang": "en",
-      "narrative": "Median cycle time was 44.8 h, with no significant change from the previous period [E1]. Limited review capacity in area-B is likely the main cause [E18][E15][E37]. The largest time sink is a growing review queue, about 61% of PR time [E71].",
-      "output_tokens": 0,
+      "narrative": "Waiting time rose to 52% of cycle time, up 6.65 percentage points [E6], with median first-review wait rising 35% to 7.8 h [E15]. Area-B is likely the main bottleneck: its first-review wait is 5× the rest of the repo, and 99% of the added reviewer-wait time is concentrated there [E51][E53]. Review demand outpaced first reviews all 6 weeks, and review concentration in the top 2 reviewers rose to 37% [E22][E24]. Expanding review capacity in area-B would likely reduce cycle time across the team [E51][E53].",
+      "output_tokens": 547,
       "recheck_violations": [],
       "scenario": "review_capacity",
       "seed": 202,
@@ -175,16 +174,15 @@
     },
     {
       "abstained": false,
-      "attempts": 1,
+      "attempts": 2,
       "audience": "manager",
-      "duration_ms": 3.49,
+      "duration_ms": 12750.47,
       "expected": {
         "id": "H_review_capacity",
         "location": "area-B"
       },
       "fallback_reason": null,
-      "first_attempt_valid": true,
-      "first_attempt_violations": [],
+      "first_attempt_valid": false,
       "generated_by": "llm",
       "hit": true,
       "hypotheses": [
@@ -194,10 +192,10 @@
           "location": "area-B"
         }
       ],
-      "input_tokens": 0,
+      "input_tokens": 17579,
       "lang": "zh",
-      "narrative": "交付周期中位数为 44.8 小时，与上一周期相比没有显著变化 [E1]。 PR 有 52% 的交付周期在等待 reviewer、CI 或合并 [E6]。 耗时最多的环节是review 队列积压，约占 PR 时间的 61% [E71]。 有 126 个开着的 PR 等待时间超过往常，其中 125 个严重超时 [E25]。 area-B 的 review 人手不足很可能是主要原因 [E18][E15][E37]。",
-      "output_tokens": 0,
+      "narrative": "等待审查者的时间占PR总时长的61%，较上期上升约12个百分点，首次审查等待中位数升至7.8 h [E15][E18]。area-B是核心瓶颈：其首次审查等待是其他区域的5倍，且贡献了99%的新增等待时长 [E51][E53]。审查队列在全部6周内需求均超过完成量，审查集中度也在上升 [E22][E24]。当前有126个PR等待超出历史水平，建议本周优先疏通area-B的积压 [E25]。",
+      "output_tokens": 634,
       "recheck_violations": [],
       "scenario": "review_capacity",
       "seed": 202,
@@ -208,16 +206,15 @@
     },
     {
       "abstained": false,
-      "attempts": 1,
+      "attempts": 2,
       "audience": "director",
-      "duration_ms": 7.35,
+      "duration_ms": 8746.15,
       "expected": {
         "id": "H_ci_bottleneck",
         "location": null
       },
       "fallback_reason": null,
-      "first_attempt_valid": true,
-      "first_attempt_violations": [],
+      "first_attempt_valid": false,
       "generated_by": "llm",
       "hit": true,
       "hypotheses": [
@@ -227,10 +224,10 @@
           "location": null
         }
       ],
-      "input_tokens": 0,
+      "input_tokens": 18387,
       "lang": "en",
-      "narrative": "Median cycle time was 45.6 h, with no significant change from the previous period [E1]. Slow or congested CI is likely the main cause [E20][E39][E44]. The largest time sink is a growing review queue, about 33% of PR time [E71].",
-      "output_tokens": 0,
+      "narrative": "Median cycle time held nearly flat at 45.59 h, but CI wait now accounts for 81% of the added time [E1][E39]. Median CI queue time surged to 61.88 min and run time to 130.83 min, while the flaky-rerun rate jumped to 17% [E44][E45][E46]. Slow and congested CI is likely the main drag on delivery speed; resolving it should recover most of the added cycle time [E39][E44][E45][E46].",
+      "output_tokens": 479,
       "recheck_violations": [],
       "scenario": "ci_slowdown",
       "seed": 101,
@@ -241,17 +238,16 @@
     },
     {
       "abstained": false,
-      "attempts": 1,
+      "attempts": 2,
       "audience": "manager",
-      "duration_ms": 3.4,
+      "duration_ms": 13732.88,
       "expected": {
         "id": "H_ci_bottleneck",
         "location": null
       },
-      "fallback_reason": null,
-      "first_attempt_valid": true,
-      "first_attempt_violations": [],
-      "generated_by": "llm",
+      "fallback_reason": "validation_failed",
+      "first_attempt_valid": false,
+      "generated_by": "template",
       "hit": true,
       "hypotheses": [
         {
@@ -260,30 +256,31 @@
           "location": null
         }
       ],
-      "input_tokens": 0,
+      "input_tokens": 18983,
       "lang": "zh",
       "narrative": "交付周期中位数为 45.6 小时，与上一周期相比没有显著变化 [E1]。 PR 有 45% 的交付周期在等待 reviewer、CI 或合并 [E6]。 耗时最多的环节是review 队列积压，约占 PR 时间的 33% [E71]。 有 105 个开着的 PR 等待时间超过往常，其中 103 个严重超时 [E25]。 CI 排队或运行变慢很可能是主要原因 [E20][E39][E44]。",
-      "output_tokens": 0,
+      "output_tokens": 836,
       "recheck_violations": [],
       "scenario": "ci_slowdown",
       "seed": 101,
       "top_hypothesis": "H_ci_bottleneck",
       "top_level": "high",
-      "validation": "passed",
-      "violations": []
+      "validation": "failed",
+      "violations": [
+        "V9:invalid_llm_hypothesis"
+      ]
     },
     {
       "abstained": false,
-      "attempts": 1,
+      "attempts": 2,
       "audience": "director",
-      "duration_ms": 3.05,
+      "duration_ms": 13196.22,
       "expected": {
         "id": "H_ci_bottleneck",
         "location": null
       },
       "fallback_reason": null,
-      "first_attempt_valid": true,
-      "first_attempt_violations": [],
+      "first_attempt_valid": false,
       "generated_by": "llm",
       "hit": true,
       "hypotheses": [
@@ -293,10 +290,10 @@
           "location": null
         }
       ],
-      "input_tokens": 0,
+      "input_tokens": 18570,
       "lang": "en",
-      "narrative": "Median cycle time was 46.3 h, with no significant change from the previous period [E1]. Slow or congested CI is likely the main cause [E20][E39][E44]. The largest time sink is a growing review queue, about 37% of PR time [E71].",
-      "output_tokens": 0,
+      "narrative": "Cycle time held steady at 46.3 h with throughput up to 449 merged PRs [E1][E3]. However, CI is the clear pressure point: median CI run time more than doubled to 129 min and the flaky-rerun rate jumped to 16% [E45][E46], with CI wait now accounting for 18% of total PR time [E20]. Slow and congested CI is likely the main drag, persisting across all 6 tracked weeks [E44][E45][E46]. Waste improved, with the share of closed-unmerged or reverted PRs falling to 8% [E7].",
+      "output_tokens": 646,
       "recheck_violations": [],
       "scenario": "ci_slowdown",
       "seed": 202,
@@ -307,16 +304,15 @@
     },
     {
       "abstained": false,
-      "attempts": 1,
+      "attempts": 2,
       "audience": "manager",
-      "duration_ms": 1.81,
+      "duration_ms": 12310.89,
       "expected": {
         "id": "H_ci_bottleneck",
         "location": null
       },
       "fallback_reason": null,
-      "first_attempt_valid": true,
-      "first_attempt_violations": [],
+      "first_attempt_valid": false,
       "generated_by": "llm",
       "hit": true,
       "hypotheses": [
@@ -326,10 +322,10 @@
           "location": null
         }
       ],
-      "input_tokens": 0,
+      "input_tokens": 18992,
       "lang": "zh",
-      "narrative": "交付周期中位数为 46.3 小时，与上一周期相比没有显著变化 [E1]。 PR 有 48% 的交付周期在等待 reviewer、CI 或合并 [E6]。 耗时最多的环节是review 队列积压，约占 PR 时间的 37% [E71]。 有 104 个开着的 PR 等待时间超过往常，其中 101 个严重超时 [E25]。 CI 排队或运行变慢很可能是主要原因 [E20][E39][E44]。",
-      "output_tokens": 0,
+      "narrative": "周期时间基本持平（中位 46.31 h）[E1]，但 CI 等待占 PR 总时间的 18%，较上期上升 11.66 个百分点 [E20]。CI 队列中位等待时间升至 59.89 分钟，运行时间升至 129.23 分钟，不稳定重跑率从 2.7% 升至 16.29% [E44][E45][E46]。当前有 104 个 PR 等待超出历史水位 [E25]，建议本周优先排查 CI 稳定性并减少不稳定测试。废弃 PR 占比显著下降至 7.84% [E7]，是积极信号。",
+      "output_tokens": 836,
       "recheck_violations": [],
       "scenario": "ci_slowdown",
       "seed": 202,
@@ -340,16 +336,15 @@
     },
     {
       "abstained": false,
-      "attempts": 1,
+      "attempts": 2,
       "audience": "director",
-      "duration_ms": 3.73,
+      "duration_ms": 10120.49,
       "expected": {
         "id": "H_pr_size_growth",
         "location": null
       },
       "fallback_reason": null,
-      "first_attempt_valid": true,
-      "first_attempt_violations": [],
+      "first_attempt_valid": false,
       "generated_by": "llm",
       "hit": true,
       "hypotheses": [
@@ -359,10 +354,10 @@
           "location": null
         }
       ],
-      "input_tokens": 0,
+      "input_tokens": 17321,
       "lang": "en",
-      "narrative": "Median cycle time rose 26% to 54.9 h from 43.6 h [E1]. Larger pull requests is likely the main cause [E1][E9][E42]. The largest time sink is rework after review, about 42% of PR time [E71].",
-      "output_tokens": 0,
+      "narrative": "Median cycle time rose 26% to 54.92 h [E1], with median PR size tripling to 232.5 lines and the share of large PRs (500+ lines) jumping to 24% [E30][E31]. All of the added cycle time is attributed to PRs with 500+ lines, and 37% of PR time is now spent on author rework [E42][E38]. Keeping PRs smaller is likely the highest-leverage action to recover delivery speed [E30][E42].",
+      "output_tokens": 466,
       "recheck_violations": [],
       "scenario": "pr_size_growth",
       "seed": 101,
@@ -375,14 +370,13 @@
       "abstained": false,
       "attempts": 1,
       "audience": "manager",
-      "duration_ms": 6.05,
+      "duration_ms": 7302.81,
       "expected": {
         "id": "H_pr_size_growth",
         "location": null
       },
       "fallback_reason": null,
       "first_attempt_valid": true,
-      "first_attempt_violations": [],
       "generated_by": "llm",
       "hit": true,
       "hypotheses": [
@@ -390,12 +384,17 @@
           "id": "H_pr_size_growth",
           "level": "high",
           "location": null
+        },
+        {
+          "id": "H_llm",
+          "level": "low",
+          "location": null
         }
       ],
-      "input_tokens": 0,
+      "input_tokens": 8494,
       "lang": "zh",
-      "narrative": "交付周期中位数上升了 26%，从 43.6 小时 变为 54.9 小时 [E1]。 PR 有 31% 的交付周期在等待 reviewer、CI 或合并 [E6]。 耗时最多的环节是review 后的返工，约占 PR 时间的 42% [E71]。 有 100 个开着的 PR 等待时间超过往常，其中 97 个严重超时 [E25]。 PR 变大很可能是主要原因 [E1][E9][E42]。",
-      "output_tokens": 0,
+      "narrative": "中位周期时间上升26%至54.92小时 [E1]，PR中位大小从75行增至232.5行 [E30]，大型PR（500行以上）占比从5%升至24% [E31]。新增时间中63%来自编码阶段 [E41]，大型PR贡献了全部新增周期时间 [E42]。当前有100个PR等待时间超出历史水平 [E25]，建议本周优先拆分大型PR并跟进这些高风险PR。",
+      "output_tokens": 396,
       "recheck_violations": [],
       "scenario": "pr_size_growth",
       "seed": 101,
@@ -408,14 +407,13 @@
       "abstained": false,
       "attempts": 1,
       "audience": "director",
-      "duration_ms": 1.95,
+      "duration_ms": 4836.41,
       "expected": {
         "id": "H_pr_size_growth",
         "location": null
       },
       "fallback_reason": null,
       "first_attempt_valid": true,
-      "first_attempt_violations": [],
       "generated_by": "llm",
       "hit": true,
       "hypotheses": [
@@ -425,10 +423,10 @@
           "location": null
         }
       ],
-      "input_tokens": 0,
+      "input_tokens": 8489,
       "lang": "en",
-      "narrative": "Median cycle time rose 31% to 58.8 h from 44.9 h [E1]. Larger pull requests is likely the main cause [E1][E42][E31]. The largest time sink is rework after review, about 44% of PR time [E71].",
-      "output_tokens": 0,
+      "narrative": "Median cycle time rose 31% to 58.82 h [E1], with the 90th percentile climbing to 139.9 h [E2]. Median PR size surged to 250 lines from 76 [E30], and large PRs (500+ lines) now account for 27% of merges [E31], with 84% of the added cycle time attributable to those larger PRs [E42]. Growing PR size is likely the main driver, and reducing batch sizes should be the clearest path to recovering delivery speed [E1][E30][E42].",
+      "output_tokens": 242,
       "recheck_violations": [],
       "scenario": "pr_size_growth",
       "seed": 202,
@@ -439,16 +437,15 @@
     },
     {
       "abstained": false,
-      "attempts": 1,
+      "attempts": 2,
       "audience": "manager",
-      "duration_ms": 1.75,
+      "duration_ms": 9947.94,
       "expected": {
         "id": "H_pr_size_growth",
         "location": null
       },
       "fallback_reason": null,
-      "first_attempt_valid": true,
-      "first_attempt_violations": [],
+      "first_attempt_valid": false,
       "generated_by": "llm",
       "hit": true,
       "hypotheses": [
@@ -458,10 +455,10 @@
           "location": null
         }
       ],
-      "input_tokens": 0,
+      "input_tokens": 17849,
       "lang": "zh",
-      "narrative": "交付周期中位数上升了 31%，从 44.9 小时 变为 58.8 小时 [E1]。 PR 有 32% 的交付周期在等待 reviewer、CI 或合并 [E6]。 耗时最多的环节是review 后的返工，约占 PR 时间的 44% [E71]。 有 121 个开着的 PR 等待时间超过往常，其中 121 个严重超时 [E25]。 PR 变大很可能是主要原因 [E1][E42][E31]。",
-      "output_tokens": 0,
+      "narrative": "中位周期时间上升31%至58.82小时 [E1]，PR中位大小从76行增至250行 [E30]，大型PR（500行以上）占比从5%升至27% [E31]。新增时间中61%来自编码阶段 [E41]，84%来自500行以上的PR [E42]。当前有121个PR等待时间超出历史水平 [E25]，建议本周优先拆分大型PR。",
+      "output_tokens": 657,
       "recheck_violations": [],
       "scenario": "pr_size_growth",
       "seed": 202,
@@ -472,23 +469,22 @@
     },
     {
       "abstained": true,
-      "attempts": 1,
+      "attempts": 2,
       "audience": "director",
-      "duration_ms": 2.33,
+      "duration_ms": 7704.54,
       "expected": {
         "id": "H_quality_tradeoff",
         "location": null
       },
       "fallback_reason": null,
-      "first_attempt_valid": true,
-      "first_attempt_violations": [],
+      "first_attempt_valid": false,
       "generated_by": "llm",
       "hit": false,
       "hypotheses": [],
-      "input_tokens": 0,
+      "input_tokens": 16971,
       "lang": "en",
-      "narrative": "Median cycle time fell 42% to 25.1 h from 43.7 h [E1]. The signals are insufficient to support a specific root cause this period [E1]. The largest time sink is work that never shipped, about 44% of PR time [E71].",
-      "output_tokens": 0,
+      "narrative": "Median cycle time fell 42% to 25.13 h [E1], with throughput rising to 488 merged PRs [E3]. Reviewer wait dropped to 38% of PR time [E18], and first-review wait fell to 2.23 h [E15]. However, 41% of PR time is now spent waiting to merge after approval [E21], and the waste share rose to 16% of finished PRs [E7]. The signals are insufficient to support a root cause for these remaining friction points [E21][E7].",
+      "output_tokens": 341,
       "recheck_violations": [],
       "scenario": "quality_tradeoff",
       "seed": 101,
@@ -499,23 +495,22 @@
     },
     {
       "abstained": true,
-      "attempts": 1,
+      "attempts": 2,
       "audience": "manager",
-      "duration_ms": 1.78,
+      "duration_ms": 7465.23,
       "expected": {
         "id": "H_quality_tradeoff",
         "location": null
       },
       "fallback_reason": null,
-      "first_attempt_valid": true,
-      "first_attempt_violations": [],
+      "first_attempt_valid": false,
       "generated_by": "llm",
       "hit": false,
       "hypotheses": [],
-      "input_tokens": 0,
+      "input_tokens": 17042,
       "lang": "zh",
-      "narrative": "交付周期中位数下降了 42%，从 43.7 小时 变为 25.1 小时 [E1]。 PR 有 36% 的交付周期在等待 reviewer、CI 或合并 [E6]。 耗时最多的环节是没有交付的工作，约占 PR 时间的 44% [E71]。 有 97 个开着的 PR 等待时间超过往常，其中 97 个严重超时 [E25]。 本期信号不足，无法给出有证据支持的根因 [E1]。",
-      "output_tokens": 0,
+      "narrative": "中位周期时间显著下降42%至25.13 h [E1]，合并PR数增至488个 [E3]。但废弃PR占比升至15.71% [E7]，97个PR等待时间超出历史正常水平 [E25]，需重点关注。审批后等待合并的时间占PR总时长的41.24% [E21]，是当前最大阻塞点；建议本周排查合并流程卡点，推动积压PR尽快落地。当前信号不足以支持单一根本原因 [E1][E7][E21]。",
+      "output_tokens": 436,
       "recheck_violations": [],
       "scenario": "quality_tradeoff",
       "seed": 101,
@@ -526,16 +521,15 @@
     },
     {
       "abstained": false,
-      "attempts": 1,
+      "attempts": 2,
       "audience": "director",
-      "duration_ms": 3.55,
+      "duration_ms": 7292.06,
       "expected": {
         "id": "H_quality_tradeoff",
         "location": null
       },
       "fallback_reason": null,
-      "first_attempt_valid": true,
-      "first_attempt_violations": [],
+      "first_attempt_valid": false,
       "generated_by": "llm",
       "hit": true,
       "hypotheses": [
@@ -545,10 +539,10 @@
           "location": null
         }
       ],
-      "input_tokens": 0,
+      "input_tokens": 17498,
       "lang": "en",
-      "narrative": "Median cycle time fell 42% to 26.3 h from 45.0 h [E1]. Lighter review in exchange for speed is likely the main cause [E1][E43][E15]. The largest time sink is approved PRs waiting to merge, about 43% of PR time [E71]. The revert rate is 8.6%, so check review depth before pushing for more speed [E10].",
-      "output_tokens": 0,
+      "narrative": "Median cycle time fell 42% to 26.3 h [E1], and 86% of ready PRs merged within 3 days [E5]. Review wait dropped sharply, with first-review pickup falling to 2.1 h [E15] and reviewer wait accounting for 57% of the saved time [E43]. However, the revert rate rose to 8.65% [E10], suggesting speed may have come at a quality cost, and addressing this tradeoff is likely the key lever to sustaining these efficiency gains [E1][E10].",
+      "output_tokens": 474,
       "recheck_violations": [],
       "scenario": "quality_tradeoff",
       "seed": 202,
@@ -559,17 +553,16 @@
     },
     {
       "abstained": false,
-      "attempts": 1,
+      "attempts": 2,
       "audience": "manager",
-      "duration_ms": 2.92,
+      "duration_ms": 13739.81,
       "expected": {
         "id": "H_quality_tradeoff",
         "location": null
       },
-      "fallback_reason": null,
-      "first_attempt_valid": true,
-      "first_attempt_violations": [],
-      "generated_by": "llm",
+      "fallback_reason": "validation_failed",
+      "first_attempt_valid": false,
+      "generated_by": "template",
       "hit": true,
       "hypotheses": [
         {
@@ -578,37 +571,41 @@
           "location": null
         }
       ],
-      "input_tokens": 0,
+      "input_tokens": 18078,
       "lang": "zh",
       "narrative": "交付周期中位数下降了 42%，从 45.0 小时 变为 26.3 小时 [E1]。 PR 有 38% 的交付周期在等待 reviewer、CI 或合并 [E6]。 耗时最多的环节是批准后迟迟不合并，约占 PR 时间的 43% [E71]。 有 121 个开着的 PR 等待时间超过往常，其中 119 个严重超时 [E25]。 放松 review 换来的提速很可能是主要原因 [E1][E43][E15]。 revert 率为 8.6%，继续提速前先检查 review 是否充分 [E10]。",
-      "output_tokens": 0,
+      "output_tokens": 832,
       "recheck_violations": [],
       "scenario": "quality_tradeoff",
       "seed": 202,
       "top_hypothesis": "H_quality_tradeoff",
       "top_level": "high",
-      "validation": "passed",
-      "violations": []
+      "validation": "failed",
+      "violations": [
+        "V5:number_not_in_evidence",
+        "V6:citation_outside_chain",
+        "V9:invalid_llm_hypothesis",
+        "V7b:overclaim"
+      ]
     },
     {
       "abstained": true,
-      "attempts": 1,
+      "attempts": 2,
       "audience": "director",
-      "duration_ms": 1.54,
+      "duration_ms": 7335.27,
       "expected": {
         "id": null,
         "location": null
       },
       "fallback_reason": null,
-      "first_attempt_valid": true,
-      "first_attempt_violations": [],
+      "first_attempt_valid": false,
       "generated_by": "llm",
       "hit": true,
       "hypotheses": [],
-      "input_tokens": 0,
+      "input_tokens": 16692,
       "lang": "en",
-      "narrative": "Median cycle time was 41.8 h, with no significant change from the previous period [E1]. The signals are insufficient to support a specific root cause this period [E1]. The largest time sink is rework after review, about 27% of PR time [E71].",
-      "output_tokens": 0,
+      "narrative": "Median cycle time was 41.82 h, a small and non-significant change from the previous period [E1]. Throughput held steady at 402 merged PRs [E3], and 86.57% of PRs finished within the historical 85th-percentile benchmark [E11]. The signals are insufficient to support a root cause this period [E1].",
+      "output_tokens": 260,
       "recheck_violations": [],
       "scenario": "no_signal",
       "seed": 101,
@@ -621,21 +618,20 @@
       "abstained": true,
       "attempts": 1,
       "audience": "manager",
-      "duration_ms": 1.42,
+      "duration_ms": 5273.7,
       "expected": {
         "id": null,
         "location": null
       },
       "fallback_reason": null,
       "first_attempt_valid": true,
-      "first_attempt_violations": [],
       "generated_by": "llm",
       "hit": true,
       "hypotheses": [],
-      "input_tokens": 0,
+      "input_tokens": 8241,
       "lang": "zh",
-      "narrative": "交付周期中位数为 41.8 小时，与上一周期相比没有显著变化 [E1]。 PR 有 46% 的交付周期在等待 reviewer、CI 或合并 [E6]。 耗时最多的环节是review 后的返工，约占 PR 时间的 27% [E71]。 有 99 个开着的 PR 等待时间超过往常，其中 99 个严重超时 [E25]。 本期信号不足，无法给出有证据支持的根因 [E1]。",
-      "output_tokens": 0,
+      "narrative": "中位周期时间为 41.82 小时，与上期相比无显著变化 [E1]。当前有 99 个 PR 等待时间超出历史正常水平，需重点关注 [E25]；另有 16 个 PR 在等待审查期间被关闭 [E34]。返工占 PR 总时间的 27%，合并阻塞占 22%，废弃 PR 占 21%，是本期主要耗时来源 [E71][E72][E73]。信号不足以支持单一根本原因，建议本周优先处理积压的高风险 PR 并跟进审查队列状态 [E22][E25]。",
+      "output_tokens": 249,
       "recheck_violations": [],
       "scenario": "no_signal",
       "seed": 101,
@@ -646,23 +642,22 @@
     },
     {
       "abstained": true,
-      "attempts": 1,
+      "attempts": 2,
       "audience": "director",
-      "duration_ms": 1.63,
+      "duration_ms": 6634.36,
       "expected": {
         "id": null,
         "location": null
       },
       "fallback_reason": null,
-      "first_attempt_valid": true,
-      "first_attempt_violations": [],
+      "first_attempt_valid": false,
       "generated_by": "llm",
       "hit": true,
       "hypotheses": [],
-      "input_tokens": 0,
+      "input_tokens": 16588,
       "lang": "en",
-      "narrative": "Median cycle time was 42.2 h, with no significant change from the previous period [E1]. The signals are insufficient to support a specific root cause this period [E1]. The largest time sink is work that never shipped, about 27% of PR time [E71].",
-      "output_tokens": 0,
+      "narrative": "Median cycle time fell slightly to 42.18 h, a change that was not statistically significant [E1]. Throughput rose to 400 merged PRs, and 87.5% of PRs finished within the historical p85 benchmark [E3][E11]. Review efficiency improved: average review rounds fell to 0.67 [E8], and the share of PRs with post-review commits dropped to 45% [E9]. The signals are insufficient to support a root cause this period [E1][E8][E9].",
+      "output_tokens": 335,
       "recheck_violations": [],
       "scenario": "no_signal",
       "seed": 202,
@@ -673,23 +668,22 @@
     },
     {
       "abstained": true,
-      "attempts": 1,
+      "attempts": 2,
       "audience": "manager",
-      "duration_ms": 1.42,
+      "duration_ms": 8985.39,
       "expected": {
         "id": null,
         "location": null
       },
       "fallback_reason": null,
-      "first_attempt_valid": true,
-      "first_attempt_violations": [],
+      "first_attempt_valid": false,
       "generated_by": "llm",
       "hit": true,
       "hypotheses": [],
-      "input_tokens": 0,
+      "input_tokens": 16673,
       "lang": "zh",
-      "narrative": "交付周期中位数为 42.2 小时，与上一周期相比没有显著变化 [E1]。 PR 有 43% 的交付周期在等待 reviewer、CI 或合并 [E6]。 耗时最多的环节是没有交付的工作，约占 PR 时间的 27% [E71]。 有 117 个开着的 PR 等待时间超过往常，其中 116 个严重超时 [E25]。 本期信号不足，无法给出有证据支持的根因 [E1]。",
-      "output_tokens": 0,
+      "narrative": "本周期中位交付时长为 42.18 小时，变化不显著 [E1]。合并 PR 数达 400，评审轮次显著降至 0.67 轮 [E3][E8]，评审后提交修改的 PR 占比也降至 45% [E9]。当前有 117 个 PR 等待时间超出历史水平，需重点关注 [E25]；废弃 PR 占比升至 12.17% [E7]，建议排查关闭未合并的情况 [E7]。信号不足以支持明确的根本原因 [E1]。",
+      "output_tokens": 462,
       "recheck_violations": [],
       "scenario": "no_signal",
       "seed": 202,
@@ -703,5 +697,5 @@
     101,
     202
   ],
-  "started_at": "2026-10-03T04:11:37.169100+00:00"
+  "started_at": "2026-10-03T03:55:45.725724+00:00"
 }

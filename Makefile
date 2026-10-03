@@ -14,7 +14,7 @@ test:
 test-unit:
 	cd backend && uv run pytest -m "not integration"
 eval:
-	cd backend && uv run python -m insights_eval.run --llm bedrock
+	cd backend && uv run --env-file ../.env python -m insights_eval.run --llm bedrock
 eval-offline:
 	cd backend && uv run python -m insights_eval.run --llm stub
 smoke:
