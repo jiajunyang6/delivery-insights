@@ -7,7 +7,7 @@ from tests.factories import at, event, record
 from tests.unit.test_ci import run
 
 from insights.analytics.bottlenecks import at_risk, series
-from insights.analytics.dataset import SnapshotParams, active_in
+from insights.analytics.dataset import RepoData, SnapshotParams, Window, active_in
 from insights.analytics.rows import build_pr_rows
 from insights.analytics.snapshot import build_snapshot
 from insights.analytics.timeline import Interval
@@ -128,3 +128,53 @@ def test_weekly_series_keeps_the_full_selected_period_cohort():
         [p], period_from=date(2026, 1, 1), period_to=date(2026, 1, 14), observation_time=at(24 * 14)
     )
     assert sum(w["merged"] for w in series(d, d.current)) == 1
+
+
+def test_window_cohorts_reuse_flow_and_review_objects():
+    d = dataset([pr(1)])
+    current = d.current
+    flow = d.flow_in(current)
+    reviews = d.reviews_in(current)
+    assert flow and reviews
+    assert d.flow_in(Window(current.start, current.end)) is flow
+    assert d.reviews_in(current) is reviews
+    assert d.flow_in(d.previous) is not flow
+    assert d.reviews_in(d.previous) == ()
+
+
+def test_repo_and_replaced_datasets_have_independent_caches():
+    d = dataset(
+        [pr(1), replace(pr(2), repo="c/d")],
+        repos=(RepoData("a/b", 1, at(-5000), at(72)), RepoData("c/d", 1, at(-5000), at(72))),
+    )
+    d.flow_in(d.current)
+    d.reviews_in(d.current)
+    scoped = d.for_repo("a/b")
+    empty = replace(d, prs=())
+    assert not scoped.cohort_cache and not empty.cohort_cache
+    assert scoped.cohort_cache is not d.cohort_cache
+    assert empty.cohort_cache is not d.cohort_cache
+    assert [p.pr_id for p in scoped.flow] == [1]
+    assert [r.pr_id for r in scoped.reviews_in(scoped.current)] == [1]
+    assert not empty.flow and not empty.reviews_in(empty.current)
+    same = replace(d)
+    assert same == d
+    assert "cohort_cache" not in repr(d)
+
+
+def test_activity_is_sorted_once_and_binary_lookup_keeps_half_open_boundaries():
+    p = replace(pr(1), created_at=at(-100), human_activity_at=(at(80), at(72), at(48), at(20)))
+    assert p.human_activity_at == (at(20), at(48), at(72), at(80))
+    for start, end in [(48, 72), (49, 72), (72, 80), (81, 90), (48, 48)]:
+        window = Window(at(start), at(end))
+        assert active_in(p, window) == any(window.contains(t) for t in p.human_activity_at)
+
+
+def test_snapshot_is_unchanged_by_cache_history():
+    d = dataset_from_repo(period_repo(), covered_since=at(-5000))
+    params = SnapshotParams(("a/b",), d.period_from, d.period_to)
+    expected = build_snapshot(d, params=params)
+    d.reviews_in(d.previous)
+    d.flow_in(Window(at(-100), at(100)))
+    assert build_snapshot(d, params=params) == expected
+    assert build_snapshot(replace(d), params=params) == expected
