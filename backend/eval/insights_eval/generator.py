@@ -85,21 +85,27 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
         body: str = "",
         author_override: Actor | None = None,
         simple: bool = False,
+        force_merge: bool = False,
     ) -> PullRequestRecord:
         current = created >= CURRENT
         size = max(1, round(ln(80, 1.1) * (spec.size_mult if current else 1)))
         external = rng.random() < 0.2
+        if author_override and author_override.login:
+            external = author_override.login.startswith("ext")
         author = author_override or Actor(
             f"ext{rng.integers(1, 31):02}" if external else f"dev{rng.integers(1, 41):02}", False
         )
         if author_override is None and rng.random() < 0.05:
             author = Actor("dependabot[bot]", True)
         base = "release/9.0" if rng.random() < 0.03 else "main"
-        if simple:
+        if simple or force_merge:
             base = "main"
         draft = not simple and rng.random() < 0.15
         ready = later(created, ln(10, 0.8)) if draft else created
-        authored = later(created, -ln(4 if draft else 12, 1.0))
+        # Controlled size intervention: larger changes take longer to code and revise.
+        # The square-root coupling is a documented synthetic assumption, not a fitted effect.
+        size_time_factor = float(np.sqrt(spec.size_mult)) if current else 1.0
+        authored = later(created, -ln(4 if draft else 12, 1.0) * size_time_factor)
         events: list[Event] = []
         local_runs: list[CiRun] = []
         area_letter = area[-1].lower()
@@ -189,7 +195,7 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
         for round_number in range(1, 6):
             if approved:
                 break
-            clock = later(clock, ln(8, 1))
+            clock = later(clock, ln(8, 1) * size_time_factor)
             if rng.random() < 0.8:
                 commit(clock)
             else:
@@ -204,15 +210,18 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
                 reviewer,
                 state="APPROVED" if approved else "CHANGES_REQUESTED",
             )
-        if not simple and rng.random() < 0.3:
+        if not simple and rng.random() < 0.3 and not local_only:
             clock = later(clock, ln(4, 1))
-            add(EventKind.REVIEW, clock, Actor("rev-x5", False), state="APPROVED")
+            reviewer = Actor(
+                next(f"rev-x{i}" for i in range(1, 5) if f"rev-x{i}" != reviewer.login), False
+            )
+            add(EventKind.REVIEW, clock, reviewer, state="APPROVED")
         planned_merge = later(clock, min(1.5, ln(3, 1)) if simple else ln(3, 1))
         merge_at: datetime | None = planned_merge
         if rng.random() < 0.1:
             commit(clock + (planned_merge - clock) / 2)
         end = planned_merge
-        outcome = 0.0 if simple or author.is_bot else float(rng.random())
+        outcome = 0.0 if simple or force_merge or author.is_bot else float(rng.random())
         state = "MERGED"
         if 0.85 <= outcome < 0.95:
             state = "CLOSED"
@@ -362,6 +371,10 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
             area,
             title=f'Revert "{original.title}"',
             body=f"Reverts synthetic/repo#{original.number}",
+            author_override=Actor(
+                next(f"dev{i:02}" for i in range(1, 41) if f"dev{i:02}" != original.author.login),
+                False,
+            ),
             simple=True,
         )
         next_number += 1
@@ -375,7 +388,15 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
                     area,
                     title=f'Reland "{original.title}"',
                     body=f"Reland #{original.number}",
-                    simple=True,
+                    author_override=Actor(
+                        next(
+                            f"dev{i:02}"
+                            for i in range(1, 41)
+                            if f"dev{i:02}" != revert.author.login
+                        ),
+                        False,
+                    ),
+                    force_merge=True,
                 )
                 records.append(reland)
                 next_number += 1
