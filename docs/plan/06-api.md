@@ -137,13 +137,13 @@ NAME_RE  = r"^(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$"
 
 | Parameter | Endpoint | Values | Default |
 |---|---|---|---|
-| `status` | `/prs` | `merged`、`closed`、`open` | `merged` |
+| `status` | `/prs` | `merged`, `closed`, `open` | `merged` |
 | at_risk | /prs | true, false | false; true requires status=open or omitted, interpreted as open |
 | state | /prs | waiting_reviewer, waiting_author, waiting_ci, waiting_merge | None; requires status=open or at_risk=true, else 422 |
 | location | /prs | ^[^\x00-\x1f\x7f]{1,200}$; exact PR locations match | None |
-| `limit`、`cursor` | `/prs` | §2.5 | |
-| `audience` | narrative | `director`、`manager` | `manager` |
-| `lang` | narrative | `en`、`zh` | `en` |
+| `limit`, `cursor` | `/prs` | §2.5 | |
+| `audience` | narrative | `director`, `manager` | `manager` |
+| `lang` | narrative | `en` only; other values return 422 | `en` |
 | snapshot_id | Path | ^s_[0-9a-f]{16}$ | |
 | job_id | Path | Canonical lowercase hyphenated UUID | |
 
@@ -169,7 +169,7 @@ Pure functions in 05 compute this structure. Unless specified, previous means pe
 | drivers | object \| null | P1 §4.12; null P0 |
 | at_risk_prs | AtRiskPr[] | §4.8, capped at AT_RISK_MAX_ITEMS |
 | `at_risk_summary` | object | §4.8 |
-| `waste`、`rework`、`guardrail` | object | §4.9 |
+| `waste`, `rework`, `guardrail` | object | §4.9 |
 | `trend` | object | §4.10 |
 | `signals` | object | §4.11 |
 | `series` | object | §4.11 |
@@ -332,7 +332,7 @@ Definitions: `05` §8. change_pp rounded to two decimals.
 
 - review_queue per `05` §9.2: net_inflow_share=(Σinflow−Σoutflow)/Σinflow, null with no inflow, may be negative. Stock/growth are period-cohort display only, never trigger findings. Locations §9.1; merge_blockers §9.3; pareto §9.4 (location only for waiting_reviewer); what_if §9.5 whole-repo items (location=null); review_load §9.8; CI P1 §4.12 here.
 
-### 4.8 `at_risk_prs`、`at_risk_summary`
+### 4.8 `at_risk_prs`, `at_risk_summary`
 
 ```json
 {
@@ -345,7 +345,7 @@ Definitions: `05` §8. change_pp rounded to two decimals.
 
 author is string or null for deleted accounts. at_risk_summary={"total":61,"critical":14,"by_state":{"waiting_reviewer":38,"waiting_author":15,"waiting_ci":0,"waiting_merge":8}}; always include all four states. Definitions `05` §9.6.
 
-### 4.9 `waste`、`rework`、`guardrail`
+### 4.9 `waste`, `rework`, `guardrail`
 
 ```json
 "waste": {"closed_unmerged": 141, "by_class": {"superseded": 30, "rejected": 41, "abandoned": 38, "no_review": 32},
@@ -382,7 +382,7 @@ Definitions `05` §9.9. revert_prs=current merged revert count; verdict in ok/wa
 
 states includes coding and all four waiting states (three shown). Consistent with §4.5/§4.7: current/previous waiting means divide ledger hours by 812/798 merged PRs; location change=2460.5/812−1102.0/798. Assume positive location gross=4.18, at least reviewer growth 3.99 because locations partition reviewer waiting; share_of_reviewer_increase=1.65/4.18, share_of_increase=0.678×0.3946. Example cycle_mean_hours equals component sums; real closures/missing commits can cause differences. `05` §9.7/§9.12; attribution=null when unavailable.
 
-### 4.11 `signals`、`series`、`per_repo`
+### 4.11 `signals`, `series`, `per_repo`
 
 - signals: {large_pr_share,merged_without_approval_share,fast_large_approval_share,external_pickup_ratio,at_risk_reviewer_top_location_share}, all Metric (`05` §9.10).
 - series={current:Week[],previous:Week[]}; Week={week_start,days,merged,cycle_p50_hours,pickup_p50_hours,pr_size_p50_lines,waiting_reviewer_share,waiting_ci_share,reverts} (`05` §9.11); previous=[] if unavailable.
@@ -468,7 +468,7 @@ Read Redis → Postgres; missing/housekeeping-deleted/logically older than seven
 
 ### 5.4 `GET /v1/snapshots/{snapshot_id}/narrative`
 
-Parameters audience/lang; flow `07` §9, response §6.
+Parameters audience/lang; narratives are English only and lang accepts only en; flow `07` §9, response §6.
 
 - Missing snapshot: 404, including narrative foreign-key race after cleanup.
 - ETag; persistent narratives (LLM or unconfigured-Bedrock templates): private, max-age=3600. Temporary LLM-failure templates: no-store. Support 304.
@@ -491,7 +491,7 @@ Return {items:[RepoStatus]} (§7.3) for every TRACKED_REPOS entry in configured 
 
 Return SyncJob (§7.4); missing 404; invalid UUID 422.
 
-### 5.8 `GET /healthz`、`GET /readyz`
+### 5.8 `GET /healthz`, `GET /readyz`
 
 - /healthz: {"status":"ok"}, no dependencies.
 - /readyz: SELECT 1 and Redis PING, each two-second timeout. Both pass: {status:ready,checks:{postgres:ok,redis:ok}}; failure 503 dependency-unavailable with checks ok/error, no original exceptions.
@@ -546,7 +546,7 @@ Return SyncJob (§7.4); missing 404; invalid UUID 422.
   "meta": {
     "generated_by": "llm",
     "model": "us.anthropic.claude-sonnet-4-6",
-    "prompt_version": "v1",
+    "prompt_version": "v6",
     "validation": "passed",
     "attempts": 1,
     "fallback_reason": null,
@@ -568,7 +568,7 @@ Return SyncJob (§7.4); missing 404; invalid UUID 422.
 | meta.model | Bedrock inference-profile ID; template for fallback |
 | meta.validation | passed=final LLM output valid; failed=both attempts invalid and fallback; not_run=not called or call failed |
 | meta.attempts | Actual LLM calls, 0–2 |
-| `meta.fallback_reason` | `null`、`llm_disabled`、`llm_error`、`validation_failed`、`llm_busy` |
+| `meta.fallback_reason` | `null`, `llm_disabled`, `llm_error`, `validation_failed`, `llm_busy` |
 | meta.violations | Codes such as V5:number_not_in_evidence; no original LLM text |
 | meta.pack_hash | First 16 hash digits of canonical evidence pack; narrative identity automatically changes with evidence/scoring configuration (`07` §9.2) |
 
@@ -684,5 +684,5 @@ curl -si -X POST "$API/v1/repos/dotnet/runtime/sync" | head -5
 curl -s -o /dev/null -w '%{http_code}\n' -X POST "$API/v1/repos/dotnet/runtime/sync"
 
 # 9. Narrative → 200; unconfigured Bedrock gives meta.generated_by == "template"
-curl -s "$API/v1/snapshots/$SID/narrative?audience=director&lang=zh" | python3 -m json.tool
+curl -s "$API/v1/snapshots/$SID/narrative?audience=director&lang=en" | python3 -m json.tool
 ```

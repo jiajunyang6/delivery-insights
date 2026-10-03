@@ -1,4 +1,4 @@
-from typing import Annotated, cast
+from typing import Annotated, Literal, cast
 
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import Response
@@ -31,16 +31,14 @@ async def narrative(
     snapshot_id: str,
     service: Annotated[SnapshotService, Depends(get_snapshot_service)],
     audience: str = "manager",
-    lang: str = "en",
+    lang: Literal["en"] = "en",
 ) -> Response:
     sid = validate_snapshot_id(snapshot_id)
     if audience not in {"director", "manager"}:
         raise invalid("audience")
-    if lang not in {"en", "zh"}:
-        raise invalid("lang")
     llm = cast(LLMClient | None, getattr(request.app.state, "llm", None))
     return response(
         await NarrativeService(service, llm).get(
-            sid, audience, lang, request.headers.get("if-none-match")
+            sid, audience, request.headers.get("if-none-match")
         )
     )

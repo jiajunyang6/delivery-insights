@@ -69,7 +69,7 @@ def assemble(
             for step in STEPS
             if candidate["chain"][step]
         ]
-        action, verify = actions(candidate["id"], candidate["location"], pack["lang"])
+        action, verify = actions(candidate["id"], candidate["location"])
         hypotheses.append(
             {
                 "id": candidate["id"],
@@ -138,13 +138,12 @@ async def generate(
     snapshot: Mapping[str, Any],
     *,
     audience: str,
-    lang: str,
     llm: LLMClient | None,
     ci_complete: bool,
     now: datetime,
 ) -> NarrativeResult:
     started = perf_counter()
-    pack, candidates = build_evidence_pack(snapshot, audience, lang, ci_complete)
+    pack, candidates = build_evidence_pack(snapshot, audience, ci_complete)
     meta: dict[str, Any] = {
         "generated_by": "template",
         "model": "template",
@@ -174,7 +173,7 @@ async def generate(
                 break
             input_tokens += reply.input_tokens
             output_tokens += reply.output_tokens
-            violations = validate(reply.tool_input, pack, snapshot, audience=audience, lang=lang)
+            violations = validate(reply.tool_input, pack, snapshot, audience=audience)
             if not violations and reply.tool_input is not None:
                 output = reply.tool_input
                 meta.update(
@@ -218,7 +217,7 @@ async def generate(
         "narrative_generated",
         snapshot_id=snapshot["snapshot_id"],
         audience=audience,
-        lang=lang,
+        lang="en",
         generated_by=meta["generated_by"],
         attempts=meta["attempts"],
         validation=meta["validation"],
@@ -279,12 +278,11 @@ class NarrativeService:
             await self.snapshots.cache(pipe.execute())
 
     async def fallback(
-        self, snapshot: dict[str, Any], audience: str, lang: str, reason: str, attempts: int = 0
+        self, snapshot: dict[str, Any], audience: str, reason: str, attempts: int = 0
     ) -> NarrativeResult:
         result = await generate(
             snapshot,
             audience=audience,
-            lang=lang,
             llm=None,
             ci_complete=self.snapshots.settings.ci_complete,
             now=self.snapshots.now,
@@ -292,10 +290,11 @@ class NarrativeService:
         result.payload["meta"].update(fallback_reason=reason, attempts=attempts)
         return NarrativeResult(result.payload, False)
 
-    async def get(self, sid: str, audience: str, lang: str, conditional: str | None) -> Reply:
+    async def get(self, sid: str, audience: str, conditional: str | None) -> Reply:
+        lang = "en"
         snapshot = orjson.loads((await self.snapshots.by_id(sid, None)).body)
         settings, redis = self.snapshots.settings, self.snapshots.redis
-        pack, _ = build_evidence_pack(snapshot, audience, lang, settings.ci_complete)
+        pack, _ = build_evidence_pack(snapshot, audience, settings.ci_complete)
         pack_hash = digest(pack)[:16]
         model_key = settings.bedrock_model_id if settings.llm_enabled else "template"
         key = narrative_key(sid, audience, lang, PROMPT_VERSION, model_key, pack_hash)
@@ -336,7 +335,7 @@ class NarrativeService:
                     await asyncio.sleep(1)
                     if cached := await self.cached(key, conditional):
                         return cached
-                result = await self.fallback(snapshot, audience, lang, "llm_busy")
+                result = await self.fallback(snapshot, audience, "llm_busy")
                 body = canonical(result.payload)
                 return narrative_reply(body, etag(body), conditional, False)
         try:
@@ -346,7 +345,6 @@ class NarrativeService:
                     generate(
                         snapshot,
                         audience=audience,
-                        lang=lang,
                         llm=counted,
                         ci_complete=settings.ci_complete,
                         now=self.snapshots.now,
@@ -354,10 +352,10 @@ class NarrativeService:
                     timeout=NARRATIVE_DEADLINE_SECONDS,
                 )
                 if settings.llm_enabled and counted is None:
-                    result = await self.fallback(snapshot, audience, lang, "llm_error")
+                    result = await self.fallback(snapshot, audience, "llm_error")
             except TimeoutError:
                 result = await self.fallback(
-                    snapshot, audience, lang, "llm_error", counted.attempts if counted else 0
+                    snapshot, audience, "llm_error", counted.attempts if counted else 0
                 )
             body, tag = canonical(result.payload), ""
             tag = etag(body)

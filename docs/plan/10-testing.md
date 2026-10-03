@@ -87,28 +87,26 @@ Each file covers at least these cases; English behavioral names, e.g. test_reply
   parse thousands separators in 1,234.
 - V5 rejects values borrowed from uncited evidence and unit mismatches, such as
   reporting count n=61 as 61 hours or a share as 42 hours.
-- Reject "fell 18%" or `下降了 18%` for an increasing value; skip direction checks
+- Reject "fell 18%" for an increasing value; skip direction checks
   when a sentence contains both upward and downward wording.
 - Allow global period.days; allow persistence only with evidence-chain citations;
   allow numbers in labels only when that evidence is cited. Validate statements
-  sentence by sentence. E5 extra.n_days supports "merged within 3 days [E5]" and
-  `在 3 天内合并 [E5]`.
+  sentence by sentence. E5 extra.n_days supports "merged within 3 days [E5]".
 - Select the evidence whose change is reported: if E1/E19 are cited but only E19's
   change is reported, check E19. Reject "fell to 41.2 h" for rising E1. Treat
   "2.4x vs. the rest" as one sentence.
-- V7b rejects certainty such as "clearly", `证明了` and `一定会`; allow qualified
-  `一定程度上`, `不一定` and `没有证据证明`. With a highest band of medium,
+- V7b rejects certainty such as "clearly" or "proves". With a highest band of medium,
   reject causal "likely" or missing band wording; allow "may".
 - If all candidates are low and all output hypotheses are omitted, reject "likely
   main cause"; allow "The signals are not strong enough to support a root cause [E1]."
   V12 rejects "because" without candidates, except in a not-enough sentence.
 - Reject unknown hypotheses, omitted high hypotheses, citations outside a chain,
-  missing counter-evidence citations, "likely" or `很可能` for medium, downgrades
+  missing counter-evidence citations, "likely" for medium, downgrades
   that do not lower the band, outside-library hypotheses without significant evidence
   on both sides or without candidates, logins/@handles, and hypotheses or missing
   insufficiency wording when there are no candidates.
 
-**test_template.py**: golden and four non-CI scenarios, plus ci_slowdown after M8, all audience×lang pass. Abstention sentence without candidates; manager≥3 with candidates. Four S1 variants: significant, nonsignificant with change_rel, no previous via coverage=current start (`08` §2.5) with no_comparison, and missing E1; all validate.
+**test_template.py**: golden and four non-CI scenarios, plus ci_slowdown after M8, both English audiences pass. Abstention sentence without candidates; manager≥3 with candidates. Four S1 variants: significant, nonsignificant with change_rel, no previous via coverage=current start (`08` §2.5) with no_comparison, and missing E1; all validate.
 
 **test_llm.py**: Stubber validates Converse modelId/toolChoice/inferenceConfig/system; toolUse parsing; throttle/timeout→LLMUnavailable; logs error code only.
 
@@ -147,6 +145,7 @@ Each file covers at least these cases; English behavioral names, e.g. test_reply
 - Manual202 Location; cooldown429 Retry-After; queued returns existing;
 - Job200/404/nonUUID422;
 - Rate limit3 gives fourth429 Retry-After; health exempt;
+- Reject non-English lang with 422/errors.param=lang; default and explicit en return identical content/ETags for both audiences; prompt v6 never reads legacy prompt/language rows or Redis entries.
 - FakeLLM success200/persistent/cache avoids second call/304; double-invalid200 template/no-store/no narrative row; disabled persistent template model. Missing/deleted-during-write snapshot404, not500. Redis/DB keys include hash matching meta;
 - All responses request ID; valid reused, newline/too-long replaced;
 - CORS allow header only for configured origins.

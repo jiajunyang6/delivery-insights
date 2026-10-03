@@ -11,25 +11,23 @@ CITATION = re.compile(r"\[(E\d+)\]")
 NUMBER = re.compile(r"(?<![A-Za-z0-9_.])\d+(?:,\d{3})*(?:\.\d+)?")
 CJK = re.compile(r"[\u4e00-\u9fff]")
 DEFINITE = re.compile(
-    r"\b(definitely|certainly|clearly|undoubtedly|proves?|proved|proven|confirms?|confirmed)\b"
-    r"|(?<!不)一定(?!程度)|(?<!不)肯定|(?<!不)必然|毫无疑问|证明了|确定是",
+    r"\b(definitely|certainly|clearly|undoubtedly|proves?|proved|proven|confirms?|confirmed)\b",
     re.I,
 )
 CAUSAL = re.compile(
     r"\b(cause[sd]?|causing|because|due to|driven by|drives|driving|leads? to|led to|"
-    r"results? in|resulted in|responsible for|explains?|explained)\b"
-    r"|原因|导致|由于|造成|引起|归因|因为",
+    r"results? in|resulted in|responsible for|explains?|explained)\b",
     re.I,
 )
-ABSTAIN = re.compile(r"\binsufficient\b|\bnot (?:strong )?enough\b|信号不足|不足以", re.I)
-UP = re.compile(r"\b(rose|increased|grew|went up|climbed)\b|上升|增加|增长|变长", re.I)
-DOWN = re.compile(r"\b(fell|decreased|dropped|declined|went down)\b|下降|减少|缩短", re.I)
+ABSTAIN = re.compile(r"\binsufficient\b|\bnot (?:strong )?enough\b", re.I)
+UP = re.compile(r"\b(rose|increased|grew|went up|climbed)\b", re.I)
+DOWN = re.compile(r"\b(fell|decreased|dropped|declined|went down)\b", re.I)
 SUFFIXES = (
-    ("percent", r"^\s*(?:%|pp\b|percent\b|percentage points?\b|个百分点)"),
-    ("hours", r"^\s*(?:h\b|hrs?\b|hours?\b|小时)"),
-    ("days", r"^\s*(?:d\b|days?\b|天)"),
-    ("minutes", r"^\s*(?:min\b|minutes?\b|分钟)"),
-    ("ratio", r"^\s*(?:x\b|×|times\b|倍)"),
+    ("percent", r"^\s*(?:%|pp\b|percent\b|percentage points?\b)"),
+    ("hours", r"^\s*(?:h\b|hrs?\b|hours?\b)"),
+    ("days", r"^\s*(?:d\b|days?\b)"),
+    ("minutes", r"^\s*(?:min\b|minutes?\b)"),
+    ("ratio", r"^\s*(?:x\b|×|times\b)"),
 )
 STEPS = ("symptom", "stage", "location", "mechanism")
 
@@ -77,9 +75,7 @@ class Violation:
 
 def sentences(text: str) -> list[str]:
     cleaned = re.sub(r"\b(?:vs\.|e\.g\.|i\.e\.)", lambda m: m[0].replace(".", ""), text, flags=re.I)
-    return [
-        s.strip() for s in re.split(r"(?<=[.!?])\s+|(?<=[。！？])", cleaned.strip()) if s.strip()
-    ]
+    return [s.strip() for s in re.split(r"(?<=[.!?])\s+", cleaned.strip()) if s.strip()]
 
 
 def citations(text: str) -> set[str]:
@@ -90,17 +86,13 @@ def chain_ids(candidate: Mapping[str, Any]) -> list[str]:
     return list(dict.fromkeys(i for step in STEPS for i in candidate["chain"].get(step, [])))
 
 
-def hedge_levels(text: str, lang: str) -> set[int]:
-    patterns = (
-        (r"\blikely\b", r"\b(may|might|possibly|could)\b", r"\bearly signs?\b")
-        if lang == "en"
-        else (r"很可能", r"(?<!很)可能", r"初步迹象")
-    )
+def hedge_levels(text: str) -> set[int]:
+    patterns = (r"\blikely\b", r"\b(may|might|possibly|could)\b", r"\bearly signs?\b")
     return {2 - i for i, pattern in enumerate(patterns) if re.search(pattern, text, re.I)}
 
 
-def hedge_ok(text: str, level: str, lang: str) -> bool:
-    levels = hedge_levels(text, lang)
+def hedge_ok(text: str, level: str) -> bool:
+    levels = hedge_levels(text)
     target = LEVEL_ORDER[level]
     return target in levels and max(levels) <= target
 
@@ -112,9 +104,7 @@ def numeric_tokens(text: str) -> list[tuple[float, int, str]]:
         category = unit(text[match.end() :])
         if category == "plain" and i + 1 < len(matches):
             following = matches[i + 1]
-            if re.fullmatch(
-                r"\s*(?:to|and|-|–|→|至|到)\s*", text[match.end() : following.start()], re.I
-            ):
+            if re.fullmatch(r"\s*(?:to|and|-|–|→)\s*", text[match.end() : following.start()], re.I):
                 category = unit(text[following.end() :])
         raw = match[0].replace(",", "")
         result.append((float(raw), len(raw.split(".")[1]) if "." in raw else 0, category))
@@ -240,7 +230,6 @@ def validate(
     snapshot: Mapping[str, Any],
     *,
     audience: str,
-    lang: str,
 ) -> list[Violation]:
     errors: list[Violation] = []
 
@@ -299,10 +288,8 @@ def validate(
             texts.append(h["downgrade"]["reason"])
     if outside:
         texts.append(outside["statement"])
-    if (lang == "zh" and len(CJK.findall(body)) < 10) or (
-        lang == "en" and any(CJK.search(t) for t in texts)
-    ):
-        fail("V3:language", "Text does not match the requested language.")
+    if any(CJK.search(t) for t in texts):
+        fail("V3:language", "Narrative text must be in English.")
     for i, sentence in enumerate(body_sentences, 1):
         if not citations(sentence):
             fail("V4:sentence_without_citation", f"Body sentence {i} needs evidence.")
@@ -358,7 +345,7 @@ def validate(
             else:
                 final_level = proposed
         levels.append(LEVEL_ORDER[final_level])
-        if not hedge_ok(statement, final_level, lang):
+        if not hedge_ok(statement, final_level):
             fail("V7:hedge_mismatch", f"Statement must use {final_level} language.")
     for identifier, candidate in candidates.items():
         if candidate["level"] in {"high", "medium"} and identifier not in seen:
@@ -378,27 +365,23 @@ def validate(
             or significant != {"efficiency", "bottleneck"}
             or not citations(outside["statement"])
             or not citations(outside["statement"]) <= ids
-            or not hedge_ok(outside["statement"], "low", lang)
+            or not hedge_ok(outside["statement"], "low")
         ):
             fail(
                 "V9:invalid_llm_hypothesis",
                 "Outside hypothesis needs significant evidence from both sides, all statement "
-                "citations in evidence_ids, and low wording only: early signs / 初步迹象, "
-                "without may, might, possibly, could, likely, 可能 or 很可能. "
+                "citations in evidence_ids, and low wording only: early signs, "
+                "without may, might, possibly, could or likely. "
                 "Omit this optional hypothesis if those requirements cannot be met.",
             )
         levels.append(0)
     for sentence in body_sentences:
         if CAUSAL.search(sentence) and (levels or not ABSTAIN.search(sentence)):
-            hedges = hedge_levels(sentence, lang)
+            hedges = hedge_levels(sentence)
             if not levels or not hedges or max(hedges) > max(levels):
                 fail("V7b:overclaim", "Body causal language exceeds the supported level.")
     if not candidates:
-        required = (
-            re.search(r"\binsufficient\b|\bnot enough\b", body, re.I)
-            if lang == "en"
-            else re.search(r"信号不足|不足以", body)
-        )
+        required = re.search(r"\binsufficient\b|\bnot enough\b", body, re.I)
         if (
             hypotheses
             or outside

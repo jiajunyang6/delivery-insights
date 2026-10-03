@@ -1,13 +1,13 @@
 # Delivery Insights
 
-Delivery Insights helps engineering managers and directors see where PRs wait and what evidence supports an explanation. `GET /v1/insights/delivery` returns deterministic metrics and bottlenecks; `GET /v1/snapshots/{snapshot_id}/narrative` explains the same snapshot. The API supports English or Chinese prose, hypotheses and evidence chains. The dashboard uses English.
+Delivery Insights helps engineering managers and directors see where PRs wait and what evidence supports an explanation. `GET /v1/insights/delivery` returns deterministic metrics and bottlenecks; `GET /v1/snapshots/{snapshot_id}/narrative` explains the same snapshot. The API returns English prose, hypotheses and evidence chains. The dashboard uses English.
 
 All sections select PRs opened **or with recorded human activity** during the selected UTC period; comparisons apply the same rule to the previous period.
 Known human comments/reviews/state/label actions qualify; bot/unknown actors, CI and `updatedAt` alone do not. Commit actors are currently unavailable.
 Historical baselines and lifecycle durations keep their meaning. Risk lists start with five rows and offer **Load more**; there is no dashboard language selector.
 
 The implementation covers P0 and P1 in [the implementation plan](docs/plan/00-overview.md).
-Analytics 1.4.0 passes automated checks, offline evaluation and live pagination recovery. The earlier full Bedrock evaluation passed on analytics 1.2.0; this review checked one live English manager narrative.
+Analytics 1.4.0 and English-only prompt v6 pass automated checks, offline and real Bedrock evaluation. Live pagination recovery and the English manager HTTP smoke also pass.
 Backfill stays at 30 days; human signoff and 90/180-day checks remain pending or excluded. See [acceptance evidence](docs/ACCEPTANCE.md).
 
 ## Quickstart (60 seconds)
@@ -111,7 +111,7 @@ OpenAPI is available at `/openapi.json` and `/docs`; the full contract is
 | GET | `/v1/insights/delivery` | Insight snapshot for selected repositories and dates |
 | GET | `/v1/insights/delivery/prs` | Filtered and paginated PR detail |
 | GET | `/v1/snapshots/{snapshot_id}` | Read a retained immutable snapshot |
-| GET | `/v1/snapshots/{snapshot_id}/narrative` | `audience=director\|manager`, `lang=en\|zh` |
+| GET | `/v1/snapshots/{snapshot_id}/narrative` | `audience=director\|manager`, `lang=en` only (default) |
 | GET | `/v1/repos` | Whitelist, freshness and sync status |
 | POST | `/v1/repos/{owner}/{name}/sync` | Enqueue a manual sync |
 | GET | `/v1/sync-jobs/{job_id}` | Inspect sync progress |
@@ -131,7 +131,7 @@ SID=$(python3 -c 'import json; print(json.load(open("/tmp/di-snapshot.json"))["s
 ETAG=$(python3 -c 'from pathlib import Path; print(next(s.split(":",1)[1].strip() for s in Path("/tmp/di-headers").read_text().splitlines() if s.lower().startswith("etag:")))')
 curl -i -H "If-None-Match: $ETAG" "$API/v1/insights/delivery?repo=dotnet/runtime&from=$FROM&to=$TO"
 curl -s "$API/v1/snapshots/$SID"
-curl -s "$API/v1/snapshots/$SID/narrative?audience=manager&lang=zh"
+curl -s "$API/v1/snapshots/$SID/narrative?audience=manager&lang=en"
 ```
 
 The conditional request returns `304` with no body. Insights have a 60-second private
@@ -301,8 +301,8 @@ Latest review checks: 2026-10-03 Pacific time, analytics 1.4.0. The Python 3.12 
 | Check | Observed result |
 |---|---|
 | Ruff check/format and strict mypy | Pass; 123 formatted files, 77 typed source/eval files |
-| Unit suite | 327 passed |
-| Full suite | 381 passed, including 54 integration tests |
+| Unit suite | 312 passed |
+| Full suite | 369 passed, including 57 integration tests |
 | Frontend typecheck and build | Pass with Node 24 |
 | Real sync / browser recovery | 50 rows → stale cursor 422 → rows cleared → refresh → 50 matching rows |
 | Golden fixture after cohort caching | Unchanged SHA256; repeat calls reuse tuples; dataset replacements have independent caches |
@@ -311,26 +311,26 @@ Earlier acceptance measured 3,541 PRs with no invariant violations, three matchi
 Those analytics 1.2/1.3 measurements and npm ci/audit checks were not repeated here. They are local measurements, not production load evidence.
 The original 90-day performance gate remains excluded; nine upstream deprecation warnings remain.
 
-The harness runs five planted scenarios × two seeds × two audience/language combinations. The current offline client is a deterministic stub.
-The earlier live eval used Bedrock Sonnet 4.6, prompt v3, on analytics 1.2.0 and was not rerun for analytics 1.4.0.
-[Evaluation records](docs/EVALUATION.md) retain offline and historical Bedrock per-case
-outcomes. Numeric/citation/hedge denominators include only final LLM outputs, excluding fallback.
+The harness runs five planted scenarios × two seeds × two English audience variants.
+Current offline and real Bedrock Sonnet 4.6 suites use prompt v6 and analytics 1.4.0.
+[Evaluation records](docs/EVALUATION.md) retain every current and historical per-case outcome.
+Numeric/citation/hedge denominators include final LLM outputs, excluding fallback.
 
-| Metric | Offline | Real Bedrock | Required |
+| Metric | Offline (v6) | Real Bedrock (v6) | Required |
 |---|---|---|---|
-| First-attempt validity | 20/20 (1.00) | 18/20 (0.90) | ≥ 0.90 |
-| Numeric / citation / hedge consistency | 20/20 each | 19/19 each | 1.00 each |
+| First-attempt validity | 20/20 (1.00) | 20/20 (1.00) | ≥ 0.90 |
+| Numeric / citation / hedge consistency | 20/20 each | 20/20 each | 1.00 each |
 | Root-cause hit rate | 14/16 (0.875) | 14/16 (0.875) | ≥ 0.80 |
 | No-signal abstention | 4/4 (1.00) | 4/4 (1.00) | ≥ 0.80 |
 | High-confidence precision | 14/14 (1.00) | 14/14 (1.00) | ≥ 0.80 |
-| Fallback rate | 0/20 (0.00) | 1/20 (0.05) | ≤ 0.10 |
+| Fallback rate | 0/20 (0.00) | 0/20 (0.00) | ≤ 0.10 |
 
-Both recorded suites pass all gates. Quality-tradeoff seed 101 abstains because its previous-period
-baseline fails the five-event gate; thresholds are unchanged. Medium/low precision is undefined.
-Prompt v1/v2 failed; their reports are retained. V3 repairs length, citation and hedge guidance.
-One v3 eval chain-citation failure falls back safely. Four real-repo HTTP variants pass after one repair each.
-This small synthetic suite was used during prompt development; it is not a held-out benchmark
-or real-world causal calibration. Missing-key evaluation exits 2 with a configuration message.
+Both current suites pass all gates. Quality-tradeoff seed 101 abstains because its
+previous-period baseline fails the five-event gate; thresholds are unchanged.
+Medium/low precision is undefined. Failed v1/v2 and English v4/v5 trials remain
+recorded. The rebuilt local API also passed the English-only real-manager HTTP smoke.
+This small synthetic suite was used during prompt development; it is not a held-out
+benchmark or real-world causal calibration. Missing-key evaluation exits 2.
 
 ## Submission notes
 
@@ -398,7 +398,7 @@ This section is a factual draft for the submitter to review before publication.
 - **Tools:** <confirm: tools used for the design document and the implementation plan, e.g. "Claude (Anthropic) in Cowork">; Codex, a GPT-6-based coding agent, implemented the project from `AGENTS.md` and `docs/plan/`. A more specific model variant is not claimed.
 - **What AI did:** Implemented backend, frontend, migrations, tests, evaluation, containers, CI configuration and this README; inspected synthetic and real GitHub HTTP/browser behavior. <confirm: what AI did for the design and the plan>.
 - **What I did:** <confirm: decisions you made and what you reviewed, e.g. the metric, the demo repo, the trade-offs, plan reviews, diff reviews>.
-- **How the output was checked:** Current Makefile tool gates, 381 tests, 20-case offline eval, frontend typecheck/build, and real sync/pagination browser checks. Earlier acceptance also ran real Bedrock eval, npm ci/audit, fresh-clone Compose, GitHub invariants/reconciliation/performance and three PR page checks. Submission archive checks follow the final commit. See `docs/ACCEPTANCE.md`.
+- **How the output was checked:** Current Makefile tool gates, 369 tests, 20-case offline eval, frontend typecheck/build, and real sync/pagination browser checks. Earlier acceptance also ran real Bedrock eval, npm ci/audit, fresh-clone Compose, GitHub invariants/reconciliation/performance and three PR page checks. Submission archive checks follow the final commit. See `docs/ACCEPTANCE.md`.
 - **Not verified:** 90/180-day live checks (excluded by request), human golden/UI review, calibrated causal accuracy, remote CI, production deployment or public submission. No person is claimed to have reviewed or approved the generated work.
 
 ### With one more day

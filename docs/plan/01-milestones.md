@@ -222,10 +222,10 @@ make lint && make test
 
 1. `insights/narrative/evidence.py`: evidence pack (`07` §2).
 2. `insights/narrative/hypotheses.py`: hypothesis library and scoring (`07` §3–§4).
-3. `insights/narrative/prompt.py`: system prompt, tool schema, user message (`07` §5), `PROMPT_VERSION = "v1"`.
+3. `insights/narrative/prompt.py`: system prompt, tool schema, user message (`07` §5), `PROMPT_VERSION = "v6"`.
 4. `insights/narrative/llm.py`: `LLMClient` Protocol, `BedrockClient` (boto3 Converse in `asyncio.to_thread`), programmable `FakeLLMClient` for tests (`07` §6).
-5. `insights/narrative/validator.py`(`07` §7)、`template.py`(`07` §8)、`service.py`(`07` §9).
-6. Route `GET /v1/snapshots/{snapshot_id}/narrative`, supporting `audience=director|manager`, `lang=en|zh` (`06` §6).
+5. `insights/narrative/validator.py`(`07` §7), `template.py`(`07` §8), `service.py`(`07` §9).
+6. Route `GET /v1/snapshots/{snapshot_id}/narrative`, supporting `audience=director|manager`, `lang=en` only (`06` §6).
 
 **Tests**: `test_evidence.py`, `test_hypotheses.py` (all `07` §4.5 examples: 0.78, counter-evidence 0.63, no mechanism produces no hypothesis, incomplete-data cap 0.5), `test_validator.py`, `test_template.py` (templates must pass validation), `test_llm.py`, `test_narrative_service.py`; endpoint integration with `FakeLLMClient` (`10` §4).
 

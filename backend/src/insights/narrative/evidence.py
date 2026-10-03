@@ -261,7 +261,7 @@ def observations(
 
 
 def build_evidence_pack(
-    snapshot: Mapping[str, Any], audience: str, lang: str, ci_complete: bool
+    snapshot: Mapping[str, Any], audience: str, ci_complete: bool
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     evidence = extract_evidence(snapshot)
     candidates, abstain = score_hypotheses(
@@ -323,7 +323,7 @@ def build_evidence_pack(
     pack = {
         "pack_version": "1",
         "audience": audience,
-        "lang": lang,
+        "lang": "en",
         "period": {k: snapshot["period"][k] for k in ("from", "to", "days", "compared_to")},
         "scope": {
             "repos": snapshot["repos"],

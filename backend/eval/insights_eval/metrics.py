@@ -26,12 +26,7 @@ def recheck(
             "statement": outside["statement"],
             "evidence_ids": [i for step in outside["evidence_chain"] for i in step["evidence"]],
         }
-    return [
-        v.code
-        for v in validate(
-            output, final_pack, snapshot, audience=payload["audience"], lang=payload["lang"]
-        )
-    ]
+    return [v.code for v in validate(output, final_pack, snapshot, audience=payload["audience"])]
 
 
 def metrics(runs: Sequence[dict[str, Any]]) -> dict[str, Any]:

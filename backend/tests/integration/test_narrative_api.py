@@ -7,6 +7,7 @@ from sqlalchemy import delete, func, select
 from tests.integration.test_api import DELIVERY
 from tests.integration.test_api import api as api
 
+from insights.analytics.snapshot import digest
 from insights.api.schemas import Narrative as NarrativeSchema
 from insights.db.models import Narrative, Snapshot
 from insights.narrative.evidence import build_evidence_pack
@@ -21,7 +22,7 @@ pytestmark = pytest.mark.integration
 async def prepare(api, *, enabled=False, bad=False):
     client, app, _, ctx = api
     snapshot = (await client.get(DELIVERY)).json()
-    pack, _ = build_evidence_pack(snapshot, "director", "en", False)
+    pack, _ = build_evidence_pack(snapshot, "director", False)
     valid = build_template(pack, snapshot)
     if enabled:
         ctx["settings"].aws_bearer_token_bedrock = SecretStr("test")
@@ -98,15 +99,74 @@ async def test_unknown_expired_and_invalid_narrative_requests(api):
     _, _, url = await prepare(api)
     assert (await client.get("/v1/snapshots/s_0000000000000000/narrative")).status_code == 404
     assert (await client.get("/v1/snapshots/no/narrative")).status_code == 422
-    for query in ("audience=administrator", "lang=xx"):
+    for query in ("audience=administrator", "lang=xx", "lang=zh"):
         response = await client.get(url.split("?")[0] + "?" + query)
         assert response.status_code == 422 and response.headers["content-type"].startswith(
             "application/problem+json"
         )
         assert query.split("=")[1] not in response.text
+        assert response.json()["errors"][0]["param"] == query.split("=")[0]
     assert (await client.get(url)).status_code == 200
     clock["now"] += timedelta(days=8)
     assert (await client.get(url)).status_code == 404
+
+
+@pytest.mark.parametrize("audience", ["director", "manager"])
+async def test_only_english_default_and_explicit_language_match(api, audience):
+    client, _, _, _ = api
+    snapshot, _, _ = await prepare(api)
+    url = f"/v1/snapshots/{snapshot['snapshot_id']}/narrative?audience={audience}"
+    default = await client.get(url)
+    explicit = await client.get(url + "&lang=en")
+    assert default.status_code == explicit.status_code == 200
+    assert default.content == explicit.content
+    assert default.headers["etag"] == explicit.headers["etag"]
+    payload = default.json()
+    assert payload["lang"] == "en" and payload["meta"]["prompt_version"] == "v6"
+    NarrativeSchema.model_validate(payload)
+    contract = (await client.get("/openapi.json")).json()
+    parameters = contract["paths"]["/v1/snapshots/{snapshot_id}/narrative"]["get"]["parameters"]
+    language = next(p["schema"] for p in parameters if p["name"] == "lang")
+    assert language.get("const") == "en" or language.get("enum") == ["en"]
+
+
+async def test_v6_never_reuses_legacy_language_or_prompt_caches(api):
+    client, app, clock, ctx = api
+    snapshot, _, url = await prepare(api, enabled=True)
+    pack, _ = build_evidence_pack(snapshot, "director", False)
+    pack_hash = digest(pack)[:16]
+    model = ctx["settings"].bedrock_model_id
+    for language, version in (("en", "v3"), ("zh", "v3"), ("en", "v4")):
+        key = narrative_key(
+            snapshot["snapshot_id"], "director", language, version, model, pack_hash
+        )
+        await ctx["redis"].hset(
+            key, mapping={"body": b'{"narrative":"legacy"}', "etag": '"legacy"', "persist": "1"}
+        )
+        async with ctx["session_factory"]() as session, session.begin():
+            session.add(
+                Narrative(
+                    snapshot_id=snapshot["snapshot_id"],
+                    audience="director",
+                    lang=language,
+                    prompt_version=version,
+                    model_id=model,
+                    pack_hash=pack_hash,
+                    generated_by="llm",
+                    payload={"narrative": "legacy"},
+                    etag='"legacy"',
+                    created_at=clock["now"],
+                )
+            )
+    rejected = await client.get(url.replace("lang=en", "lang=zh"))
+    assert rejected.status_code == 422 and not app.state.llm.calls
+    fresh = await client.get(url)
+    assert fresh.status_code == 200 and fresh.json()["meta"]["prompt_version"] == "v6"
+    assert fresh.json()["narrative"] != "legacy" and len(app.state.llm.calls) == 1
+    current_key = narrative_key(snapshot["snapshot_id"], "director", "en", "v6", model, pack_hash)
+    await ctx["redis"].delete(current_key)
+    restored = await client.get(url)
+    assert restored.content == fresh.content and len(app.state.llm.calls) == 1
 
 
 async def test_snapshot_deleted_during_generation_returns_404(api):

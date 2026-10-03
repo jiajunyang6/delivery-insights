@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchJson, message } from "../api";
 import { format, signed, safeGithubUrl } from "../format";
-import type { Audience, Lang, Narrative } from "../types";
+import type { Audience, Narrative } from "../types";
 
 const reasons: Record<string, string> = {
   insufficient_sample: "insufficient sample",
@@ -12,11 +12,9 @@ const reasons: Record<string, string> = {
 export function NarrativePanel({
   snapshotId,
   audience,
-  lang,
 }: {
   snapshotId: string;
   audience: Audience;
-  lang: Lang;
 }) {
   const [data, setData] = useState<Narrative | null>(null);
   const [error, setError] = useState("");
@@ -30,9 +28,7 @@ export function NarrativePanel({
       "/v1/snapshots/" +
         snapshotId +
         "/narrative?audience=" +
-        audience +
-        "&lang=" +
-        lang,
+        audience,
       controller.signal,
     )
       .then((r) => {
@@ -50,7 +46,7 @@ export function NarrativePanel({
         }
       });
     return () => controller.abort();
-  }, [snapshotId, audience, lang]);
+  }, [snapshotId, audience]);
   function focus(id: string) {
     setHighlight(id);
     document
@@ -81,7 +77,7 @@ export function NarrativePanel({
     <section
       className="panel narrative-panel"
       aria-labelledby="narrative-heading"
-      lang={lang}
+      lang="en"
     >
       <div className="section-heading">
         <div>
@@ -89,7 +85,7 @@ export function NarrativePanel({
           <h2 id="narrative-heading">The evidence, in words</h2>
         </div>
         <span className="badge neutral">
-          {audience} · {lang.toUpperCase()}
+          {audience} · EN
         </span>
       </div>
       {error ? (

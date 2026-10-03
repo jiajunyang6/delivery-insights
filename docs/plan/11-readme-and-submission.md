@@ -137,7 +137,7 @@ flowchart LR
 
 ### 7.3 Beyond the brief
 
-List completed extras only: deterministic confidence/chains/validator/fallback; org multi-repo aggregation; immutable snapshots/ETags; PR drilldown; staged backfill/open sweep; director/manager×en/zh; eval; React; ownership parsing; Actions CI; drivers; KM/predictability; containers/CI workflow.
+List completed extras only: deterministic confidence/chains/validator/fallback; org multi-repo aggregation; immutable snapshots/ETags; PR drilldown; staged backfill/open sweep; English director/manager variants; eval; React; ownership parsing; Actions CI; drivers; KM/predictability; containers/CI workflow.
 
 ### 7.4 Known limitations and next steps
 

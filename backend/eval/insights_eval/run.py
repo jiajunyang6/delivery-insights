@@ -52,12 +52,12 @@ async def evaluate(
         for seed in seeds:
             snapshot = build_snapshot_from_repo(generate(SCENARIOS[scenario], seed))
             expected_id, expected_location = EXPECTED[scenario]
-            for audience, lang in (("director", "en"), ("manager", "zh")):
+            for audience in ("director", "manager"):
                 started = perf_counter()
                 traced = TracedClient(client)
-                pack, _ = build_evidence_pack(snapshot, audience, lang, True)
+                pack, _ = build_evidence_pack(snapshot, audience, True)
                 result = await narrate(
-                    snapshot, audience=audience, lang=lang, llm=traced, ci_complete=True, now=AS_OF
+                    snapshot, audience=audience, llm=traced, ci_complete=True, now=AS_OF
                 )
                 payload, meta = result.payload, result.payload["meta"]
                 hypotheses = payload["hypotheses"]
@@ -71,7 +71,7 @@ async def evaluate(
                     else payload["abstained"] and not hypotheses
                 )
                 first_errors = (
-                    validate(traced.first.tool_input, pack, snapshot, audience=audience, lang=lang)
+                    validate(traced.first.tool_input, pack, snapshot, audience=audience)
                     if traced.first is not None
                     else []
                 )
@@ -79,7 +79,7 @@ async def evaluate(
                     "scenario": scenario,
                     "seed": seed,
                     "audience": audience,
-                    "lang": lang,
+                    "lang": "en",
                     "expected": {"id": expected_id, "location": expected_location},
                     "generated_by": meta["generated_by"],
                     "validation": meta["validation"],
@@ -106,7 +106,7 @@ async def evaluate(
                 }
                 runs.append(row)
                 print(
-                    f"{scenario:17} {seed:4} {audience + '/' + lang:13} "
+                    f"{scenario:17} {seed:4} {audience + '/en':13} "
                     f"{top.get('id', '-')!s:22} {top.get('confidence_level', '-')!s:7} "
                     f"{hit!s:5} {meta['generated_by'] == 'template'}"
                 )

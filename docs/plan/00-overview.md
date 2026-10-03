@@ -1,7 +1,6 @@
 # 00 Overview
 
-This is the implementation plan, translated from its original Chinese text. Later
-user-approved scope and tooling changes are recorded in `docs/DECISIONS.md`; the
+This is the implementation plan. User-approved scope and tooling changes are recorded in `docs/DECISIONS.md`; the
 current behavior and verification status are described in README and `docs/ACCEPTANCE.md`.
 
 ## 1. Product
@@ -89,7 +88,7 @@ Key points:
 | Layer | Choice |
 |---|---|
 | Language | Python 3.12 |
-| API | FastAPI ≥ 0.115、uvicorn[standard] ≥ 0.30、Pydantic ≥ 2.8、pydantic-settings ≥ 2.4 |
+| API | FastAPI ≥ 0.115, uvicorn[standard] ≥ 0.30, Pydantic ≥ 2.8, pydantic-settings ≥ 2.4 |
 | Storage | Postgres 16, SQLAlchemy[asyncio] ≥ 2.0.30, asyncpg ≥ 0.29, Alembic ≥ 1.13 |
 | Cache and queue | Redis 7, redis-py ≥ 5.0 (`redis.asyncio`), arq ≥ 0.26 |
 | Upstream client | httpx ≥ 0.27 |
@@ -160,8 +159,8 @@ delivery-insights/
 │   │   ├── narrative/
 │   │   │   ├── evidence.py        # Evidence pack
 │   │   │   ├── hypotheses.py      # Hypothesis library and scoring
-│   │   │   ├── prompt.py          # system prompt、tool schema
-│   │   │   ├── llm.py             # LLMClient Protocol、BedrockClient、FakeLLMClient
+│   │   │   ├── prompt.py          # system prompt, tool schema
+│   │   │   ├── llm.py             # LLMClient Protocol, BedrockClient, FakeLLMClient
 │   │   │   ├── validator.py
 │   │   │   ├── template.py        # Template narrative
 │   │   │   └── service.py         # Generation, validation, retries, fallback, caching
@@ -170,7 +169,7 @@ delivery-insights/
 │   │       ├── schemas.py         # Pydantic response models (matching 06-api.md)
 │   │       ├── caching.py         # ETag utilities
 │   │       └── routes/  health.py  insights.py  snapshots.py  repos.py  sync_jobs.py
-│   ├── eval/insights_eval/        # generator.py、pipeline.py、scenarios.py（M5）；stub_llm.py、metrics.py、run.py（M10）
+│   ├── eval/insights_eval/        # generator.py, pipeline.py, scenarios.py(M5);stub_llm.py, metrics.py, run.py(M10)
 │   └── tests/  unit/  integration/  fixtures/  golden/
 └── frontend/                      # P1
     ├── package.json  vite.config.ts  tsconfig.json  index.html
@@ -204,4 +203,4 @@ Package `eval/` separately as `insights_eval` under `backend/eval/insights_eval/
 - **Team-level reporting**: individuals appear only in `review_load.distribution` and the at-risk PR `author` field.
 - **Determinism**: bootstrap seeds derive from the snapshot parameter hash; all lists have explicit sort orders (see individual specifications).
 - **Injectable time**: domain code does not call `datetime.now()` directly. The API uses `insights.api.deps.get_now`; worker jobs and services receive `now` so tests and synthetic data can fix "today".
-- **Versions**: `insights.analytics.ANALYTICS_VERSION = "1.0.0"`, `thresholds.THRESHOLDS_VERSION = "1.0.0"`, `narrative.prompt.PROMPT_VERSION = "v1"`. Increment the relevant version when algorithms, thresholds, or prompts change to avoid old cache hits.
+- **Versions**: `insights.analytics.ANALYTICS_VERSION = "1.0.0"`, `thresholds.THRESHOLDS_VERSION = "1.0.0"`, `narrative.prompt.PROMPT_VERSION = "v6"`. Increment the relevant version when algorithms, thresholds, or prompts change to avoid old cache hits.

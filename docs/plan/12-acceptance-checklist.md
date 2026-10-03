@@ -92,4 +92,4 @@
 - [ ] **H4** `[P1][Credentials]` Area owners_count present; codeowners mode uses rules after restart/rederivation.
 - [ ] **H5** `[P1]` CI section/coverage present; default incomplete-CI hypothesis≤0.5.
 - [ ] **H6** `[P1]` Drivers/survival/predictability present; golden update explained in commit.
-- [ ] **H7** `[P1]` All director/manager×en/zh validate in templates/eval.
+- [ ] **H7** `[P1]` Both English director/manager variants validate in templates/eval; non-English lang requests return 422.

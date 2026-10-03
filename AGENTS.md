@@ -5,7 +5,7 @@ Implement **Delivery Insights**, a Python web service that synchronizes GitHub P
 1. `GET /v1/insights/delivery`: period-based team efficiency and bottleneck analysis; code computes every number.
 2. `GET /v1/snapshots/{snapshot_id}/narrative`: a short narrative from the same snapshot, written by Claude Sonnet 4.6 on AWS Bedrock, with root-cause hypotheses, confidence, and evidence chains.
 
-The plan is the requirements source. Documentation, code, comments, logs, API text, and README use **English**. Preserve Chinese examples and validator vocabulary where they define the bilingual API contract.
+The plan is the requirements source. Documentation, code, comments, logs, API text, and README use **English**. Narrative output is English only; the API accepts only `lang=en`.
 
 ## 1. Reading order
 
