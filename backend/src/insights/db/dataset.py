@@ -67,6 +67,15 @@ async def load_dataset(session: AsyncSession, params: SnapshotParams, *, now: da
             .where(
                 PrFact.repo_id.in_(names),
                 or_(
+                    select(PrEvent.id)
+                    .where(
+                        PrEvent.pr_id == PrFact.pr_id,
+                        ~PrEvent.actor_is_bot,
+                        PrEvent.actor_login.is_not(None),
+                        PrEvent.occurred_at >= previous_start,
+                        PrEvent.occurred_at < as_of,
+                    )
+                    .exists(),
                     and_(
                         PrFact.ready_at < end,
                         or_(PrFact.end_at.is_(None), PrFact.end_at >= previous_start),
@@ -92,6 +101,22 @@ async def load_dataset(session: AsyncSession, params: SnapshotParams, *, now: da
             )
         ).all():
             intervals[pr_id].append(Interval(state, began, ended))
+    activity: dict[int, list[datetime]] = defaultdict(list)
+    if ids:
+        for pr_id, at in (
+            await session.execute(
+                select(PrEvent.pr_id, PrEvent.occurred_at)
+                .where(
+                    PrEvent.pr_id.in_(ids),
+                    ~PrEvent.actor_is_bot,
+                    PrEvent.actor_login.is_not(None),
+                    PrEvent.occurred_at >= previous_start,
+                    PrEvent.occurred_at < as_of,
+                )
+                .order_by(PrEvent.pr_id, PrEvent.occurred_at)
+            )
+        ).all():
+            activity[pr_id].append(at)
     ci = await load_ci_data(session, list(names), pr_ids=ids)
     prs = tuple(
         PrData(
@@ -106,6 +131,7 @@ async def load_dataset(session: AsyncSession, params: SnapshotParams, *, now: da
             draft,
             created,
             union_intervals(ci.by_pr.get(f.pr_id, ())),
+            tuple(activity[f.pr_id]),
         )
         for f, title, url, author, draft, created in rows
     )

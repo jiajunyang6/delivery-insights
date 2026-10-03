@@ -58,6 +58,7 @@ class PrData:
     is_draft: bool
     created_at: datetime
     ci_intervals: tuple[tuple[datetime, datetime], ...] = ()
+    human_activity_at: tuple[datetime, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,7 +128,14 @@ class Dataset:
 
     @property
     def flow(self) -> tuple[PrData, ...]:
-        return tuple(p for p in self.prs if is_flow(p.facts))
+        return self.flow_in(self.current)
+
+    def flow_in(self, window: Window) -> tuple[PrData, ...]:
+        return tuple(p for p in self.prs if is_flow(p.facts) and active_in(p, window))
+
+    def reviews_in(self, window: Window) -> tuple[Review, ...]:
+        ids = {p.pr_id for p in self.flow_in(window)}
+        return tuple(r for r in self.reviews if r.pr_id in ids and window.contains(r.occurred_at))
 
     def for_repo(self, repo: str) -> "Dataset":
         prs = tuple(p for p in self.prs if p.repo == repo)
@@ -144,13 +152,20 @@ class Dataset:
         )
 
 
-def merged(dataset: Dataset, window: Window) -> tuple[PrData, ...]:
-    return tuple(p for p in dataset.flow if window.contains(p.facts.merged_at))
+def active_in(pr: PrData, window: Window) -> bool:
+    """Select new PRs or recorded human activity, never bot-driven updated_at."""
+    return window.contains(pr.created_at) or any(window.contains(at) for at in pr.human_activity_at)
+
+
+def merged(dataset: Dataset, window: Window, *, scope: Window | None = None) -> tuple[PrData, ...]:
+    return tuple(p for p in dataset.flow_in(scope or window) if window.contains(p.facts.merged_at))
 
 
 def closed(dataset: Dataset, window: Window) -> tuple[PrData, ...]:
     return tuple(
-        p for p in dataset.flow if p.facts.merged_at is None and window.contains(p.facts.closed_at)
+        p
+        for p in dataset.flow_in(window)
+        if p.facts.merged_at is None and window.contains(p.facts.closed_at)
     )
 
 

@@ -86,7 +86,7 @@ def test_ci_cohort_gates_comparison_and_workflow_sorting():
     )
     runs += (("a/b", run(90, start=30, end=32)),)
     runs += (("a/b", run(91, pr_numbers=())),)
-    d = replace(dataset([]), ci_runs=runs)
+    d = replace(dataset([pr(i) for i in range(30)]), ci_runs=runs)
     ci = build_ci(d, "fixed", 0.75)
     assert ci["queue_p50_minutes"]["value"] == 30
     assert ci["run_p50_minutes"]["value"] == 90

@@ -65,7 +65,7 @@ export function AtRiskTable({
       if (!current.signal.aborted) setBusy(false);
     }
   }
-  const rows = extra ?? s.at_risk_prs;
+  const rows = extra ?? s.at_risk_prs.slice(0, 5);
   return (
     <section className="panel">
       <div className="section-heading">
@@ -125,14 +125,16 @@ export function AtRiskTable({
           {error}
         </p>
       )}
-      {((extra === null && total > 0) || cursor !== null) && (
+      {total > 0 && (
         <div className="table-footer">
           <span>
             Showing {rows.length} of {total}
           </span>
-          <button onClick={load} disabled={busy}>
-            {busy ? "Loading…" : extra === null ? "Load all" : "Load more"}
-          </button>
+          {rows.length < total && (extra === null || cursor !== null) && (
+            <button onClick={load} disabled={busy}>
+              {busy ? "Loading…" : "Load more"}
+            </button>
+          )}
         </div>
       )}
     </section>

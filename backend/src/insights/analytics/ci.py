@@ -58,8 +58,12 @@ def overlap_hours(
 
 
 def measures(dataset: Dataset, window: Window) -> tuple[dict[str, Measure], list[CiRun]]:
+    eligible = {(p.repo, p.number) for p in dataset.flow_in(window)}
     runs = [
-        (repo, r) for repo, r in dataset.ci_runs if r.pr_numbers and window.contains(r.created_at)
+        (repo, replace(r, pr_numbers=numbers))
+        for repo, r in dataset.ci_runs
+        if window.contains(r.created_at)
+        and (numbers := tuple(n for n in r.pr_numbers if (repo, n) in eligible))
     ]
     queue = [
         (r.run_started_at - r.created_at).total_seconds() / 60

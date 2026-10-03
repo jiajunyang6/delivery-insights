@@ -1,4 +1,4 @@
-import type { Audience, Lang, Params, RepoStatus } from "../types";
+import type { Audience, Params, RepoStatus } from "../types";
 import { dateRange } from "../format";
 
 interface Props {
@@ -7,8 +7,6 @@ interface Props {
   repos: RepoStatus[];
   audience: Audience;
   setAudience: (a: Audience) => void;
-  lang: Lang;
-  setLang: (l: Lang) => void;
   invalid: boolean;
   refresh: () => void;
 }
@@ -80,7 +78,7 @@ export function Controls(p: Props) {
         </button>
       </div>
       <div className="control-row secondary-controls">
-        <p>Compare outcomes. Follow the evidence. Improve the flow.</p>
+        <p>PRs opened or with human activity during the selected period.</p>
         <div className="control-row compact">
           <span className="label">View</span>
           <div className="segmented">
@@ -95,16 +93,6 @@ export function Controls(p: Props) {
               </button>
             ))}
           </div>
-          <label className="language">
-            Narrative
-            <select
-              value={p.lang}
-              onChange={(e) => p.setLang(e.target.value as Lang)}
-            >
-              <option value="en">EN</option>
-              <option value="zh">中文</option>
-            </select>
-          </label>
         </div>
       </div>
       {p.invalid && (

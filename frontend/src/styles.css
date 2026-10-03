@@ -220,14 +220,6 @@ main {
   align-items: center;
   gap: 12px;
 }
-.language {
-  flex-direction: row !important;
-  align-items: center;
-}
-.language select {
-  height: 33px;
-  padding: 5px 8px;
-}
 .report {
   display: flex;
   flex-direction: column;

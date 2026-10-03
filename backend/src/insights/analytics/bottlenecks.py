@@ -29,7 +29,11 @@ def location_names(pr: PrData, dataset: Dataset) -> tuple[str, ...]:
 
 
 def at_risk(
-    dataset: Dataset, *, at: datetime, exclude_current_drafts: bool = False
+    dataset: Dataset,
+    *,
+    at: datetime,
+    exclude_current_drafts: bool = False,
+    window: Window | None = None,
 ) -> list[dict[str, Any]]:
     completed: dict[tuple[str, str], list[tuple[datetime, float]]] = defaultdict(list)
     for baseline in dataset.baselines:
@@ -57,7 +61,7 @@ def at_risk(
                 )
             thresholds[repo.repo, state] = warning, critical, source
     result = []
-    for pr in dataset.flow:
+    for pr in dataset.flow_in(window or dataset.current):
         if not open_at(pr, at) or (exclude_current_drafts and pr.is_draft):
             continue
         interval = state_at(pr.intervals, at)
@@ -143,12 +147,12 @@ def review_queue(dataset: Dataset, window: Window) -> dict[str, Any]:
             {
                 "week_start": week.start.date().isoformat(),
                 "days": (week.end - week.start).total_seconds() / 86400,
-                "inflow": sum(week.contains(p.facts.ready_at) for p in dataset.flow),
-                "outflow": sum(week.contains(effective_review(p)) for p in dataset.flow),
+                "inflow": sum(week.contains(p.facts.ready_at) for p in dataset.flow_in(window)),
+                "outflow": sum(week.contains(effective_review(p)) for p in dataset.flow_in(window)),
                 "open_at_week_end": sum(
                     open_at(p, week.end)
                     and ((review_at := effective_review(p)) is None or review_at >= week.end)
-                    for p in dataset.flow
+                    for p in dataset.flow_in(window)
                 ),
             }
         )
@@ -171,10 +175,11 @@ def locations(
     current = {p.pr_id: p for p in merged(dataset, dataset.current)}
     previous = {p.pr_id: p for p in merged(dataset, dataset.previous)}
     all_prs = {p.pr_id: p for p in dataset.flow}
+    comparison_prs = {**previous, **all_prs}
     memberships: dict[str, set[int]] = defaultdict(set)
     allocated: dict[str, float] = defaultdict(float)
     old_allocated: dict[str, float] = defaultdict(float)
-    for pr in dataset.flow:
+    for pr in comparison_prs.values():
         names = location_names(pr, dataset)
         for name in names:
             memberships[name].add(pr.pr_id)
@@ -227,8 +232,14 @@ def locations(
                 "waiting_reviewer_share": ratio(
                     wait, ledger["states"]["waiting_reviewer"]["pr_hours"]
                 ),
-                "inflow": sum(dataset.current.contains(all_prs[i].facts.ready_at) for i in ids),
-                "outflow": sum(dataset.current.contains(effective_review(all_prs[i])) for i in ids),
+                "inflow": sum(
+                    dataset.current.contains(all_prs[i].facts.ready_at)
+                    for i in ids & all_prs.keys()
+                ),
+                "outflow": sum(
+                    dataset.current.contains(effective_review(all_prs[i]))
+                    for i in ids & all_prs.keys()
+                ),
                 "at_risk_prs": len(group_risks),
                 "owners_count": owner_counts.get(name) if name != "other" else None,
             }
@@ -320,7 +331,7 @@ def pareto(ledger: dict[str, Any], locations_: list[dict[str, Any]]) -> list[dic
 
 
 def review_load(dataset: Dataset) -> dict[str, Any]:
-    counts = Counter(r.reviewer for r in dataset.reviews if dataset.current.contains(r.occurred_at))
+    counts = Counter(r.reviewer for r in dataset.reviews_in(dataset.current))
     total = sum(counts.values())
     return {
         "reviewers": len(counts),
@@ -337,7 +348,7 @@ def waste_rework(dataset: Dataset) -> tuple[dict[str, Any], dict[str, Any]]:
     wasted = [p for p in lost if p.facts.close_class != "superseded"]
     reverted_prs = [p for p in prs if reverted(p, dataset.as_of)]
     wasted_ids = {p.pr_id for p in wasted}
-    reviews = [r for r in dataset.reviews if dataset.current.contains(r.occurred_at)]
+    reviews = dataset.reviews_in(dataset.current)
     waste = {
         "closed_unmerged": len(lost),
         "by_class": {
@@ -357,9 +368,9 @@ def waste_rework(dataset: Dataset) -> tuple[dict[str, Any], dict[str, Any]]:
             sum(hours(p, end=dataset.as_of).values()) for p in [*wasted, *reverted_prs]
         ),
     }
-    by_id = {p.pr_id: p for p in dataset.prs}
+    by_id = {p.pr_id: p for p in dataset.flow}
     relands: dict[int, PrData] = {}
-    for pr in sorted(dataset.prs, key=lambda p: (p.facts.merged_at or dataset.as_of, p.pr_id)):
+    for pr in sorted(dataset.flow, key=lambda p: (p.facts.merged_at or dataset.as_of, p.pr_id)):
         if (
             pr.facts.reland_of_pr_id is not None
             and pr.facts.merged_at
@@ -464,7 +475,9 @@ def signal_measures(
 def signals(dataset: Dataset, risks: Sequence[dict[str, Any]], params_hash: str) -> dict[str, Any]:
     current = signal_measures(dataset, dataset.current, risks)
     previous = (
-        signal_measures(dataset, dataset.previous, at_risk(dataset, at=dataset.start))
+        signal_measures(
+            dataset, dataset.previous, at_risk(dataset, at=dataset.start, window=dataset.previous)
+        )
         if dataset.comparison_available
         else {}
     )
@@ -483,7 +496,7 @@ def signals(dataset: Dataset, risks: Sequence[dict[str, Any]], params_hash: str)
 def series(dataset: Dataset, window: Window) -> list[dict[str, Any]]:
     result = []
     for week in weeks(window):
-        prs = merged(dataset, week)
+        prs = merged(dataset, week, scope=window)
         totals = {
             state: sum(hours(p, end=week.end)[state] for p in prs) for state in WAITING_STATES
         }
