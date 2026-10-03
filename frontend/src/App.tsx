@@ -99,7 +99,10 @@ export default function App() {
         }
       })
       .catch((e) => {
-        if (!controller.signal.aborted) setError(message(e));
+        if (!controller.signal.aborted) {
+          setPending(null);
+          setError(message(e));
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);

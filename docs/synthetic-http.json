@@ -1,0 +1,15 @@
+{
+  "synthetic_prs_loaded": 2172,
+  "snapshot_id": "s_470c682233051c77",
+  "period_merged_prs": 427,
+  "risk_prs": 97,
+  "ledger_relative_rounding_error": 7.653313638774416e-06,
+  "narrative_variants": 4,
+  "insight_etag": 304,
+  "org_identity_equal": true,
+  "narrative_cache_control": "private, max-age=3600",
+  "90day_merged_prs": 894,
+  "90day_cold_http_ms": 526.27,
+  "50_warm_http_p95_ms": 35.83,
+  "perf_scope": "synthetic only; not dotnet/runtime acceptance"
+}

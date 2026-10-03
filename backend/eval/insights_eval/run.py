@@ -70,6 +70,11 @@ async def evaluate(
                     if expected_id
                     else payload["abstained"] and not hypotheses
                 )
+                first_errors = (
+                    validate(traced.first.tool_input, pack, snapshot, audience=audience, lang=lang)
+                    if traced.first is not None
+                    else []
+                )
                 row = {
                     "scenario": scenario,
                     "seed": seed,
@@ -93,10 +98,10 @@ async def evaluate(
                         {"id": h["id"], "level": h["confidence_level"], "location": h["location"]}
                         for h in hypotheses
                     ],
-                    "first_attempt_valid": traced.first is not None
-                    and not validate(
-                        traced.first.tool_input, pack, snapshot, audience=audience, lang=lang
-                    ),
+                    "first_attempt_valid": traced.first is not None and not first_errors,
+                    "first_attempt_violations": [
+                        {"code": v.code, "message": v.message} for v in first_errors
+                    ],
                     "recheck_violations": recheck(payload, pack, snapshot),
                 }
                 runs.append(row)

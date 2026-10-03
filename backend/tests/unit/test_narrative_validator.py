@@ -268,3 +268,12 @@ def test_chinese_medium_cannot_use_high_language_and_same_level_downgrade():
     assert not codes(output, pack, snapshot, "zh")
     output["hypotheses"][0]["downgrade"] = {"level": "medium", "reason": "信号有限 [E15]。"}
     assert "V8:invalid_downgrade" in codes(output, pack, snapshot, "zh")
+
+
+def test_schema_repair_feedback_identifies_field_and_limit_without_echoing_input():
+    snapshot, pack, output = validation_fixture()
+    output["hypotheses"][0]["statement"] = "untrusted-payload" * 30
+    errors = validate(output, pack, snapshot, audience="director", lang="en")
+    schema = [v.message for v in errors if v.code == "V1:schema"]
+    assert any("hypotheses.0.statement" in message and "400" in message for message in schema)
+    assert all("untrusted-payload" not in message for message in schema)

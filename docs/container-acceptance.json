@@ -1,0 +1,29 @@
+{
+  "clean_clone_head": "8971fdf",
+  "health": 200,
+  "ready": [
+    200,
+    503,
+    200
+  ],
+  "worker_recovered": true,
+  "empty_token_status": "missing_token",
+  "empty_token_insight": 503,
+  "manual_sync": [
+    202,
+    429
+  ],
+  "openapi_paths": 9,
+  "uids": {
+    "api": 10001,
+    "worker": 10001,
+    "web": 101
+  },
+  "ui": 200,
+  "proxy_health": 200,
+  "csp": true,
+  "json_log_lines": 28,
+  "access_records": 11,
+  "smoke_shell_syntax": "passed",
+  "live_smoke": "pending credentials"
+}
