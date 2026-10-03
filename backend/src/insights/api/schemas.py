@@ -500,3 +500,105 @@ class PrPage(Contract):
     total: int
     items: list[PrRow]
     next_cursor: str | None
+
+
+class LlmDowngrade(Contract):
+    original: str = Field(alias="from")
+    to: str
+    reason: str
+
+
+class ConfidenceBasis(Contract):
+    signal_agreement: float | None
+    signals_present: int | None
+    signals_total: int | None
+    effect_size: float | None
+    persistence: float | None
+    weeks_holding: str | None
+    sample_adequacy: float | None
+    sample_size: int | None
+    localization: float | None
+    counter_evidence: int | None
+    covers_both_parts: bool | None
+    raw_score: float | None
+    cap: float | None
+    cap_reason: str | None
+    llm_downgrade: LlmDowngrade | None
+
+
+class EvidenceStep(Contract):
+    step: Literal["symptom", "stage", "location", "mechanism", "cited"]
+    evidence: list[str]
+
+
+class RuledOut(Contract):
+    hypothesis: str
+    evidence: list[str]
+
+
+class OpenAlternative(Contract):
+    hypothesis: str
+    reason: Literal["no_data", "insufficient_sample", "below_threshold", "not_selected"]
+
+
+class NarrativeHypothesis(Contract):
+    id: str
+    source: Literal["library", "llm"]
+    title: str
+    location: str | None
+    statement: str
+    confidence: float
+    confidence_level: Literal["high", "medium", "low"]
+    confidence_basis: ConfidenceBasis
+    evidence_chain: list[EvidenceStep]
+    counter_evidence: list[str]
+    alternatives_ruled_out: list[RuledOut]
+    alternatives_open: list[OpenAlternative]
+    action: str | None
+    verify_next: str | None
+
+
+class EvidenceEntry(Contract):
+    id: str
+    key: str
+    label: str
+    unit: Unit
+    value: int | float
+    previous: int | float | None
+    change_abs: float | None
+    change_rel: float | None
+    change_pp: float | None
+    significant: bool | None
+    n: int | None
+    side: Literal["efficiency", "bottleneck"]
+    baseline: str | None
+    location: str | None
+    extra: dict[str, int | float | None]
+    ref: str
+    examples: list[str]
+
+
+class NarrativeMeta(Contract):
+    generated_by: Literal["llm", "template"]
+    model: str
+    prompt_version: str
+    validation: Literal["passed", "failed", "not_run"]
+    attempts: int
+    fallback_reason: Literal["llm_disabled", "llm_error", "validation_failed", "llm_busy"] | None
+    violations: list[str]
+    confidence_method: Literal["deterministic-v1"]
+    pack_hash: str
+    generated_at: datetime
+
+
+class Narrative(Contract):
+    snapshot_id: str
+    audience: Literal["director", "manager"]
+    lang: Literal["en", "zh"]
+    narrative: str
+    abstained: bool
+    abstain_reason: Literal["no_comparison", "insufficient_signal"] | None
+    hypotheses: list[NarrativeHypothesis]
+    evidence: list[EvidenceEntry]
+    links: dict[str, str]
+    meta: NarrativeMeta

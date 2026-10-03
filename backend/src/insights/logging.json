@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "formatters": {
+    "json": {
+      "()": "insights.logging.json_formatter"
+    }
+  },
+  "handlers": {
+    "json": {
+      "class": "logging.StreamHandler",
+      "stream": "ext://sys.stdout",
+      "formatter": "json"
+    }
+  },
+  "root": {
+    "level": "INFO",
+    "handlers": [
+      "json"
+    ]
+  },
+  "loggers": {
+    "arq": {
+      "handlers": [],
+      "propagate": true
+    },
+    "uvicorn": {
+      "handlers": [],
+      "propagate": true
+    },
+    "uvicorn.error": {
+      "handlers": [],
+      "propagate": true
+    },
+    "uvicorn.access": {
+      "handlers": [],
+      "propagate": false
+    }
+  }
+}

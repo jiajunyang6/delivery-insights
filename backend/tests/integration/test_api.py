@@ -274,3 +274,24 @@ async def test_rate_limit_fail_open_and_redis_cache_fallback(api, monkeypatch):
     assert "private" not in result.text
     denied_origin = await client.get("/healthz", headers={"Origin": "https://evil.example"})
     assert "access-control-allow-origin" not in denied_origin.headers
+
+
+async def test_org_alias_and_complete_openapi_models(api):
+    client, app, _, _ = api
+    single = await client.get(DELIVERY)
+    organization = await client.get(DELIVERY.replace("repo=a/b", "org=a"))
+    assert single.status_code == organization.status_code == 200
+    assert single.content == organization.content
+    paths = app.openapi()["paths"]
+    for path in (
+        "/v1/insights/delivery",
+        "/v1/insights/delivery/prs",
+        "/v1/snapshots/{snapshot_id}",
+        "/v1/snapshots/{snapshot_id}/narrative",
+        "/v1/repos",
+        "/v1/sync-jobs/{job_id}",
+        "/healthz",
+        "/readyz",
+    ):
+        assert paths[path]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    assert "post" in paths["/v1/repos/{owner}/{name}/sync"]
