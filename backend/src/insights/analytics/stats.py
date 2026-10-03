@@ -1,6 +1,7 @@
 import hashlib
 from collections.abc import Sequence
-from typing import Literal
+from itertools import groupby
+from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -57,3 +58,50 @@ def bootstrap_diff(
 
 def ratio(numerator: float, denominator: float) -> float:
     return numerator / denominator if denominator else 0.0
+
+
+def kaplan_meier(samples: Sequence[tuple[float, bool]]) -> dict[str, Any]:
+    """Estimate time-to-event survival; tied events precede censoring."""
+    survival = 1.0
+    at_risk = len(samples)
+    median: float | None = None
+    steps: list[tuple[float, float]] = []
+    for duration, group in groupby(sorted(samples), key=lambda item: item[0]):
+        outcomes = list(group)
+        events = sum(event for _, event in outcomes)
+        survival *= 1 - events / at_risk
+        steps.append((duration, survival))
+        if median is None and survival <= 0.5:
+            median = duration
+        at_risk -= len(outcomes)
+    return {
+        "n": len(samples),
+        "events": sum(event for _, event in samples),
+        "median_hours": median,
+        "s_at_hours": {
+            str(hour): next((s for t, s in reversed(steps) if t <= hour), 1.0)
+            for hour in (24, 72, 168, 336)
+        },
+    }
+
+
+def spearman(x: Sequence[float], y: Sequence[float]) -> float | None:
+    if len(x) != len(y):
+        raise ValueError("Correlation requires paired samples")
+    if len(x) < 10 or len(set(x)) < 2 or len(set(y)) < 2:
+        return None
+
+    def ranks(values: Sequence[float]) -> NDArray[np.float64]:
+        array = np.asarray(values, dtype=np.float64)
+        order = np.argsort(array, kind="stable")
+        result = np.empty(len(array), dtype=np.float64)
+        start = 0
+        while start < len(order):
+            end = start + 1
+            while end < len(order) and array[order[end]] == array[order[start]]:
+                end += 1
+            result[order[start:end]] = (start + end - 1) / 2
+            start = end
+        return result
+
+    return float(np.corrcoef(ranks(x), ranks(y))[0, 1])

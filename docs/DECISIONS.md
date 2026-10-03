@@ -19,3 +19,5 @@ Deviations and explicit trade-offs relative to `docs/plan/`.
 | 2026-10-02 | CLI logging | Share one JSON log configuration across uvicorn, arq bootstrap and application logging | Container acceptance exposed arq's default handler duplicating records as plain text; configuring before startup also makes bootstrap messages JSON. |
 
 | 2026-10-02 | Post-approval CI sample | Compute the post-approval overlap median only for CI-covered approved-and-merged PRs (minimum 10), leaving it null without coverage. | Treating missing CI telemetry as zero would understate the observed delay; the overall coverage remains explicit. |
+
+| 2026-10-02 | Sparse author-WIP correlation | Return null for fewer than 10 paired observations or a constant variable; tied ranks use their average. | The plan defines the correlation but no minimum; this uses the same minimum as driver groups and avoids misleading tiny-sample coefficients. |

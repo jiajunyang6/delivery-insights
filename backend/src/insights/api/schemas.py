@@ -52,6 +52,23 @@ class StageMetrics(Contract):
     merge: Metric
 
 
+class Predictability(Contract):
+    within_hist_p85: Metric
+    weekly_throughput_cv: Metric
+
+
+class KM(Contract):
+    n: int
+    events: int
+    median_hours: float | None
+    s_at_hours: dict[Literal["24", "72", "168", "336"], float]
+
+
+class Survival(Contract):
+    current: KM | None
+    previous: KM | None
+
+
 class Efficiency(Contract):
     merged_prs: Metric
     effective_throughput: Metric
@@ -66,8 +83,8 @@ class Efficiency(Contract):
     review_concentration_top_k: Metric
     revert_rate: Metric
     pr_size_p50_lines: Metric
-    predictability: dict[str, Any] | None
-    survival: dict[str, Any] | None
+    predictability: Predictability | None
+    survival: Survival | None
 
 
 class StateLedger(Contract):
@@ -212,6 +229,80 @@ class BottleneckAnalysis(Contract):
     what_if: list[WhatIf]
     review_load: ReviewLoad
     ci: CI | None
+
+
+class PickupGroup(Contract):
+    n: int
+    pickup_p50_hours: float | None
+
+
+class Assignment(Contract):
+    assigned: PickupGroup
+    unassigned: PickupGroup
+    ratio: float | None
+
+
+class RoundBucket(Contract):
+    rounds: Literal["0", "1", "2", "3+"]
+    n: int
+    cycle_p50_hours: float | None
+
+
+class ReviewRoundCost(Contract):
+    buckets: list[RoundBucket]
+    hours_per_extra_round: float | None
+    re_review_wait_p50_hours: float | None
+    first_pickup_p50_hours: float | None
+
+
+class WipBucket(Contract):
+    wip: Literal["0", "1-2", "3+"]
+    n: int
+    waiting_author_p50_hours: float | None
+
+
+class AuthorWip(Contract):
+    buckets: list[WipBucket]
+    spearman: float | None
+
+
+class WeekdayPickup(PickupGroup):
+    weekday: int = Field(ge=0, le=6)
+
+
+class HourPickup(PickupGroup):
+    hours: Literal["00-05", "06-11", "12-17", "18-23"]
+
+
+class SubmitTiming(Contract):
+    by_weekday: list[WeekdayPickup]
+    by_hour_block: list[HourPickup]
+
+
+class SlowFeature(Contract):
+    feature: Literal[
+        "size_lines_p50",
+        "external_share",
+        "multi_location_share",
+        "review_rounds_p50",
+        "unrequested_share",
+    ]
+    slowest: float | None
+    rest: float | None
+    ratio: float | None
+
+
+class SlowestDecile(Contract):
+    n: int
+    features: list[SlowFeature]
+
+
+class Drivers(Contract):
+    assignment: Assignment
+    review_round_cost: ReviewRoundCost
+    author_wip: AuthorWip
+    submit_timing: SubmitTiming
+    slowest_decile: SlowestDecile | None
 
 
 class AtRiskPr(Contract):
@@ -398,7 +489,7 @@ class Snapshot(Contract):
     time_ledger: TimeLedger
     bottlenecks: list[Finding]
     bottleneck_analysis: BottleneckAnalysis
-    drivers: dict[str, Any] | None
+    drivers: Drivers | None
     at_risk_prs: list[AtRiskPr]
     at_risk_summary: AtRiskSummary
     waste: Waste
