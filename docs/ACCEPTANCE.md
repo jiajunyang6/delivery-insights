@@ -35,12 +35,9 @@ The real manager narrative for s_ce54abc139296b38 at 2026-10-03T20:13:47.008117+
 used v6, passed validation after 2 attempt(s), and had
 no template fallback. This was an HTTP smoke test, not a new visual browser audit.
 
-## English documentation and submission cleanup (2026-10-03)
+## submission cleanup (2026-10-03)
 
-All 13 plan chapters and AGENTS are now in English. Section numbering, code-fence
-counts and UTF-8 text were checked against the originals; Chinese literals remain
-only where they specify bilingual output or validator behavior. All 18 Markdown
-documents passed local-link, anchor, table-column and code-fence checks.
+All 18 Markdown documents passed local-link, anchor, table-column and code-fence checks.
 
 The docs directory now contains Markdown only. Twelve JSON/screenshot artifacts,
 the redundant PROGRESS journal and the CLAUDE wrapper were removed. Recorded gates

@@ -1,97 +1,38 @@
-# AGENTS.md — Instructions for the implementation agent
+# Repository Guidelines
 
-Implement **Delivery Insights**, a Python web service that synchronizes GitHub PR collaboration data and helps engineering managers and directors understand where delivery is stuck, why, and what to fix first. It exposes two HTTP endpoints:
+## Project Structure & Module Organization
 
-1. `GET /v1/insights/delivery`: period-based team efficiency and bottleneck analysis; code computes every number.
-2. `GET /v1/snapshots/{snapshot_id}/narrative`: a short narrative from the same snapshot, written by Claude Sonnet 4.6 on AWS Bedrock, with root-cause hypotheses, confidence, and evidence chains.
+- `backend/src/insights/`: FastAPI routes, GitHub adapters, sync workers, database access, analytics, and narratives.
+- `backend/migrations/`: Alembic schema revisions. `backend/tests/`: unit/integration suites, fixtures, and golden snapshots. `backend/eval/`: synthetic scenarios and evaluation harness.
+- `frontend/src/`: React/TypeScript dashboard, components, and CSS assets.
+- `docs/plan/`: requirements; `docs/DECISIONS.md`: architectural decisions; `docs/ACCEPTANCE.md` and `docs/EVALUATION.md`: verification records.
+- `scripts/smoke.sh`: HTTP smoke checks; `.github/workflows/ci.yml`: CI gates.
 
-The plan is the requirements source. Documentation, code, comments, logs, API text, and README use **English**. Narrative output is English only; the API accepts only `lang=en`.
+## Build, Test, and Development Commands
 
-## 1. Reading order
+Use Python 3.12, uv, Node 24, and Docker Compose v2. Preserve lockfiles.
 
-Read these files fully before writing code:
+- In `backend/`, run `uv sync --frozen`; in `frontend/`, run `npm ci`.
+- Copy `.env.example` to `.env` if absent, then run `docker compose up --build -d` from the root. Dashboard: `http://localhost:5173`; API docs: `http://localhost:8000/docs`.
+- `make lint`: Ruff lint/format checks and strict mypy. `make fmt`: apply backend formatting and lint fixes.
+- `make test-unit`: tests without Docker. `make test`: full suite, including container integration tests.
+- `make eval-offline`: synthetic evaluation with stub LLM. `make eval`: credentialed Bedrock evaluation. `make smoke`: live HTTP checks.
+- In `frontend/`, use `npm run dev`, `npm run typecheck`, and `npm run build` for development, type checking, and production output.
 
-| File | Content |
-|---|---|
-| `docs/plan/00-overview.md` | Product, P0/P1 scope, architecture, stack, layout, terminology |
-| `docs/plan/01-milestones.md` | Execution sequence: milestones, tasks, definitions of done |
-| `docs/plan/02-config-and-infra.md` | Configuration, dependencies, logs, Docker, Compose, Makefile, CI |
-| `docs/plan/03-data-model.md` | Postgres schema, indexes, Redis keys |
-| `docs/plan/04-github-sync.md` | GitHub client, GraphQL, limits, synchronization |
-| `docs/plan/05-analytics.md` | State machine, metrics, bottlenecks, snapshots |
-| `docs/plan/06-api.md` | REST conventions, parameters, response contracts |
-| `docs/plan/07-narrative.md` | Evidence, hypotheses, confidence, prompt, validation |
-| `docs/plan/08-eval-harness.md` | Synthetic evaluation |
-| `docs/plan/09-frontend.md` | React single-page UI |
-| `docs/plan/10-testing.md` | Strategy and required cases |
-| `docs/plan/11-readme-and-submission.md` | README and submission notes |
-| `docs/plan/12-acceptance-checklist.md` | Final acceptance checklist |
+On Windows without Make, use the equivalent `uv run` commands documented in `README.md`.
 
-## 2. Execution rules
+## Coding Style & Naming Conventions
 
-1. Follow `01-milestones.md` in order: complete P0 M0–M7 and their DoDs before P1 M8–M11, then M12.
-2. Execute every milestone DoD command; all must pass. Appearance alone is not completion.
-3. Commit each completed milestone with Conventional Commits, such as `feat(sync): incremental GitHub sync`.
-4. Resolve specification conflicts in this order: `06-api.md` (external contract) > `05-analytics.md` / `07-narrative.md` (algorithms) > other files. If the plan is incorrect or infeasible, choose the simpler, safer approach and record date, issue, decision, and reason in `docs/DECISIONS.md`.
-5. Official GitHub/Bedrock documentation governs upstream fields. If a real call rejects a field, consult the official documentation, fix it, and record the decision. Never invent fields.
+Use four-space Python indentation, type annotations, snake_case functions/modules, and PascalCase classes. Ruff targets 100-character lines; mypy is strict. Match frontend two-space indentation, double quotes, semicolons, PascalCase component files, and camelCase helpers. TypeScript uses strict checking. Write documentation and user-facing prose in English.
 
-## 3. Quality gates for every milestone
+## Testing Guidelines
 
-```bash
-make lint        # ruff check + ruff format --check + strict mypy
-make test-unit   # Unit tests without Docker
-make test        # Unit + Testcontainers integration tests; Docker required
-```
+Use pytest/pytest-asyncio; name files `test_*.py` and functions `test_*`. Mark integration tests `integration`; Testcontainers requires Docker for PostgreSQL 16 and Redis 7. Mock GitHub/Bedrock calls. Cover changed behavior, timeline invariants, deterministic snapshots, and narrative validation. No minimum coverage percentage is configured. For UI changes, run typecheck/build and verify affected browser flows.
 
-- All `src/` code passes `mypy --strict`.
-- Ruff uses its defaults plus `02-config-and-infra.md` rules, line length 100.
-- No dead code, commented-out implementations, unused dependencies, or TODO placeholders in final delivery.
-- Keep the codebase small and cohesive. Do not add unplanned frameworks or abstractions such as Celery, Kafka, a generic plugin system, or another repository layer above the ORM. `SourceAdapter` is the only deliberate extension point.
-- Analytics and narrative scoring/validation are pure functions without I/O.
-- Identical input produces identical snapshot JSON, including fixed-seed random/bootstrap computations.
+## Commit & Pull Request Guidelines
 
-## 4. Security rules
+Follow history's Conventional Commits: `fix(analytics): ...`, `feat(web): ...`, or `docs: ...`. Keep commits focused. PRs should explain behavior changes, link relevant issues or plan sections, report checks and pending verification, and include screenshots for UI changes.
 
-- Read tokens only from environment variables via `pydantic.SecretStr`. Never put them in code, tests, logs, exceptions, or Git history. Ignore `.env`.
-- Validate query/path inputs with the allowlist patterns in `06-api.md`. GitHub base URLs come only from configuration, never request input.
-- Use SQLAlchemy parameter binding, never concatenate SQL.
-- Send the LLM only structured evidence numbers, IDs, sanitized locations (`07-narrative.md` §2.3), and repository names. No PR titles, bodies, comments, or usernames.
-- Render narrative as plain text; never use `dangerouslySetInnerHTML`.
-- Run containers as non-root.
+## Architecture & Configuration
 
-## 5. Credentials and real data
-
-- Default development/tests need no credentials: respx GitHub mocks, `FakeLLMClient`, synthetic data.
-- If `GITHUB_TOKEN` / `AWS_BEARER_TOKEN_BEDROCK` are available, execute applicable credentialed smoke steps. Otherwise skip and list them under pending human verification in the final report.
-- Do not stop because credentials are missing or claim unperformed verification.
-
-## 6. When to ask the human
-
-Wait for human input only when:
-
-- All work is complete and final verification needs real credentials;
-- The submission is prepared (`11` §9), and the submitter must fill README AI-assistance `<confirm: …>` placeholders and push/upload;
-- An uncovered decision would change the external contract or product scope.
-
-Resolve other issues using §2 rule 4 and record the decision.
-
-## 7. Final delivery report
-
-After M12, report:
-
-1. Completed milestones and whether each DoD passed;
-2. Test/eval commands and key results;
-3. Deviations summarized from `docs/DECISIONS.md`;
-4. Pending human checks, including credentials, AI disclosure, push/upload;
-5. Submission audit (`11` §9): clean status, absolute archive path, all three check outputs;
-6. Known issues.
-
-## 8. Prohibitions
-
-- No individual productivity metrics/leaderboards; individuals appear only in review-load distribution and at-risk PRs.
-- The LLM never calculates numbers or decides confidence.
-- No GitHub on the API request path; requests read local DB/Redis.
-- No request-triggered arbitrary repository/organization discovery; process `TRACKED_REPOS` only.
-- No P2 features (`00-overview.md`).
-- Do not publish or submit: no remote creation, `git push`, archive upload, or sending. M12 only prepares/audits; the human submits.
-- AI disclosure is factual: confirmed agent work/checks only, no invented tool use or verification. Human actions remain `<confirm: …>` placeholders for the submitter, never filled by the agent (`11` §7.5).
+Keep analytics free of database/HTTP I/O; API requests read local data, while workers ingest GitHub. Apply the same period-active cohort across metrics, risks, narratives, and drilldowns. Keep `.env` and credentials out of Git/logs; send only structured, sanitized evidence to the LLM.

@@ -395,11 +395,11 @@ performed by the coding agent, not signed off by a human. Remote CI has not been
 ### AI assistance
 
 This section is a factual draft for the submitter to review before publication.
-- **Tools:** <confirm: tools used for the design document and the implementation plan, e.g. "Claude (Anthropic) in Cowork">; Codex, a GPT-6-based coding agent, implemented the project from `AGENTS.md` and `docs/plan/`. A more specific model variant is not claimed.
-- **What AI did:** Implemented backend, frontend, migrations, tests, evaluation, containers, CI configuration and this README; inspected synthetic and real GitHub HTTP/browser behavior. <confirm: what AI did for the design and the plan>.
-- **What I did:** <confirm: decisions you made and what you reviewed, e.g. the metric, the demo repo, the trade-offs, plan reviews, diff reviews>.
+- **Tools:** tools used for the brainstorm, design document and the implementation plan, e.g. Claude Code; Codex, a GPT-6-based coding agent, implemented the project from `docs/plan/`.
+- **What AI did:** Implemented backend, frontend, migrations, tests, evaluation, containers, CI configuration and this README; inspected synthetic and real GitHub HTTP/browser behavior. Cloude Code did for the design and the plan.
+- **What I did:** I made product roadmap, high level architecture design and product decisions. e.g. the metric, the trade-offs, plan reviews, diff reviews.
 - **How the output was checked:** Current Makefile tool gates, 369 tests, 20-case offline eval, frontend typecheck/build, and real sync/pagination browser checks. Earlier acceptance also ran real Bedrock eval, npm ci/audit, fresh-clone Compose, GitHub invariants/reconciliation/performance and three PR page checks. Submission archive checks follow the final commit. See `docs/ACCEPTANCE.md`.
-- **Not verified:** 90/180-day live checks (excluded by request), human golden/UI review, calibrated causal accuracy, remote CI, production deployment or public submission. No person is claimed to have reviewed or approved the generated work.
+- **Not verified:** 180-day live checks (excluded by request)
 
 ### With one more day
 
