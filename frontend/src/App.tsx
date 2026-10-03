@@ -85,9 +85,14 @@ export default function App() {
     }
     setLoading(true);
     setError(null);
-    loadInsights(params, controller.signal, (p) => {
-      if (!controller.signal.aborted) setPending(p);
-    })
+    loadInsights(
+      params,
+      controller.signal,
+      (p) => {
+        if (!controller.signal.aborted) setPending(p);
+      },
+      refresh > 0 ? "no-cache" : undefined,
+    )
       .then((s) => {
         if (!controller.signal.aborted) {
           setSnapshot(s);
@@ -188,6 +193,7 @@ export default function App() {
                   key={snapshot.snapshot_id}
                   snapshot={snapshot}
                   params={params}
+                  onRefresh={() => setRefresh((r) => r + 1)}
                 />
               </>
             )}

@@ -7,6 +7,7 @@ export class ApiProblem extends Error {
     public detail: string,
     public status: number,
     public request_id?: string,
+    public errors: { param: string; message: string }[] = [],
   ) {
     super(detail);
   }
@@ -20,23 +21,37 @@ export function message(error: unknown): ApiProblem {
         0,
       );
 }
-export async function fetchJson<T>(path: string, signal: AbortSignal) {
+export async function fetchJson<T>(
+  path: string,
+  signal: AbortSignal,
+  cache?: RequestCache,
+) {
   const response = await fetch(API_BASE + path, {
     signal,
+    cache,
     headers: { Accept: "application/json" },
   });
+  const contentType = response.headers
+    .get("Content-Type")
+    ?.split(";")[0]
+    ?.trim()
+    .toLowerCase();
+  if (contentType !== "application/json" && !contentType?.endsWith("+json")) {
+    throw new ApiProblem(
+      "Service temporarily unavailable",
+      `The service is temporarily unavailable (HTTP ${response.status}). Try again shortly.`,
+      response.status,
+      response.headers.get("X-Request-ID") ?? undefined,
+    );
+  }
   const data = await response.json();
-  if (
-    response.headers
-      .get("Content-Type")
-      ?.includes("application/problem+json") ||
-    !response.ok
-  ) {
+  if (contentType === "application/problem+json" || !response.ok) {
     throw new ApiProblem(
       data.title ?? "Request failed",
       data.detail ?? "Please try again.",
       response.status,
       data.request_id ?? response.headers.get("X-Request-ID") ?? undefined,
+      data.errors ?? [],
     );
   }
   return {
@@ -66,12 +81,14 @@ export async function loadInsights(
   params: Params,
   signal: AbortSignal,
   onPending: (p: Pending) => void,
+  cache?: RequestCache,
 ) {
   const deadline = Date.now() + 300_000;
   while (!signal.aborted) {
     const result = await fetchJson<Snapshot | Pending>(
       "/v1/insights/delivery?" + query(params),
       signal,
+      cache,
     );
     if (result.status === 200) return result.data as Snapshot;
     if (result.status !== 202)
