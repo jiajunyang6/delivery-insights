@@ -5,7 +5,7 @@
       "age_hours": 4116.24,
       "author": "dev18",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
         "area-D"
@@ -15,7 +15,7 @@
       "severity": "critical",
       "size_lines": 51,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1029 in area-D",
       "url": "https://github.com/synthetic/repo/pull/1029"
     },
@@ -23,7 +23,7 @@
       "age_hours": 3984.28,
       "author": "ext11",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": true,
       "locations": [
         "area-E"
@@ -33,7 +33,7 @@
       "severity": "critical",
       "size_lines": 914,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1085 in area-E",
       "url": "https://github.com/synthetic/repo/pull/1085"
     },
@@ -41,7 +41,7 @@
       "age_hours": 3943.78,
       "author": "dev26",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
         "area-B"
@@ -51,7 +51,7 @@
       "severity": "critical",
       "size_lines": 26,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1136 in area-B",
       "url": "https://github.com/synthetic/repo/pull/1136"
     },
@@ -59,7 +59,7 @@
       "age_hours": 3829.54,
       "author": "dev04",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
         "area-A",
@@ -70,7 +70,7 @@
       "severity": "critical",
       "size_lines": 146,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1159 in area-A",
       "url": "https://github.com/synthetic/repo/pull/1159"
     },
@@ -78,7 +78,7 @@
       "age_hours": 3828.04,
       "author": "dev18",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
         "area-C"
@@ -88,7 +88,7 @@
       "severity": "critical",
       "size_lines": 72,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1172 in area-C",
       "url": "https://github.com/synthetic/repo/pull/1172"
     },
@@ -96,7 +96,7 @@
       "age_hours": 3431.89,
       "author": "ext13",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": true,
       "locations": [
         "area-A"
@@ -106,7 +106,7 @@
       "severity": "critical",
       "size_lines": 127,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1352 in area-A",
       "url": "https://github.com/synthetic/repo/pull/1352"
     },
@@ -114,7 +114,7 @@
       "age_hours": 3379.64,
       "author": "dev29",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
         "area-D"
@@ -124,7 +124,7 @@
       "severity": "critical",
       "size_lines": 195,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1373 in area-D",
       "url": "https://github.com/synthetic/repo/pull/1373"
     },
@@ -132,7 +132,7 @@
       "age_hours": 3285.84,
       "author": "dev32",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
         "area-A"
@@ -142,7 +142,7 @@
       "severity": "critical",
       "size_lines": 14,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1431 in area-A",
       "url": "https://github.com/synthetic/repo/pull/1431"
     },
@@ -150,7 +150,7 @@
       "age_hours": 3174.91,
       "author": "dev35",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
         "area-A"
@@ -160,7 +160,7 @@
       "severity": "critical",
       "size_lines": 649,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1488 in area-A",
       "url": "https://github.com/synthetic/repo/pull/1488"
     },
@@ -168,7 +168,7 @@
       "age_hours": 3127.11,
       "author": "dev09",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
         "area-B",
@@ -179,7 +179,7 @@
       "severity": "critical",
       "size_lines": 29,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1532 in area-C",
       "url": "https://github.com/synthetic/repo/pull/1532"
     },
@@ -187,7 +187,7 @@
       "age_hours": 3082.66,
       "author": "dev08",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
         "area-C"
@@ -197,7 +197,7 @@
       "severity": "critical",
       "size_lines": 171,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1558 in area-C",
       "url": "https://github.com/synthetic/repo/pull/1558"
     },
@@ -205,7 +205,7 @@
       "age_hours": 3077.42,
       "author": "dev38",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
         "area-A"
@@ -215,7 +215,7 @@
       "severity": "critical",
       "size_lines": 15,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1554 in area-A",
       "url": "https://github.com/synthetic/repo/pull/1554"
     },
@@ -223,7 +223,7 @@
       "age_hours": 3061.26,
       "author": "dev26",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
         "area-A"
@@ -233,7 +233,7 @@
       "severity": "critical",
       "size_lines": 108,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1552 in area-A",
       "url": "https://github.com/synthetic/repo/pull/1552"
     },
@@ -241,7 +241,7 @@
       "age_hours": 2950.89,
       "author": "dev15",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
         "area-B"
@@ -251,7 +251,7 @@
       "severity": "critical",
       "size_lines": 123,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1600 in area-B",
       "url": "https://github.com/synthetic/repo/pull/1600"
     },
@@ -259,7 +259,7 @@
       "age_hours": 2937.92,
       "author": "ext19",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": true,
       "locations": [
         "area-A"
@@ -269,7 +269,7 @@
       "severity": "critical",
       "size_lines": 52,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1612 in area-A",
       "url": "https://github.com/synthetic/repo/pull/1612"
     },
@@ -277,7 +277,7 @@
       "age_hours": 2857.02,
       "author": "ext15",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": true,
       "locations": [
         "area-B"
@@ -287,7 +287,7 @@
       "severity": "critical",
       "size_lines": 45,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1634 in area-B",
       "url": "https://github.com/synthetic/repo/pull/1634"
     },
@@ -295,7 +295,7 @@
       "age_hours": 2845.53,
       "author": "dev18",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
         "dir:src/C"
@@ -305,7 +305,7 @@
       "severity": "critical",
       "size_lines": 85,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1638 in area-C",
       "url": "https://github.com/synthetic/repo/pull/1638"
     },
@@ -313,7 +313,7 @@
       "age_hours": 2777.18,
       "author": "dev14",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": false,
       "locations": [
         "area-C"
@@ -323,7 +323,7 @@
       "severity": "critical",
       "size_lines": 16,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1670 in area-C",
       "url": "https://github.com/synthetic/repo/pull/1670"
     },
@@ -331,7 +331,7 @@
       "age_hours": 4112.52,
       "author": "dev15",
       "baseline_source": "90d",
-      "critical_threshold_hours": 37.65,
+      "critical_threshold_hours": 37.5,
       "external_contributor": false,
       "locations": [
         "area-A"
@@ -349,7 +349,7 @@
       "age_hours": 2761.32,
       "author": "ext17",
       "baseline_source": "90d",
-      "critical_threshold_hours": 20.93,
+      "critical_threshold_hours": 20.96,
       "external_contributor": true,
       "locations": [
         "area-B"
@@ -359,7 +359,7 @@
       "severity": "critical",
       "size_lines": 293,
       "state": "waiting_merge",
-      "threshold_hours": 11.69,
+      "threshold_hours": 11.71,
       "title": "Change 1681 in area-B",
       "url": "https://github.com/synthetic/repo/pull/1681"
     }
@@ -379,55 +379,55 @@
     "locations": [
       {
         "at_risk_prs": 41,
-        "inflow": 150,
+        "inflow": 152,
         "location": "area-A",
-        "merged_prs": 124,
-        "outflow": 137,
+        "merged_prs": 126,
+        "outflow": 139,
         "owners_count": null,
-        "pickup_p50_hours": 5.65,
-        "pickup_ratio_vs_rest": 1.01,
-        "previous_waiting_reviewer_pr_hours": 1523.9,
-        "waiting_reviewer_pr_hours": 1910.99,
-        "waiting_reviewer_share": 0.2692
+        "pickup_p50_hours": 5.55,
+        "pickup_ratio_vs_rest": 0.96,
+        "previous_waiting_reviewer_pr_hours": 1549.87,
+        "waiting_reviewer_pr_hours": 1941.77,
+        "waiting_reviewer_share": 0.2702
       },
       {
         "at_risk_prs": 30,
-        "inflow": 120,
+        "inflow": 118,
         "location": "area-B",
-        "merged_prs": 96,
-        "outflow": 111,
+        "merged_prs": 94,
+        "outflow": 109,
         "owners_count": null,
-        "pickup_p50_hours": 5.18,
-        "pickup_ratio_vs_rest": 0.91,
-        "previous_waiting_reviewer_pr_hours": 2030.57,
-        "waiting_reviewer_pr_hours": 1562.54,
-        "waiting_reviewer_share": 0.2202
+        "pickup_p50_hours": 5.83,
+        "pickup_ratio_vs_rest": 1.03,
+        "previous_waiting_reviewer_pr_hours": 2023.77,
+        "waiting_reviewer_pr_hours": 1572.62,
+        "waiting_reviewer_share": 0.2188
       },
       {
         "at_risk_prs": 21,
-        "inflow": 116,
+        "inflow": 114,
         "location": "area-C",
-        "merged_prs": 102,
-        "outflow": 110,
+        "merged_prs": 100,
+        "outflow": 108,
         "owners_count": null,
-        "pickup_p50_hours": 5.34,
-        "pickup_ratio_vs_rest": 0.93,
-        "previous_waiting_reviewer_pr_hours": 1375.52,
-        "waiting_reviewer_pr_hours": 1499.31,
-        "waiting_reviewer_share": 0.2112
+        "pickup_p50_hours": 5.51,
+        "pickup_ratio_vs_rest": 0.96,
+        "previous_waiting_reviewer_pr_hours": 1375.03,
+        "waiting_reviewer_pr_hours": 1497.31,
+        "waiting_reviewer_share": 0.2083
       },
       {
         "at_risk_prs": 13,
-        "inflow": 84,
+        "inflow": 88,
         "location": "area-D",
-        "merged_prs": 72,
-        "outflow": 77,
+        "merged_prs": 76,
+        "outflow": 81,
         "owners_count": null,
-        "pickup_p50_hours": 5.31,
-        "pickup_ratio_vs_rest": 0.93,
-        "previous_waiting_reviewer_pr_hours": 909.8,
-        "waiting_reviewer_pr_hours": 1076.91,
-        "waiting_reviewer_share": 0.1517
+        "pickup_p50_hours": 4.96,
+        "pickup_ratio_vs_rest": 0.85,
+        "previous_waiting_reviewer_pr_hours": 935.35,
+        "waiting_reviewer_pr_hours": 1090.84,
+        "waiting_reviewer_share": 0.1518
       },
       {
         "at_risk_prs": 12,
@@ -436,94 +436,94 @@
         "merged_prs": 45,
         "outflow": 50,
         "owners_count": null,
-        "pickup_p50_hours": 5.28,
-        "pickup_ratio_vs_rest": 0.94,
-        "previous_waiting_reviewer_pr_hours": 711.88,
-        "waiting_reviewer_pr_hours": 494.05,
-        "waiting_reviewer_share": 0.0696
+        "pickup_p50_hours": 5.7,
+        "pickup_ratio_vs_rest": 1.0,
+        "previous_waiting_reviewer_pr_hours": 712.88,
+        "waiting_reviewer_pr_hours": 530.74,
+        "waiting_reviewer_share": 0.0738
       },
       {
         "at_risk_prs": 2,
-        "inflow": 11,
+        "inflow": 12,
         "location": "dir:src/D",
-        "merged_prs": 10,
-        "outflow": 10,
+        "merged_prs": 11,
+        "outflow": 11,
         "owners_count": null,
-        "pickup_p50_hours": 9.46,
-        "pickup_ratio_vs_rest": 1.71,
+        "pickup_p50_hours": 7.58,
+        "pickup_ratio_vs_rest": 1.36,
         "previous_waiting_reviewer_pr_hours": 62.66,
-        "waiting_reviewer_pr_hours": 335.59,
-        "waiting_reviewer_share": 0.0473
+        "waiting_reviewer_pr_hours": 336.59,
+        "waiting_reviewer_share": 0.0468
       },
       {
         "at_risk_prs": 3,
-        "inflow": 17,
+        "inflow": 16,
         "location": "other",
-        "merged_prs": 15,
-        "outflow": 16,
+        "merged_prs": 14,
+        "outflow": 15,
         "owners_count": null,
-        "pickup_p50_hours": 4.93,
-        "pickup_ratio_vs_rest": 0.87,
+        "pickup_p50_hours": 5.58,
+        "pickup_ratio_vs_rest": 0.98,
         "previous_waiting_reviewer_pr_hours": 195.08,
-        "waiting_reviewer_pr_hours": 218.11,
-        "waiting_reviewer_share": 0.0307
+        "waiting_reviewer_pr_hours": 217.11,
+        "waiting_reviewer_share": 0.0302
       }
     ],
     "merge_blockers": {
-      "approved_merged_prs": 446,
+      "approved_merged_prs": 448,
       "ci_after_approval_p50_hours": null,
-      "post_approval_update_share": 0.1009,
-      "second_approval_share": 0.2825,
-      "second_approval_wait_p50_hours": 2.8
+      "post_approval_update_share": 0.1049,
+      "second_approval_share": 0.2835,
+      "second_approval_wait_p50_hours": 2.79
     },
     "pareto": [
       {
         "cause": "waiting_author",
         "location": null,
-        "pr_hours": 4094.73,
-        "share": 0.2954
+        "pr_hours": 4167.99,
+        "share": 0.297
       },
       {
         "cause": "waiting_merge",
         "location": null,
-        "pr_hours": 2668.91,
-        "share": 0.1925
+        "pr_hours": 2678.79,
+        "share": 0.1909
       },
       {
         "cause": "waiting_reviewer",
         "location": "area-A",
-        "pr_hours": 1910.99,
-        "share": 0.1379
+        "pr_hours": 1941.77,
+        "share": 0.1384
       },
       {
         "cause": "waiting_reviewer",
         "location": "area-B",
-        "pr_hours": 1562.54,
-        "share": 0.1127
+        "pr_hours": 1572.62,
+        "share": 0.1121
       },
       {
         "cause": "waiting_reviewer",
         "location": "area-C",
-        "pr_hours": 1499.31,
-        "share": 0.1082
+        "pr_hours": 1497.31,
+        "share": 0.1067
       },
       {
         "cause": "waiting_reviewer",
         "location": "area-D",
-        "pr_hours": 1076.91,
+        "pr_hours": 1090.84,
         "share": 0.0777
       },
       {
         "cause": "waiting_reviewer",
         "location": "other",
         "pr_hours": 553.69,
-        "share": 0.0399
+        "share": 0.0395
       },
       {
         "cause": "waiting_reviewer",
         "location": "area-E",
-        "pr_hours": 494.05,
-        "share": 0.0356
+        "pr_hours": 530.74,
+        "share": 0.0378
       },
       {
         "cause": "waiting_ci",
@@ -535,74 +535,74 @@
     "review_load": {
       "distribution": [
         {
-          "reviewer": "rev-x5",
-          "reviews": 130,
-          "share": 0.1356
-        },
-        {
-          "reviewer": "rev-a3",
-          "reviews": 58,
-          "share": 0.0605
+          "reviewer": "rev-x1",
+          "reviews": 184,
+          "share": 0.1903
         },
         {
           "reviewer": "rev-x2",
-          "reviews": 57,
-          "share": 0.0594
+          "reviews": 61,
+          "share": 0.0631
         },
         {
-          "reviewer": "rev-b1",
-          "reviews": 52,
-          "share": 0.0542
+          "reviewer": "rev-a3",
+          "reviews": 60,
+          "share": 0.062
         },
         {
           "reviewer": "rev-c2",
           "reviews": 52,
-          "share": 0.0542
+          "share": 0.0538
         },
         {
-          "reviewer": "rev-x1",
-          "reviews": 50,
-          "share": 0.0521
-        },
-        {
-          "reviewer": "rev-c3",
-          "reviews": 47,
-          "share": 0.049
+          "reviewer": "rev-b1",
+          "reviews": 49,
+          "share": 0.0507
         },
         {
           "reviewer": "rev-a1",
-          "reviews": 46,
-          "share": 0.048
+          "reviews": 45,
+          "share": 0.0465
+        },
+        {
+          "reviewer": "rev-c3",
+          "reviews": 45,
+          "share": 0.0465
         },
         {
           "reviewer": "rev-x3",
-          "reviews": 45,
-          "share": 0.0469
+          "reviews": 44,
+          "share": 0.0455
         },
         {
           "reviewer": "rev-d2",
-          "reviews": 39,
-          "share": 0.0407
+          "reviews": 41,
+          "share": 0.0424
+        },
+        {
+          "reviewer": "rev-a4",
+          "reviews": 36,
+          "share": 0.0372
         }
       ],
-      "reviewers": 25,
-      "reviews": 959
+      "reviewers": 24,
+      "reviews": 967
     },
     "review_queue": {
       "open_growth_rel": 0.4412,
       "weeks": [
         {
           "days": 7,
-          "inflow": 93,
+          "inflow": 94,
           "open_at_week_end": 34,
-          "outflow": 87,
+          "outflow": 88,
           "week_start": "2026-01-19"
         },
         {
           "days": 7,
-          "inflow": 85,
+          "inflow": 86,
           "open_at_week_end": 36,
-          "outflow": 79,
+          "outflow": 80,
           "week_start": "2026-01-26"
         },
         {
@@ -614,23 +614,23 @@
         },
         {
           "days": 7,
-          "inflow": 110,
-          "open_at_week_end": 48,
-          "outflow": 95,
+          "inflow": 109,
+          "open_at_week_end": 49,
+          "outflow": 93,
           "week_start": "2026-02-09"
         },
         {
           "days": 7,
-          "inflow": 81,
+          "inflow": 80,
           "open_at_week_end": 41,
           "outflow": 84,
           "week_start": "2026-02-16"
         },
         {
           "days": 7,
-          "inflow": 88,
+          "inflow": 90,
           "open_at_week_end": 49,
-          "outflow": 78,
+          "outflow": 80,
           "week_start": "2026-02-23"
         }
       ],
@@ -639,19 +639,19 @@
     },
     "what_if": [
       {
-        "affected_prs": 167,
-        "change_rel": -0.0751,
-        "cycle_p50_after_hours": 37.93,
-        "cycle_p50_before_hours": 41.01,
+        "affected_prs": 169,
+        "change_rel": -0.0622,
+        "cycle_p50_after_hours": 37.46,
+        "cycle_p50_before_hours": 39.95,
         "location": null,
         "stage": "pickup",
         "target_hours": 8.0
       },
       {
         "affected_prs": 104,
-        "change_rel": -0.0366,
-        "cycle_p50_after_hours": 39.51,
-        "cycle_p50_before_hours": 41.01,
+        "change_rel": -0.0264,
+        "cycle_p50_after_hours": 38.9,
+        "cycle_p50_before_hours": 39.95,
         "location": null,
         "stage": "merge",
         "target_hours": 8.0
@@ -675,8 +675,8 @@
         }
       ],
       "id": "review_queue_growth",
-      "impact_pr_hours": 7097.5,
-      "impact_share": 0.512,
+      "impact_pr_hours": 7186.98,
+      "impact_share": 0.5121,
       "location": null,
       "rank": 1,
       "recommendation": "Review demand exceeds capacity: rebalance review load or temporarily limit work in progress until the queue stops growing.",
@@ -691,18 +691,18 @@
           "label": "Average review rounds",
           "ref": "/efficiency/avg_review_rounds",
           "unit": "rounds",
-          "value": 0.74
+          "value": 0.75
         },
         {
           "label": "Share with commits after first review",
           "ref": "/efficiency/post_review_commit_share",
           "unit": "share",
-          "value": 0.509
+          "value": 0.5179
         }
       ],
       "id": "rework_high",
-      "impact_pr_hours": 4094.73,
-      "impact_share": 0.2954,
+      "impact_pr_hours": 4167.99,
+      "impact_share": 0.297,
       "location": null,
       "rank": 2,
       "recommendation": "Agree on the approach before coding (issue or design note) and keep PRs small to cut review rounds.",
@@ -717,7 +717,7 @@
           "label": "Waste share",
           "ref": "/efficiency/waste_share",
           "unit": "share",
-          "value": 0.0992
+          "value": 0.1028
         },
         {
           "label": "PRs lost while waiting for review",
@@ -727,8 +727,8 @@
         }
       ],
       "id": "waste_high",
-      "impact_pr_hours": 3313.5,
-      "impact_share": 0.239,
+      "impact_pr_hours": 3155.39,
+      "impact_share": 0.2248,
       "location": null,
       "rank": 3,
       "recommendation": "Review late rejections and PRs lost while waiting for review; align on scope earlier and triage stale PRs.",
@@ -743,24 +743,24 @@
           "label": "Share of PR time waiting to merge",
           "ref": "/time_ledger/states/waiting_merge/share",
           "unit": "share",
-          "value": 0.1925
+          "value": 0.1909
         },
         {
           "label": "Median approval-to-merge time",
           "ref": "/efficiency/stage_p50_hours/merge",
           "unit": "hours",
-          "value": 3.85
+          "value": 3.89
         },
         {
           "label": "Share with a second approval",
           "ref": "/bottleneck_analysis/merge_blockers/second_approval_share",
           "unit": "share",
-          "value": 0.2825
+          "value": 0.2835
         }
       ],
       "id": "merge_blocked",
-      "impact_pr_hours": 2668.91,
-      "impact_share": 0.1925,
+      "impact_pr_hours": 2678.79,
+      "impact_share": 0.1909,
       "location": null,
       "rank": 4,
       "recommendation": "Reduce post-approval rebase friction, for example with a merge queue.",
@@ -769,9 +769,9 @@
       "type": "merge_blocked",
       "what_if": {
         "affected_prs": 104,
-        "change_rel": -0.0366,
-        "cycle_p50_after_hours": 39.51,
-        "cycle_p50_before_hours": 41.01,
+        "change_rel": -0.0264,
+        "cycle_p50_after_hours": 38.9,
+        "cycle_p50_before_hours": 39.95,
         "location": null,
         "stage": "merge",
         "target_hours": 8.0
@@ -781,50 +781,50 @@
   "drivers": {
     "assignment": {
       "assigned": {
-        "n": 315,
-        "pickup_p50_hours": 5.85
+        "n": 317,
+        "pickup_p50_hours": 5.86
       },
       "ratio": 0.95,
       "unassigned": {
         "n": 131,
-        "pickup_p50_hours": 5.54
+        "pickup_p50_hours": 5.55
       }
     },
     "author_wip": {
       "buckets": [
         {
-          "n": 67,
+          "n": 78,
           "waiting_author_p50_hours": 0.0,
           "wip": "0"
         },
         {
-          "n": 245,
-          "waiting_author_p50_hours": 2.28,
+          "n": 240,
+          "waiting_author_p50_hours": 2.76,
           "wip": "1-2"
         },
         {
-          "n": 134,
-          "waiting_author_p50_hours": 2.04,
+          "n": 130,
+          "waiting_author_p50_hours": 2.54,
           "wip": "3+"
         }
       ],
-      "spearman": 0.0389
+      "spearman": 0.0865
     },
     "review_round_cost": {
       "buckets": [
         {
-          "cycle_p50_hours": 25.89,
-          "n": 209,
+          "cycle_p50_hours": 25.62,
+          "n": 207,
           "rounds": "0"
         },
         {
-          "cycle_p50_hours": 49.16,
-          "n": 164,
+          "cycle_p50_hours": 47.84,
+          "n": 167,
           "rounds": "1"
         },
         {
-          "cycle_p50_hours": 61.37,
-          "n": 55,
+          "cycle_p50_hours": 61.95,
+          "n": 56,
           "rounds": "2"
         },
         {
@@ -833,40 +833,40 @@
           "rounds": "3+"
         }
       ],
-      "first_pickup_p50_hours": 5.61,
-      "hours_per_extra_round": 23.28,
-      "re_review_wait_p50_hours": 4.86
+      "first_pickup_p50_hours": 5.71,
+      "hours_per_extra_round": 22.22,
+      "re_review_wait_p50_hours": 4.88
     },
     "slowest_decile": {
       "features": [
         {
           "feature": "size_lines_p50",
-          "ratio": 1.7,
-          "rest": 76.0,
-          "slowest": 129.0
+          "ratio": 1.6,
+          "rest": 80.0,
+          "slowest": 128.0
         },
         {
           "feature": "external_share",
-          "ratio": 0.43,
-          "rest": 0.2045,
+          "ratio": 0.46,
+          "rest": 0.1935,
           "slowest": 0.0889
         },
         {
           "feature": "multi_location_share",
-          "ratio": 0.52,
-          "rest": 0.0424,
+          "ratio": 0.53,
+          "rest": 0.0422,
           "slowest": 0.0222
         },
         {
           "feature": "review_rounds_p50",
-          "ratio": null,
-          "rest": 0.0,
+          "ratio": 1.0,
+          "rest": 1.0,
           "slowest": 1.0
         },
         {
           "feature": "unrequested_share",
-          "ratio": 0.98,
-          "rest": 0.2943,
+          "ratio": 0.99,
+          "rest": 0.2928,
           "slowest": 0.2889
         }
       ],
@@ -876,39 +876,39 @@
       "by_hour_block": [
         {
           "hours": "00-05",
-          "n": 117,
-          "pickup_p50_hours": 5.16
+          "n": 119,
+          "pickup_p50_hours": 4.96
         },
         {
           "hours": "06-11",
-          "n": 112,
-          "pickup_p50_hours": 7.54
+          "n": 116,
+          "pickup_p50_hours": 7.08
         },
         {
           "hours": "12-17",
-          "n": 112,
-          "pickup_p50_hours": 5.26
+          "n": 113,
+          "pickup_p50_hours": 5.3
         },
         {
           "hours": "18-23",
-          "n": 105,
-          "pickup_p50_hours": 5.03
+          "n": 100,
+          "pickup_p50_hours": 5.13
         }
       ],
       "by_weekday": [
         {
-          "n": 79,
-          "pickup_p50_hours": 6.25,
+          "n": 78,
+          "pickup_p50_hours": 6.66,
           "weekday": 0
         },
         {
-          "n": 76,
-          "pickup_p50_hours": 5.62,
+          "n": 77,
+          "pickup_p50_hours": 5.54,
           "weekday": 1
         },
         {
-          "n": 88,
-          "pickup_p50_hours": 5.1,
+          "n": 90,
+          "pickup_p50_hours": 5.03,
           "weekday": 2
         },
         {
@@ -922,13 +922,13 @@
           "weekday": 4
         },
         {
-          "n": 27,
-          "pickup_p50_hours": 6.5,
+          "n": 30,
+          "pickup_p50_hours": 5.17,
           "weekday": 5
         },
         {
-          "n": 30,
-          "pickup_p50_hours": 4.05,
+          "n": 27,
+          "pickup_p50_hours": 4.93,
           "weekday": 6
         }
       ]
@@ -937,277 +937,277 @@
   "efficiency": {
     "avg_review_rounds": {
       "change_abs": 0.05,
-      "change_rel": 0.0775,
+      "change_rel": 0.073,
       "extra": {},
-      "n": 446,
-      "n_previous": 428,
-      "previous": 0.68,
+      "n": 448,
+      "n_previous": 426,
+      "previous": 0.69,
       "significant": false,
       "status": "ok",
       "unit": "rounds",
-      "value": 0.74
+      "value": 0.75
     },
     "cycle_time_p50_hours": {
-      "change_abs": 0.28,
-      "change_rel": 0.0069,
+      "change_abs": -0.78,
+      "change_rel": -0.019,
       "extra": {},
-      "n": 446,
-      "n_previous": 428,
-      "previous": 40.74,
+      "n": 448,
+      "n_previous": 426,
+      "previous": 40.73,
       "significant": false,
       "status": "ok",
       "unit": "hours",
-      "value": 41.01
+      "value": 39.95
     },
     "cycle_time_p90_hours": {
-      "change_abs": 1.76,
-      "change_rel": 0.0186,
+      "change_abs": 1.66,
+      "change_rel": 0.0176,
       "extra": {},
-      "n": 446,
-      "n_previous": 428,
-      "previous": 94.39,
+      "n": 448,
+      "n_previous": 426,
+      "previous": 94.42,
       "significant": false,
       "status": "ok",
       "unit": "hours",
-      "value": 96.15
+      "value": 96.08
     },
     "effective_throughput": {
-      "change_abs": 16,
-      "change_rel": 0.039,
+      "change_abs": 12,
+      "change_rel": 0.0291,
       "extra": {},
-      "n": 446,
-      "n_previous": 428,
-      "previous": 410,
+      "n": 448,
+      "n_previous": 426,
+      "previous": 412,
       "significant": null,
       "status": "ok",
       "unit": "count",
-      "value": 426
+      "value": 424
     },
     "merged_prs": {
-      "change_abs": 18,
-      "change_rel": 0.0421,
+      "change_abs": 22,
+      "change_rel": 0.0516,
       "extra": {},
-      "n": 446,
-      "n_previous": 428,
-      "previous": 428,
+      "n": 448,
+      "n_previous": 426,
+      "previous": 426,
       "significant": null,
       "status": "ok",
       "unit": "count",
-      "value": 446
+      "value": 448
     },
     "merged_within_n_days": {
-      "change_abs": -0.0501,
-      "change_rel": -0.0616,
+      "change_abs": -0.0486,
+      "change_rel": -0.06,
       "extra": {
-        "denominator": 507,
+        "denominator": 508,
         "events": 387,
         "n_days": 3
       },
-      "n": 507,
-      "n_previous": 461,
-      "previous": 0.8134,
+      "n": 508,
+      "n_previous": 459,
+      "previous": 0.8105,
       "significant": false,
       "status": "ok",
       "unit": "share",
-      "value": 0.7633
+      "value": 0.7618
     },
     "post_review_commit_share": {
-      "change_abs": 0.0417,
-      "change_rel": 0.0892,
+      "change_abs": 0.0413,
+      "change_rel": 0.0867,
       "extra": {
-        "denominator": 446,
-        "events": 227
+        "denominator": 448,
+        "events": 232
       },
-      "n": 446,
-      "n_previous": 428,
-      "previous": 0.4673,
+      "n": 448,
+      "n_previous": 426,
+      "previous": 0.4765,
       "significant": false,
       "status": "ok",
       "unit": "share",
-      "value": 0.509
+      "value": 0.5179
     },
     "pr_size_p50_lines": {
-      "change_abs": 6.5,
-      "change_rel": 0.0833,
+      "change_abs": 8.5,
+      "change_rel": 0.1111,
       "extra": {},
-      "n": 446,
-      "n_previous": 428,
-      "previous": 78.0,
+      "n": 448,
+      "n_previous": 426,
+      "previous": 76.5,
       "significant": false,
       "status": "ok",
       "unit": "lines",
-      "value": 84.5
+      "value": 85.0
     },
     "predictability": {
       "weekly_throughput_cv": {
-        "change_abs": -0.063,
-        "change_rel": -0.3423,
+        "change_abs": -0.0751,
+        "change_rel": -0.3991,
         "extra": {},
         "n": 6,
         "n_previous": 6,
-        "previous": 0.184,
+        "previous": 0.1881,
         "significant": null,
         "status": "ok",
         "unit": "coefficient",
-        "value": 0.121
+        "value": 0.113
       },
       "within_hist_p85": {
-        "change_abs": -0.0052,
-        "change_rel": -0.0061,
+        "change_abs": -0.0038,
+        "change_rel": -0.0045,
         "extra": {
-          "baseline_n": 896,
+          "baseline_n": 893,
           "baseline_p85_hours": 80.39,
-          "denominator": 446,
-          "events": 377
+          "denominator": 448,
+          "events": 379
         },
-        "n": 446,
-        "n_previous": 428,
-        "previous": 0.8505,
+        "n": 448,
+        "n_previous": 426,
+        "previous": 0.8498,
         "significant": null,
         "status": "ok",
         "unit": "share",
-        "value": 0.8453
+        "value": 0.846
       }
     },
     "revert_rate": {
-      "change_abs": -0.0008,
-      "change_rel": -0.0404,
+      "change_abs": 0.0081,
+      "change_rel": 0.4943,
       "extra": {
-        "denominator": 446,
-        "events": 9
+        "denominator": 448,
+        "events": 11
       },
-      "n": 446,
-      "n_previous": 428,
-      "previous": 0.021,
+      "n": 448,
+      "n_previous": 426,
+      "previous": 0.0164,
       "significant": false,
       "status": "ok",
       "unit": "share",
-      "value": 0.0202
+      "value": 0.0246
     },
     "review_concentration_top_k": {
-      "change_abs": -0.0124,
-      "change_rel": -0.0596,
+      "change_abs": 0.0273,
+      "change_rel": 0.1208,
       "extra": {
         "k": 2
       },
-      "n": 959,
-      "n_previous": 897,
-      "previous": 0.2085,
+      "n": 967,
+      "n_previous": 898,
+      "previous": 0.2261,
       "significant": null,
       "status": "ok",
       "unit": "share",
-      "value": 0.196
+      "value": 0.2534
     },
     "stage_p50_hours": {
       "coding": {
-        "change_abs": -0.17,
-        "change_rel": -0.0138,
+        "change_abs": 0.18,
+        "change_rel": 0.0145,
         "extra": {},
-        "n": 446,
-        "n_previous": 428,
-        "previous": 12.54,
+        "n": 448,
+        "n_previous": 426,
+        "previous": 12.16,
         "significant": false,
         "status": "ok",
         "unit": "hours",
-        "value": 12.37
+        "value": 12.34
       },
       "merge": {
-        "change_abs": 0.32,
-        "change_rel": 0.0915,
+        "change_abs": 0.25,
+        "change_rel": 0.0701,
         "extra": {},
-        "n": 446,
-        "n_previous": 428,
-        "previous": 3.52,
+        "n": 448,
+        "n_previous": 426,
+        "previous": 3.63,
         "significant": false,
         "status": "ok",
         "unit": "hours",
-        "value": 3.85
+        "value": 3.89
       },
       "pickup": {
-        "change_abs": -0.55,
-        "change_rel": -0.0888,
+        "change_abs": -0.64,
+        "change_rel": -0.1009,
         "extra": {},
-        "n": 446,
-        "n_previous": 428,
-        "previous": 6.15,
+        "n": 448,
+        "n_previous": 426,
+        "previous": 6.36,
         "significant": false,
         "status": "ok",
         "unit": "hours",
-        "value": 5.61
+        "value": 5.71
       },
       "review": {
-        "change_abs": 1.87,
-        "change_rel": 0.513,
+        "change_abs": 1.64,
+        "change_rel": 0.4113,
         "extra": {},
-        "n": 446,
-        "n_previous": 428,
-        "previous": 3.64,
+        "n": 448,
+        "n_previous": 426,
+        "previous": 4.0,
         "significant": false,
         "status": "ok",
         "unit": "hours",
-        "value": 5.51
+        "value": 5.64
       }
     },
     "survival": {
       "current": {
-        "events": 439,
-        "median_hours": 26.97,
-        "n": 530,
+        "events": 441,
+        "median_hours": 27.23,
+        "n": 532,
         "s_at_hours": {
-          "168": 0.1039,
-          "24": 0.5425,
-          "336": 0.1003,
-          "72": 0.1951
+          "168": 0.1032,
+          "24": 0.5462,
+          "336": 0.0996,
+          "72": 0.1963
         }
       },
       "previous": {
-        "events": 417,
-        "median_hours": 25.2,
-        "n": 486,
+        "events": 415,
+        "median_hours": 25.35,
+        "n": 484,
         "s_at_hours": {
-          "168": 0.0819,
-          "24": 0.5274,
-          "336": 0.0786,
-          "72": 0.1503
+          "168": 0.082,
+          "24": 0.5315,
+          "336": 0.0788,
+          "72": 0.1531
         }
       }
     },
     "waiting_share": {
-      "change_abs": 0.0009,
-      "change_rel": 0.0021,
+      "change_abs": 0.0019,
+      "change_rel": 0.0043,
       "extra": {},
-      "n": 446,
-      "n_previous": 428,
-      "previous": 0.4348,
+      "n": 448,
+      "n_previous": 426,
+      "previous": 0.4399,
       "significant": false,
       "status": "ok",
       "unit": "share",
-      "value": 0.4357
+      "value": 0.4418
     },
     "waste_share": {
-      "change_abs": 0.0069,
-      "change_rel": 0.0749,
+      "change_abs": 0.0145,
+      "change_rel": 0.1637,
       "extra": {
-        "denominator": 494,
-        "events": 49
+        "denominator": 496,
+        "events": 51
       },
-      "n": 494,
-      "n_previous": 466,
-      "previous": 0.0923,
+      "n": 496,
+      "n_previous": 464,
+      "previous": 0.0884,
       "significant": false,
       "status": "ok",
       "unit": "share",
-      "value": 0.0992
+      "value": 0.1028
     }
   },
   "guardrail": {
-    "cycle_time_p50_change_rel": 0.0069,
-    "previous_revert_rate": 0.021,
-    "revert_rate": 0.0202,
-    "revert_rate_change_pp": -0.0849,
+    "cycle_time_p50_change_rel": -0.019,
+    "previous_revert_rate": 0.0164,
+    "revert_rate": 0.0246,
+    "revert_rate_change_pp": 0.8122,
     "verdict": "ok"
   },
-  "headline": "Median cycle time is 41.0h (+1% vs previous period, not significant); the main bottleneck is review queue is growing (51% of PR time waits on reviewers).",
+  "headline": "Median cycle time is 40.0h (-2% vs previous period, not significant); the main bottleneck is review queue is growing (51% of PR time waits on reviewers).",
   "links": {
     "narrative": "/v1/snapshots/s_0a5ef79a77db7a6a/narrative",
     "self": "/v1/snapshots/s_0a5ef79a77db7a6a"
@@ -1227,22 +1227,22 @@
     ],
     "excluded": {
       "backport_prs": 12,
-      "bot_prs": 21,
+      "bot_prs": 20,
       "never_ready_drafts": 0
     },
     "location_dimension": "label:area-",
     "location_sources": {
       "codeowners": 0,
       "directory": 25,
-      "label": 421,
+      "label": 423,
       "unclassified": 0
     },
     "sample": {
       "closed_unmerged_prs": 48,
-      "human_reviews": 959,
-      "merged_prs": 446,
+      "human_reviews": 967,
+      "merged_prs": 448,
       "open_prs_at_as_of": 120,
-      "ready_prs": 530
+      "ready_prs": 532
     },
     "schema_version": "1",
     "thresholds_version": "1.0.0",
@@ -1266,94 +1266,49 @@
     "relanded": 4,
     "revert_chains": [
       {
-        "exposure_hours": 40.77,
+        "exposure_hours": 40.38,
         "original": {
-          "number": 3016,
-          "url": "https://github.com/synthetic/repo/pull/3016"
-        },
-        "reland": null,
-        "revert": {
-          "number": 3196,
-          "url": "https://github.com/synthetic/repo/pull/3196"
-        },
-        "revert_pr_cycle_hours": 2.5
-      },
-      {
-        "exposure_hours": 65.05,
-        "original": {
-          "number": 2932,
-          "url": "https://github.com/synthetic/repo/pull/2932"
-        },
-        "reland": null,
-        "revert": {
-          "number": 3192,
-          "url": "https://github.com/synthetic/repo/pull/3192"
-        },
-        "revert_pr_cycle_hours": 2.5
-      },
-      {
-        "exposure_hours": 27.22,
-        "original": {
-          "number": 2995,
-          "url": "https://github.com/synthetic/repo/pull/2995"
-        },
-        "reland": null,
-        "revert": {
-          "number": 3195,
-          "url": "https://github.com/synthetic/repo/pull/3195"
-        },
-        "revert_pr_cycle_hours": 2.5
-      },
-      {
-        "exposure_hours": 12.36,
-        "original": {
-          "number": 2921,
-          "url": "https://github.com/synthetic/repo/pull/2921"
-        },
-        "reland": {
-          "number": 3190,
-          "url": "https://github.com/synthetic/repo/pull/3190"
-        },
-        "revert": {
-          "number": 3189,
-          "url": "https://github.com/synthetic/repo/pull/3189"
-        },
-        "revert_pr_cycle_hours": 2.5
-      },
-      {
-        "exposure_hours": 27.82,
-        "original": {
-          "number": 2929,
-          "url": "https://github.com/synthetic/repo/pull/2929"
+          "number": 3077,
+          "url": "https://github.com/synthetic/repo/pull/3077"
         },
         "reland": null,
         "revert": {
           "number": 3191,
           "url": "https://github.com/synthetic/repo/pull/3191"
         },
+        "revert_pr_cycle_hours": 2.11
+      },
+      {
+        "exposure_hours": 27.22,
+        "original": {
+          "number": 3054,
+          "url": "https://github.com/synthetic/repo/pull/3054"
+        },
+        "reland": null,
+        "revert": {
+          "number": 3190,
+          "url": "https://github.com/synthetic/repo/pull/3190"
+        },
         "revert_pr_cycle_hours": 2.5
       },
       {
-        "exposure_hours": 19.01,
+        "exposure_hours": 64.16,
         "original": {
-          "number": 2898,
-          "url": "https://github.com/synthetic/repo/pull/2898"
+          "number": 2962,
+          "url": "https://github.com/synthetic/repo/pull/2962"
         },
-        "reland": {
+        "reland": null,
+        "revert": {
           "number": 3188,
           "url": "https://github.com/synthetic/repo/pull/3188"
         },
-        "revert": {
-          "number": 3187,
-          "url": "https://github.com/synthetic/repo/pull/3187"
-        },
-        "revert_pr_cycle_hours": 2.5
+        "revert_pr_cycle_hours": 1.61
       },
       {
-        "exposure_hours": 15.49,
+        "exposure_hours": 12.36,
         "original": {
-          "number": 2871,
-          "url": "https://github.com/synthetic/repo/pull/2871"
+          "number": 2932,
+          "url": "https://github.com/synthetic/repo/pull/2932"
         },
         "reland": null,
         "revert": {
@@ -1363,10 +1318,39 @@
         "revert_pr_cycle_hours": 2.5
       },
       {
-        "exposure_hours": 14.28,
+        "exposure_hours": 27.82,
         "original": {
-          "number": 2605,
-          "url": "https://github.com/synthetic/repo/pull/2605"
+          "number": 2958,
+          "url": "https://github.com/synthetic/repo/pull/2958"
+        },
+        "reland": null,
+        "revert": {
+          "number": 3187,
+          "url": "https://github.com/synthetic/repo/pull/3187"
+        },
+        "revert_pr_cycle_hours": 2.5
+      },
+      {
+        "exposure_hours": 19.01,
+        "original": {
+          "number": 2920,
+          "url": "https://github.com/synthetic/repo/pull/2920"
+        },
+        "reland": {
+          "number": 3185,
+          "url": "https://github.com/synthetic/repo/pull/3185"
+        },
+        "revert": {
+          "number": 3184,
+          "url": "https://github.com/synthetic/repo/pull/3184"
+        },
+        "revert_pr_cycle_hours": 2.5
+      },
+      {
+        "exposure_hours": 15.49,
+        "original": {
+          "number": 2913,
+          "url": "https://github.com/synthetic/repo/pull/2913"
         },
         "reland": {
           "number": 3183,
@@ -1379,10 +1363,10 @@
         "revert_pr_cycle_hours": 2.5
       },
       {
-        "exposure_hours": 62.53,
+        "exposure_hours": 54.45,
         "original": {
-          "number": 2576,
-          "url": "https://github.com/synthetic/repo/pull/2576"
+          "number": 2886,
+          "url": "https://github.com/synthetic/repo/pull/2886"
         },
         "reland": {
           "number": 3181,
@@ -1392,34 +1376,63 @@
           "number": 3180,
           "url": "https://github.com/synthetic/repo/pull/3180"
         },
+        "revert_pr_cycle_hours": 1.85
+      },
+      {
+        "exposure_hours": 62.53,
+        "original": {
+          "number": 2635,
+          "url": "https://github.com/synthetic/repo/pull/2635"
+        },
+        "reland": {
+          "number": 3177,
+          "url": "https://github.com/synthetic/repo/pull/3177"
+        },
+        "revert": {
+          "number": 3176,
+          "url": "https://github.com/synthetic/repo/pull/3176"
+        },
+        "revert_pr_cycle_hours": 2.5
+      },
+      {
+        "exposure_hours": 35.85,
+        "original": {
+          "number": 2596,
+          "url": "https://github.com/synthetic/repo/pull/2596"
+        },
+        "reland": null,
+        "revert": {
+          "number": 3174,
+          "url": "https://github.com/synthetic/repo/pull/3174"
+        },
         "revert_pr_cycle_hours": 2.5
       }
     ],
-    "revert_prs": 11,
-    "reverts": 9
+    "revert_prs": 13,
+    "reverts": 11
   },
   "series": {
     "current": [
       {
-        "cycle_p50_hours": 39.32,
+        "cycle_p50_hours": 39.26,
         "days": 7,
-        "merged": 79,
-        "pickup_p50_hours": 5.16,
-        "pr_size_p50_lines": 83.0,
-        "reverts": 2,
+        "merged": 80,
+        "pickup_p50_hours": 5.13,
+        "pr_size_p50_lines": 82.5,
+        "reverts": 3,
         "waiting_ci_share": 0.0,
         "waiting_reviewer_share": 0.4402,
         "week_start": "2026-01-19"
       },
       {
-        "cycle_p50_hours": 36.69,
+        "cycle_p50_hours": 37.67,
         "days": 7,
-        "merged": 71,
-        "pickup_p50_hours": 6.03,
-        "pr_size_p50_lines": 56.0,
+        "merged": 72,
+        "pickup_p50_hours": 6.15,
+        "pr_size_p50_lines": 57.0,
         "reverts": 0,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.547,
+        "waiting_reviewer_share": 0.5556,
         "week_start": "2026-01-26"
       },
       {
@@ -1434,34 +1447,34 @@
         "week_start": "2026-02-02"
       },
       {
-        "cycle_p50_hours": 42.56,
+        "cycle_p50_hours": 42.64,
         "days": 7,
-        "merged": 89,
-        "pickup_p50_hours": 6.7,
+        "merged": 87,
+        "pickup_p50_hours": 6.71,
         "pr_size_p50_lines": 95.0,
         "reverts": 3,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5485,
+        "waiting_reviewer_share": 0.5488,
         "week_start": "2026-02-09"
       },
       {
-        "cycle_p50_hours": 41.65,
+        "cycle_p50_hours": 40.48,
         "days": 7,
-        "merged": 79,
-        "pickup_p50_hours": 6.3,
-        "pr_size_p50_lines": 85.0,
-        "reverts": 4,
+        "merged": 80,
+        "pickup_p50_hours": 6.32,
+        "pr_size_p50_lines": 88.0,
+        "reverts": 3,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5471,
+        "waiting_reviewer_share": 0.5382,
         "week_start": "2026-02-16"
       },
       {
-        "cycle_p50_hours": 39.95,
+        "cycle_p50_hours": 39.07,
         "days": 7,
-        "merged": 65,
-        "pickup_p50_hours": 4.93,
-        "pr_size_p50_lines": 95.0,
-        "reverts": 0,
+        "merged": 66,
+        "pickup_p50_hours": 4.88,
+        "pr_size_p50_lines": 93.5,
+        "reverts": 2,
         "waiting_ci_share": 0.0,
         "waiting_reviewer_share": 0.5001,
         "week_start": "2026-02-23"
@@ -1469,14 +1482,14 @@
     ],
     "previous": [
       {
-        "cycle_p50_hours": 42.68,
+        "cycle_p50_hours": 45.73,
         "days": 7,
-        "merged": 75,
-        "pickup_p50_hours": 5.68,
-        "pr_size_p50_lines": 87.0,
+        "merged": 73,
+        "pickup_p50_hours": 6.9,
+        "pr_size_p50_lines": 86.0,
         "reverts": 2,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5688,
+        "waiting_reviewer_share": 0.5561,
         "week_start": "2025-12-08"
       },
       {
@@ -1485,31 +1498,31 @@
         "merged": 67,
         "pickup_p50_hours": 5.93,
         "pr_size_p50_lines": 82.0,
-        "reverts": 2,
+        "reverts": 1,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5331,
+        "waiting_reviewer_share": 0.5335,
         "week_start": "2025-12-15"
       },
       {
-        "cycle_p50_hours": 48.31,
+        "cycle_p50_hours": 45.07,
         "days": 7,
-        "merged": 61,
+        "merged": 63,
         "pickup_p50_hours": 6.38,
-        "pr_size_p50_lines": 89.0,
-        "reverts": 0,
+        "pr_size_p50_lines": 84.0,
+        "reverts": 1,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.4738,
+        "waiting_reviewer_share": 0.4746,
         "week_start": "2025-12-22"
       },
       {
-        "cycle_p50_hours": 39.6,
+        "cycle_p50_hours": 38.92,
         "days": 7,
-        "merged": 69,
-        "pickup_p50_hours": 7.9,
-        "pr_size_p50_lines": 64.0,
-        "reverts": 2,
+        "merged": 70,
+        "pickup_p50_hours": 7.87,
+        "pr_size_p50_lines": 63.5,
+        "reverts": 1,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.582,
+        "waiting_reviewer_share": 0.5821,
         "week_start": "2025-12-29"
       },
       {
@@ -1520,18 +1533,18 @@
         "pr_size_p50_lines": 76.5,
         "reverts": 1,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.4318,
+        "waiting_reviewer_share": 0.4317,
         "week_start": "2026-01-05"
       },
       {
-        "cycle_p50_hours": 46.56,
+        "cycle_p50_hours": 46.02,
         "days": 7,
-        "merged": 58,
-        "pickup_p50_hours": 5.34,
-        "pr_size_p50_lines": 77.0,
-        "reverts": 2,
+        "merged": 55,
+        "pickup_p50_hours": 5.85,
+        "pr_size_p50_lines": 78.0,
+        "reverts": 1,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5218,
+        "waiting_reviewer_share": 0.5237,
         "week_start": "2026-01-12"
       }
     ]
@@ -1550,26 +1563,26 @@
       "value": 0.3404
     },
     "external_pickup_ratio": {
-      "change_abs": 0.25,
-      "change_rel": 0.2747,
+      "change_abs": 0.29,
+      "change_rel": 0.3215,
       "extra": {},
-      "n": 446,
-      "n_previous": 428,
+      "n": 448,
+      "n_previous": 426,
       "previous": 0.9,
       "significant": null,
       "status": "ok",
       "unit": "ratio",
-      "value": 1.15
+      "value": 1.2
     },
     "fast_large_approval_share": {
       "change_abs": null,
       "change_rel": null,
       "extra": {
-        "denominator": 446,
+        "denominator": 448,
         "events": 0
       },
-      "n": 446,
-      "n_previous": 428,
+      "n": 448,
+      "n_previous": 426,
       "previous": null,
       "significant": null,
       "status": "insufficient_sample",
@@ -1577,29 +1590,29 @@
       "value": null
     },
     "large_pr_share": {
-      "change_abs": 0.0031,
-      "change_rel": 0.0876,
+      "change_abs": 0.0027,
+      "change_rel": 0.0777,
       "extra": {
-        "denominator": 446,
+        "denominator": 448,
         "events": 17
       },
-      "n": 446,
-      "n_previous": 428,
-      "previous": 0.035,
+      "n": 448,
+      "n_previous": 426,
+      "previous": 0.0352,
       "significant": null,
       "status": "ok",
       "unit": "share",
-      "value": 0.0381
+      "value": 0.0379
     },
     "merged_without_approval_share": {
       "change_abs": null,
       "change_rel": null,
       "extra": {
-        "denominator": 446,
+        "denominator": 448,
         "events": 0
       },
-      "n": 446,
-      "n_previous": 428,
+      "n": 448,
+      "n_previous": 426,
       "previous": null,
       "significant": null,
       "status": "insufficient_sample",
@@ -1611,17 +1624,17 @@
   "time_ledger": {
     "ci_coverage": 0.0,
     "ci_data_available": false,
-    "merged_prs": 446,
-    "previous_merged_prs": 428,
-    "previous_total_pr_hours": 13191.99,
+    "merged_prs": 448,
+    "previous_merged_prs": 426,
+    "previous_total_pr_hours": 13329.57,
     "scope": "merged_prs",
     "states": {
       "waiting_author": {
-        "change_pp": 2.15,
-        "pr_hours": 4094.73,
-        "previous_pr_hours": 3613.76,
-        "previous_share": 0.2739,
-        "share": 0.2954
+        "change_pp": 2.16,
+        "pr_hours": 4167.99,
+        "previous_pr_hours": 3670.42,
+        "previous_share": 0.2754,
+        "share": 0.297
       },
       "waiting_ci": {
         "change_pp": 0.0,
@@ -1631,42 +1644,42 @@
         "share": 0.0
       },
       "waiting_merge": {
-        "change_pp": -1.73,
-        "pr_hours": 2668.91,
-        "previous_pr_hours": 2768.82,
-        "previous_share": 0.2099,
-        "share": 0.1925
+        "change_pp": -1.95,
+        "pr_hours": 2678.79,
+        "previous_pr_hours": 2804.5,
+        "previous_share": 0.2104,
+        "share": 0.1909
       },
       "waiting_reviewer": {
-        "change_pp": -0.41,
-        "pr_hours": 7097.5,
-        "previous_pr_hours": 6809.41,
-        "previous_share": 0.5162,
-        "share": 0.512
+        "change_pp": -0.21,
+        "pr_hours": 7186.98,
+        "previous_pr_hours": 6854.65,
+        "previous_share": 0.5142,
+        "share": 0.5121
       }
     },
-    "total_pr_hours": 13861.14
+    "total_pr_hours": 14033.76
   },
   "trend": {
     "attribution": {
       "basis": "mean_hours_per_merged_pr",
       "cycle_mean_hours": {
-        "change": -1.21,
-        "current": 50.26,
-        "previous": 51.47
+        "change": -1.7,
+        "current": 49.84,
+        "previous": 51.54
       },
       "large_prs": {
-        "change": -0.44,
-        "current": 1.32,
+        "change": -0.46,
+        "current": 1.3,
         "previous": 1.76,
         "share_of_increase": 0
       },
       "locations": [
         {
-          "change": 0.72,
+          "change": 0.7,
           "location": "area-A",
-          "share_of_increase": 0.0021,
-          "share_of_reviewer_increase": 0.4023
+          "share_of_increase": 0.0,
+          "share_of_reviewer_increase": 0.4142
         },
         {
           "change": -1.24,
@@ -1675,50 +1688,50 @@
           "share_of_reviewer_increase": 0.0
         },
         {
-          "change": 0.15,
+          "change": 0.11,
           "location": "area-C",
-          "share_of_increase": 0.0004,
-          "share_of_reviewer_increase": 0.0821
+          "share_of_increase": 0.0,
+          "share_of_reviewer_increase": 0.0681
         },
         {
-          "change": 0.29,
+          "change": 0.24,
           "location": "area-D",
-          "share_of_increase": 0.0008,
-          "share_of_reviewer_increase": 0.1605
+          "share_of_increase": 0.0,
+          "share_of_reviewer_increase": 0.1424
         },
         {
-          "change": -0.56,
+          "change": -0.49,
           "location": "area-E",
           "share_of_increase": 0.0,
           "share_of_reviewer_increase": 0.0
         },
         {
-          "change": 0.61,
+          "change": 0.6,
           "location": "dir:src/D",
-          "share_of_increase": 0.0018,
-          "share_of_reviewer_increase": 0.3366
+          "share_of_increase": 0.0,
+          "share_of_reviewer_increase": 0.3595
         },
         {
           "change": 0.03,
           "location": "other",
-          "share_of_increase": 0.0001,
-          "share_of_reviewer_increase": 0.0185
+          "share_of_increase": 0.0,
+          "share_of_reviewer_increase": 0.0159
         }
       ],
       "states": {
         "coding": {
-          "change": -1.47,
-          "current": 19.18,
-          "previous": 20.65,
-          "share_of_decrease": 0.7519,
+          "change": -1.73,
+          "current": 18.52,
+          "previous": 20.25,
+          "share_of_decrease": 0.7266,
           "share_of_increase": 0.0
         },
         "waiting_author": {
-          "change": 0.74,
-          "current": 9.18,
-          "previous": 8.44,
+          "change": 0.69,
+          "current": 9.3,
+          "previous": 8.62,
           "share_of_decrease": 0.0,
-          "share_of_increase": 0.9948
+          "share_of_increase": 1.0
         },
         "waiting_ci": {
           "change": 0.0,
@@ -1728,22 +1741,22 @@
           "share_of_increase": 0.0
         },
         "waiting_merge": {
-          "change": -0.49,
+          "change": -0.6,
           "current": 5.98,
-          "previous": 6.47,
-          "share_of_decrease": 0.2481,
+          "previous": 6.58,
+          "share_of_decrease": 0.2532,
           "share_of_increase": 0.0
         },
         "waiting_reviewer": {
-          "change": 0.0,
-          "current": 15.91,
-          "previous": 15.91,
-          "share_of_decrease": 0.0,
-          "share_of_increase": 0.0052
+          "change": -0.05,
+          "current": 16.04,
+          "previous": 16.09,
+          "share_of_decrease": 0.0203,
+          "share_of_increase": 0.0
         }
       },
-      "total_decrease_hours": 1.95,
-      "total_increase_hours": 0.74
+      "total_decrease_hours": 2.39,
+      "total_increase_hours": 0.69
     },
     "bottleneck_shift": null
   },
@@ -1757,7 +1770,7 @@
     "closed_unmerged": 48,
     "late_rejections": 0,
     "lost_while_waiting": 12,
-    "wasted_pr_hours": 3313.5,
-    "wasted_review_share": 0.0292
+    "wasted_pr_hours": 3155.39,
+    "wasted_review_share": 0.029
   }
 }

@@ -18,3 +18,4 @@ jobs:
       - run: uv run ruff check . && uv run ruff format --check . && uv run mypy
       - run: uv run pytest -m "not integration"
       - run: uv run pytest -m integration
+      - run: uv run python -m insights_eval.run --llm stub
