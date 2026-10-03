@@ -44,7 +44,7 @@ async def test_narrative_persistence_cache_pack_identity_and_conditional(api, en
     payload = response.json()
     NarrativeSchema.model_validate(payload)
     assert payload["meta"]["generated_by"] == ("llm" if enabled else "template")
-    assert "immutable" in response.headers["cache-control"]
+    assert response.headers["cache-control"] == "private, max-age=3600"
     conditional = await client.get(url, headers={"If-None-Match": response.headers["etag"]})
     assert conditional.status_code == 304 and not conditional.content
     model_key = ctx["settings"].bedrock_model_id if enabled else "template"
