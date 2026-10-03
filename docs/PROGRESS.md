@@ -9,4 +9,5 @@ The plan is the requirements source. Milestones are accepted only after their ga
 | M2 | Passed locally | 45 unit tests and 46 total tests passed; ruff and strict mypy passed. Pagination, dismissed reviews, bot detection, ETag, retries and sanitized errors covered. Live GitHub smoke pending: GITHUB_TOKEN absent. |
 | M3 | Passed locally | 53 tests passed (8 integration); ruff/strict mypy passed. Staged backfill, catch-up, resume, open sweep, idempotency, replacement, lock and arq dedup verified with real Postgres/Redis and mocked GitHub. Live backfill pending credentials. |
 | M4 | Passed locally | 99 unit tests and 112 total tests passed (13 integration); ruff and strict mypy passed. All 22 timeline cases plus 200 random invariant sequences; classification, transactional facts, 501-row interrupted rederivation and resumption verified. Live invariants pending GitHub credentials. |
-| M5-M12 | Pending | Not yet implemented |
+| M5 | Passed locally; human golden review pending | Ruff/strict mypy passed; 130 unit and 144 total tests (14 integration) passed. Seed-42 snapshot schema and byte determinism, independent ledger arithmetic, weighting, sample gates, attribution, rows and REPEATABLE READ database/pure-pipeline parity verified. Human spot-check of the golden file remains pending. |
+| M6-M12 | Pending | Not yet implemented |
