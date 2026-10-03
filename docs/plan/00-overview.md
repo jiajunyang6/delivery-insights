@@ -27,7 +27,7 @@ Demo repository: **`dotnet/runtime`** (large, active, with ownership areas ident
 
 ### P0 (required)
 
-1. GitHub synchronization: staged GraphQL backfill (7 → 30 → 180 days) and incremental synchronization into Postgres (arq worker).
+1. GitHub synchronization: staged GraphQL backfill (7 → 30 → 120 days) and incremental synchronization into Postgres (arq worker).
 2. Derivation: per-PR waiting-state intervals, stage durations, and facts; closed-PR classification; revert / reland / supersession chains; bot and backport detection.
 3. Efficiency metrics: effective throughput, cycle time (p50/p90), share merged within N days, waiting share (of the full cycle), waste rate, rework rate, review-load concentration, and revert guardrail.
 4. Bottlenecks: time ledger, review-queue inflow/outflow, location analysis (default `area-*` labels, directory fallback), merge-block decomposition, cumulative waiting ranking (Pareto), what-if estimates, at-risk PRs (historical p85), bottleneck shifts, findings rule engine, and headline.

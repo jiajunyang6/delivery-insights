@@ -4,7 +4,11 @@ from typing import Any
 
 import numpy as np
 
-from insights.analytics.thresholds import CI_COVERAGE_MIN, MIN_SAMPLES_P50
+from insights.analytics.thresholds import (
+    CI_COVERAGE_MIN,
+    MIN_SAMPLES_P50,
+    REVIEW_CAPACITY_MIN_WAIT_SHARE,
+)
 
 LEVEL_ORDER = {"low": 0, "medium": 1, "high": 2}
 SERIES_KEYS = {
@@ -21,6 +25,9 @@ TITLES = {
     "H_pr_size_growth": "Pull requests getting larger",
     "H_quality_tradeoff": "Speed gained by lighter review",
 }
+SLOWDOWN_HYPOTHESES = ("H_review_capacity", "H_ci_bottleneck", "H_pr_size_growth")
+# A stage or location item belongs in the displayed chain only when it shows the added time.
+ATTRIBUTION_MIN_SHARE = REVIEW_CAPACITY_MIN_WAIT_SHARE
 
 
 def level(score: float) -> str | None:
@@ -163,8 +170,11 @@ def score_hypotheses(
         key=lambda entry: (entry["value"], -int(entry["id"][1:])),
         default=None,
     )
-    location = localized["location"] if localized else None
-    location_index = (int(localized["id"][1:]) - 53) // 4 if localized else None
+    # The strongest location still feeds the score, but it is named only when a
+    # meaningful share of the added time is reviewer wait there.
+    shown = localized if at_least(localized, ATTRIBUTION_MIN_SHARE) else None
+    location = shown["location"] if shown else None
+    location_index = (int(shown["id"][1:]) - 53) // 4 if shown else None
     size_counter = bool(
         rel_up(e("E30"), 0.20) and e("E30") and evidence["E30"]["significant"] is True
     )
@@ -186,7 +196,9 @@ def score_hypotheses(
             "direction": 1,
             "localization": localized["value"] if localized else 0,
             "location": location,
-            "stage": ("E15", "E37"),
+            "stage": stage_ids(
+                ("E15", rel_up(e("E15"), 0.10)), ("E37", at_least(e("E37"), ATTRIBUTION_MIN_SHARE))
+            ),
             "location_ids": tuple(f"E{51 + 4 * location_index + offset}" for offset in (0, 2, 3))
             if location_index is not None
             else (),
@@ -213,7 +225,7 @@ def score_hypotheses(
             "direction": 1,
             "localization": (e("E39") or {}).get("value", 0),
             "location": None,
-            "stage": ("E39",),
+            "stage": stage_ids(("E39", at_least(e("E39"), ATTRIBUTION_MIN_SHARE))),
             "location_ids": (),
             "signals": [
                 signal("symptom", ("E20",), pp_up(e("E20"), 3)),
@@ -229,7 +241,7 @@ def score_hypotheses(
             "direction": 1,
             "localization": (e("E42") or {}).get("value", 0),
             "location": None,
-            "stage": ("E42",),
+            "stage": stage_ids(("E42", at_least(e("E42"), ATTRIBUTION_MIN_SHARE))),
             "location_ids": (),
             "signals": [
                 signal("symptom", ("E1",), rel_up(e("E1"), 0.10)),
@@ -254,7 +266,10 @@ def score_hypotheses(
             "direction": -1,
             "localization": (e("E43") or {}).get("value", 0),
             "location": None,
-            "stage": ("E43", "E15"),
+            "stage": stage_ids(
+                ("E43", at_least(e("E43"), ATTRIBUTION_MIN_SHARE)),
+                ("E15", rel_down(e("E15"), 0.10)),
+            ),
             "location_ids": (),
             "signals": [
                 signal("symptom", ("E1",), rel_down(e("E1"), 0.10)),
@@ -394,14 +409,36 @@ def score_hypotheses(
                         i for s in other["mechanisms"] for i in s.evidence if i in evidence
                     )
                 )
-                candidate["alternatives_ruled_out"].append(
-                    {"hypothesis": identifier, "evidence": ids}
-                )
+                if ids:
+                    candidate["alternatives_ruled_out"].append(
+                        {"hypothesis": identifier, "evidence": ids}
+                    )
+                else:
+                    reason = "no_data"
             else:
                 reason = "not_selected" if other["eligible"] else "below_threshold"
             if reason:
                 candidate["alternatives_open"].append({"hypothesis": identifier, "reason": reason})
-    return selected, None if selected else "insufficient_signal"
+    return selected, None if selected else abstain_reason(evidence, evaluated)
+
+
+def abstain_reason(
+    evidence: Mapping[str, dict[str, Any]], evaluated: Mapping[str, Mapping[str, Any]]
+) -> str:
+    """no_slowdown when cycle time is comparable and no slowdown symptom is present."""
+    cycle = evidence.get("E1")
+    comparable = bool(
+        cycle
+        and cycle.get("value") is not None
+        and cycle.get("previous") is not None
+        and (cycle.get("n") or 0) >= MIN_SAMPLES_P50
+    )
+    slowing = any(evaluated[i]["symptom"] for i in SLOWDOWN_HYPOTHESES)
+    return "no_slowdown" if comparable and not slowing else "insufficient_signal"
+
+
+def stage_ids(*items: tuple[str, bool]) -> tuple[str, ...]:
+    return tuple(identifier for identifier, shows_change in items if shows_change)
 
 
 def cast_signals(value: Any) -> list[Signal]:

@@ -561,7 +561,7 @@ Return SyncJob (§7.4); missing 404; invalid UUID 422.
 | Field | Description |
 |---|---|
 | narrative | Plain text with [E#] citations |
-| abstained, abstain_reason | true if no hypothesis clears gates; no_comparison or insufficient_signal (`07` §4.2) |
+| abstained, abstain_reason | true if no hypothesis clears gates; no_comparison, no_slowdown (comparable period, no slowdown symptom) or insufficient_signal (`07` §4.2) |
 | hypotheses[] | After assembly/LLM downgrades, descending final confidence, library before LLM on ties, then ascending ID. Alternatives consider omitted library hypotheses with at least one symptom: ruled_out only with counter-evidence or all assessable mechanisms absent; otherwise alternatives_open [{hypothesis,reason}], reason=no_data/insufficient_sample/below_threshold/not_selected (`07` §3.3 priority); H_llm alternatives empty. source=library/llm; confidence_level=high/medium/low; chain steps symptom/stage/location/mechanism (LLM hypothesis has one cited step). Code templates supply action/verify_next; null for LLM. Definitions `07` §3–§4 |
 | evidence[] | All evidence cited by narrative/hypotheses/chains/counter-evidence/alternatives, ascending numeric ID; JSON Pointer ref; up to three PR example links (`07` §2.1) |
 | meta.generated_by | llm or template |

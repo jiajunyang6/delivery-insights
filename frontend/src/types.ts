@@ -187,10 +187,12 @@ export interface Hypothesis {
   action: string | null;
   verify_next: string | null;
 }
+export type AbstainReason = "no_comparison" | "no_slowdown" | "insufficient_signal";
 export interface Narrative {
   snapshot_id: string;
   narrative: string;
   abstained: boolean;
+  abstain_reason: AbstainReason | null;
   hypotheses: Hypothesis[];
   evidence: Evidence[];
   meta: {

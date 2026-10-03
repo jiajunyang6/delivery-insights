@@ -76,7 +76,7 @@ async def test_staged_backfill_sweep_catchup_and_idempotency(context, github_pag
     assert created
     assert await sync_repo(context, "a/b", "backfill", str(job.id)) == "succeeded"
     repo, jobs = await load_state(context)
-    assert repo.covered_since == NOW - timedelta(days=180)
+    assert repo.covered_since == NOW - timedelta(days=context["settings"].backfill_days)
     assert repo.last_open_sweep_at == repo.last_synced_at == NOW
     assert repo.last_sync_status == "ok" and repo.data_version >= 4
     assert jobs[0].status == "succeeded"
@@ -251,7 +251,7 @@ async def test_incremental_runs_before_resumed_backfill(context, github_page):
     assert await sync_repo(context, "a/b", "backfill", str(job.id)) == "succeeded"
     assert seen[:2] == [None, "resume"]
     repo, _ = await load_state(context)
-    assert repo.covered_since == NOW - timedelta(days=180)
+    assert repo.covered_since == NOW - timedelta(days=context["settings"].backfill_days)
 
 
 async def test_reduced_backfill_target_preserves_coverage_without_resuming_history(

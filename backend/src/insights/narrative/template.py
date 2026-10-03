@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from typing import Any
 
-from insights.narrative.validator import chain_ids
+from insights.narrative.validator import ABSTAIN_SENTENCES, chain_ids
 
 SUBJECTS = {
     "H_ci_bottleneck": "Slow or congested CI",
@@ -17,6 +17,12 @@ FINDINGS = {
     "waste_high": "work that never shipped",
     "quality_guardrail": "a quality warning",
     "external_contributor_wait": "slow first reviews for external contributors",
+}
+WAITING = {
+    "E18": "waiting on reviewers",
+    "E19": "waiting on authors",
+    "E20": "waiting on CI",
+    "E21": "waiting to merge after approval",
 }
 
 
@@ -95,6 +101,14 @@ def build_template(pack: Mapping[str, Any], snapshot: Mapping[str, Any]) -> dict
         parts["S3"] = sentence(
             f"The largest time sink is {name}, about {share} of PR time", ["E71"]
         )
+    elif waits := [i for i in WAITING if evidence.get(i, {}).get("value") is not None]:
+        largest = max(waits, key=lambda i: (evidence[i]["value"], -int(i[1:])))
+        share = percent(evidence[largest]["value"])
+        parts["S3"] = sentence(
+            f"No single bottleneck stands out; the largest share of PR time, {share}, "
+            f"is spent {WAITING[largest]}",
+            [largest],
+        )
     if audience == "manager" and evidence.get("E25", {}).get("value", 0) > 0:
         count, critical = (evidence["E25"]["value"], evidence["E25"]["extra"]["critical"])
         parts["S4"] = sentence(
@@ -104,10 +118,8 @@ def build_template(pack: Mapping[str, Any], snapshot: Mapping[str, Any]) -> dict
     if candidates:
         parts["S5"] = sentence(phrase(candidates[0]), chain_ids(candidates[0]))
     else:
-        parts["S5"] = sentence(
-            "The signals are insufficient to support a specific root cause this period",
-            ["E1" if cycle else "E3"],
-        )
+        reason = pack.get("abstain_reason") or "insufficient_signal"
+        parts["S5"] = sentence(ABSTAIN_SENTENCES[reason], ["E1" if cycle else "E3"])
     if snapshot["guardrail"]["verdict"] != "ok" and "E10" in evidence:
         share = percent(evidence["E10"]["value"])
         parts["S6"] = sentence(
