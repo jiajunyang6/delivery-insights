@@ -23,7 +23,7 @@ logger = structlog.get_logger(__name__)
 
 async def save_runs(
     session: AsyncSession, repo_id: int, runs: list[CiRun], *, settings: Settings, now: datetime
-) -> tuple[int, int]:
+) -> tuple[int, int, int]:
     ids = [r.run_id for r in runs]
     existing = (
         {
@@ -39,7 +39,7 @@ async def save_runs(
     )
     changed = [r for r in runs if existing.get(r.run_id) != r]
     if not changed:
-        return 0, 0
+        return 0, 0, 0
     changed_ids = [r.run_id for r in changed]
     before = await load_ci_data(session, [repo_id], run_ids=changed_ids)
     for offset in range(0, len(changed), 500):
@@ -58,14 +58,17 @@ async def save_runs(
         )
     after = await load_ci_data(session, [repo_id], run_ids=changed_ids)
     affected = sorted(before.by_pr.keys() | after.by_pr.keys())
+    violations = 0
     for offset in range(0, len(affected), 500):
-        await derive_prs(session, affected[offset : offset + 500], settings=settings, now=now)
+        violations += await derive_prs(
+            session, affected[offset : offset + 500], settings=settings, now=now
+        )
     await session.execute(
         update(Repository)
         .where(Repository.id == repo_id)
         .values(data_version=Repository.data_version + 1)
     )
-    return len(changed), len(affected)
+    return len(changed), len(affected), violations
 
 
 async def save_ownership(
@@ -143,13 +146,14 @@ async def execute(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: s
                 start = now_for(ctx) - timedelta(days=2) if previous else repo.covered_since
                 runs = await adapter.ci_runs(ref, created_from=start, created_to=now_for(ctx))
                 async with sessions_for(ctx)() as session, session.begin():
-                    updates, affected = await save_runs(
+                    updates, affected, violations = await save_runs(
                         session, repo.id, runs, settings=settings, now=now_for(ctx)
                     )
                 stats = {
                     "runs_fetched": len(runs),
                     "runs_changed": updates,
                     "prs_rederived": affected,
+                    "invariant_violations": violations,
                 }
                 changed = updates > 0
             elif kind == "ownership":

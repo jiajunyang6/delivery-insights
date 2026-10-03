@@ -107,7 +107,7 @@ async def test_partial_failure_keyset_resume_and_cron_without_token(context, mon
         calls.append(len(ids))
         if len(calls) == 2:
             raise RuntimeError("Injected failure")
-        await original(session, ids, **kwargs)
+        return await original(session, ids, **kwargs)
 
     monkeypatch.setattr(module, "derive_prs", fail_second)
     assert await rederive_repo(context, "a/b", "rederive", str(job.id)) == "failed"

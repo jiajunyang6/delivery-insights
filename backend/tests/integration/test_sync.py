@@ -1,12 +1,14 @@
 from copy import deepcopy
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
 from sqlalchemy import func, select, update
 
-from insights.db.models import PrEvent, PrFile, PullRequest, Repository, SyncJob
+from insights.db.models import PrEvent, PrFact, PrFile, PrInterval, PullRequest, Repository, SyncJob
 from insights.redis import sync_lock_key
+from insights.sync.derive import current_key, derivation_complete
 from insights.sync.jobs import incremental_sync_all, reconcile_tracked_repos, sync_repo
 from insights.sync.queue import enqueue_sync
 
@@ -106,6 +108,84 @@ async def test_changed_content_replaces_events_and_files(context, github_page):
         assert await session.scalar(select(func.count()).select_from(PullRequest)) == 1
         assert await session.scalar(select(func.count()).select_from(PrEvent)) == 0
         assert (await session.scalars(select(PrFile.path))).all() == ["src/B/new.cs"]
+
+
+async def test_null_body_is_saved_and_watermark_advances(context, github_page):
+    page = response_page(github_page, 1, 1)
+    page["data"]["repository"]["pullRequests"]["nodes"][0]["body"] = "before\x00after"
+    context["router"].post("https://api.github.com/graphql").respond(200, json=page)
+    job, _ = await queued(context)
+    assert await sync_repo(context, "a/b", "backfill", str(job.id)) == "succeeded"
+    repo, jobs = await load_state(context)
+    assert repo.sync_watermark == NOW - timedelta(days=1)
+    assert jobs[0].stats["skipped_prs"] == 0
+    async with context["session_factory"]() as session:
+        assert await session.scalar(select(PullRequest.body_excerpt)) == "beforeafter"
+
+
+async def test_malformed_pr_is_skipped_while_other_prs_and_watermark_are_saved(
+    context, github_page
+):
+    first = response_page(github_page, 1, 2)
+    connection = first["data"]["repository"]["pullRequests"]
+    good = response_page(github_page, 2, 3)["data"]["repository"]["pullRequests"]["nodes"][0]
+    bad = response_page(github_page, 3, 1)["data"]["repository"]["pullRequests"]["nodes"][0]
+    del bad["title"]
+    connection["nodes"] = [bad, connection["nodes"][0], good]
+    empty = deepcopy(github_page)
+    empty["data"]["repository"]["pullRequests"]["nodes"] = []
+    calls = 0
+
+    def respond(request):
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, json=first if calls == 1 else empty)
+
+    context["router"].post("https://api.github.com/graphql").mock(side_effect=respond)
+    job, _ = await queued(context)
+    assert await sync_repo(context, "a/b", "backfill", str(job.id)) == "succeeded"
+    repo, jobs = await load_state(context)
+    assert jobs[0].stats["skipped_prs"] == 1
+    assert jobs[0].stats["prs_fetched"] == 3
+    assert repo.sync_watermark == NOW - timedelta(days=1)
+    async with context["session_factory"]() as session:
+        assert (
+            await session.scalars(select(PullRequest.number).order_by(PullRequest.number))
+        ).all() == [1, 2]
+        assert await derivation_complete(session, repo.id, current_key(context["settings"]))
+
+
+async def test_timeline_violation_is_counted_and_facts_are_still_saved(
+    context, github_page, monkeypatch
+):
+    import insights.sync.derive as module
+
+    original = module.build_timeline
+
+    def broken_timeline(*args):
+        result = original(*args)
+        intervals = list(result.intervals)
+        index = next(i for i, interval in enumerate(intervals) if interval.state != "coding")
+        interval = intervals[index]
+        # Leave a real coverage gap while retaining intervals valid for storage.
+        intervals[index] = replace(interval, start_at=interval.start_at + timedelta(seconds=1))
+        broken = replace(result, intervals=tuple(intervals))
+        assert module.check_invariants(broken, args[0])
+        return broken
+
+    monkeypatch.setattr(module, "build_timeline", broken_timeline)
+    node = github_page["data"]["repository"]["pullRequests"]["nodes"][0]
+    node.update(state="MERGED", mergedAt="2026-01-05T00:00:00Z", closedAt="2026-01-05T00:00:00Z")
+    context["router"].post("https://api.github.com/graphql").respond(200, json=github_page)
+    job, _ = await queued(context)
+    assert await sync_repo(context, "a/b", "backfill", str(job.id)) == "succeeded"
+    repo, jobs = await load_state(context)
+    assert jobs[0].stats["invariant_violations"] == 1
+    assert repo.derived_key == current_key(context["settings"])
+    async with context["session_factory"]() as session:
+        assert await session.scalar(select(func.count()).select_from(PrFact)) == 1
+        assert await session.scalar(select(func.count()).select_from(PrInterval)) > 0
+        assert await derivation_complete(session, repo.id, current_key(context["settings"]))
 
 
 async def test_enqueue_deduplicates_without_extra_ledger_rows(context):

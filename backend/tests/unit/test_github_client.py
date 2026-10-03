@@ -41,6 +41,55 @@ async def test_success(client, github_page):
     assert page.repository.full_name == "a/b"
 
 
+@pytest.mark.parametrize("broken", ["missing_title", "bad_time", "bad_labels", "bad_author"])
+async def test_one_malformed_pr_does_not_block_page(client, github_page, broken):
+    connection = github_page["data"]["repository"]["pullRequests"]
+    damaged = deepcopy(connection["nodes"][0])
+    damaged["number"] = 2
+    damaged["updatedAt"] = "2026-01-03T00:00:00Z"
+    if broken == "missing_title":
+        del damaged["title"]
+    elif broken == "bad_time":
+        damaged["createdAt"] = "invalid"
+    elif broken == "bad_labels":
+        damaged["labels"] = None
+    else:
+        damaged["author"] = ["unexpected shape"]
+    connection["nodes"].insert(0, damaged)
+    client.router.post(URL).respond(200, json=github_page)
+    page = await GitHubAdapter(client).pull_requests_page(
+        RepoRef("a", "b"), cursor=None, page_size=25
+    )
+    assert [pr.number for pr in page.prs] == [1]
+    assert page.skipped_prs == 1
+    assert page.oldest_updated_at.isoformat() == "2026-01-02T00:00:00+00:00"
+    assert page.newest_updated_at.isoformat() == "2026-01-03T00:00:00+00:00"
+
+
+async def test_all_skipped_prs_retain_pagination_bounds(client, github_page):
+    connection = github_page["data"]["repository"]["pullRequests"]
+    del connection["nodes"][0]["title"]
+    connection["pageInfo"] = {"hasNextPage": True, "endCursor": "next"}
+    client.router.post(URL).respond(200, json=github_page)
+    page = await GitHubAdapter(client).pull_requests_page(
+        RepoRef("a", "b"), cursor=None, page_size=25
+    )
+    assert not page.prs and page.skipped_prs == 1
+    assert page.has_next_page and page.end_cursor == "next"
+    assert page.oldest_updated_at == page.newest_updated_at
+    assert page.newest_updated_at.isoformat() == "2026-01-02T00:00:00+00:00"
+
+
+async def test_timeline_network_failure_is_not_treated_as_a_bad_pr(client, github_page):
+    node = github_page["data"]["repository"]["pullRequests"]["nodes"][0]
+    node["timelineItems"]["pageInfo"] = {"hasNextPage": True, "endCursor": "next"}
+    client.router.post(URL).mock(
+        side_effect=[httpx.Response(200, json=github_page), httpx.Response(401)]
+    )
+    with pytest.raises(GitHubAuthError):
+        await GitHubAdapter(client).pull_requests_page(RepoRef("a", "b"), cursor=None, page_size=25)
+
+
 @pytest.mark.parametrize(
     ("status", "headers", "delays", "exception"),
     [

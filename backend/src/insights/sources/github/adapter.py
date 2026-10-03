@@ -1,13 +1,25 @@
+from contextlib import suppress
 from datetime import datetime
 from urllib.parse import quote
 
+import structlog
+
 from insights.config import REPO_RE, split_list
-from insights.domain import CiRun, OwnershipRule, PageResult, RepoRef, RepositoryInfo
+from insights.domain import (
+    CiRun,
+    OwnershipRule,
+    PageResult,
+    PullRequestRecord,
+    RepoRef,
+    RepositoryInfo,
+)
 from insights.sources.github.actions import fetch_runs
 from insights.sources.github.client import GitHubClient, GitHubNotFoundError, GitHubTransientError
-from insights.sources.github.normalize import normalize_pr
+from insights.sources.github.normalize import normalize_pr, parse_time, remove_nulls
 from insights.sources.github.ownership import parse_area_owners, parse_codeowners
 from insights.sources.github.queries import PULL_REQUEST_TIMELINE, PULL_REQUESTS_PAGE
+
+logger = structlog.get_logger(__name__)
 
 
 class GitHubAdapter:
@@ -43,37 +55,54 @@ class GitHubAdapter:
             raise GitHubNotFoundError("repository_not_found")
         connection = repository["pullRequests"]
         cost = int(data["rateLimit"]["cost"])
-        for node in connection["nodes"]:
-            timeline = node["timelineItems"]
-            seen: set[str] = set()
-            while timeline["pageInfo"]["hasNextPage"]:
-                next_cursor = timeline["pageInfo"]["endCursor"]
-                if not next_cursor or next_cursor in seen:
-                    raise GitHubTransientError("timeline_cursor_did_not_advance")
-                seen.add(next_cursor)
-                extra = await self.client.graphql(
-                    PULL_REQUEST_TIMELINE, {"id": node["id"], "cursor": next_cursor}
-                )
-                cost += int(extra["rateLimit"]["cost"])
-                if not extra.get("node"):
-                    raise GitHubNotFoundError("pull_request_not_found")
-                page = extra["node"]["timelineItems"]
-                timeline["nodes"].extend(page["nodes"])
-                timeline["pageInfo"] = page["pageInfo"]
         extra_bots = frozenset(x.lower() for x in split_list(self.client.settings.extra_bot_logins))
-        prs = tuple(normalize_pr(node, extra_bots) for node in connection["nodes"])
+        prs: list[PullRequestRecord] = []
+        updated_at: list[datetime] = []
+        skipped = 0
+        for node in connection["nodes"]:
+            # Preserve page bounds even when a PR's other fields cannot be normalized.
+            with suppress(KeyError, TypeError, ValueError, AttributeError):
+                updated_at.append(parse_time(remove_nulls(node["updatedAt"])))
+            try:
+                timeline = node["timelineItems"]
+                seen: set[str] = set()
+                while timeline["pageInfo"]["hasNextPage"]:
+                    next_cursor = timeline["pageInfo"]["endCursor"]
+                    if not next_cursor or next_cursor in seen:
+                        raise GitHubTransientError("timeline_cursor_did_not_advance")
+                    seen.add(next_cursor)
+                    extra = await self.client.graphql(
+                        PULL_REQUEST_TIMELINE, {"id": node["id"], "cursor": next_cursor}
+                    )
+                    cost += int(extra["rateLimit"]["cost"])
+                    if not extra.get("node"):
+                        raise GitHubNotFoundError("pull_request_not_found")
+                    page = extra["node"]["timelineItems"]
+                    timeline["nodes"].extend(page["nodes"])
+                    timeline["pageInfo"] = page["pageInfo"]
+                prs.append(normalize_pr(node, extra_bots))
+            except (KeyError, TypeError, ValueError, AttributeError) as exc:
+                number = node.get("number") if isinstance(node, dict) else None
+                logger.warning(
+                    "pr_normalize_failed",
+                    repo=repo.full_name,
+                    number=number if isinstance(number, int) else None,
+                    error=type(exc).__name__,
+                )
+                skipped += 1
         return PageResult(
             RepositoryInfo(
-                repository["nameWithOwner"],
-                (repository.get("defaultBranchRef") or {}).get("name", ""),
+                remove_nulls(repository["nameWithOwner"]),
+                remove_nulls((repository.get("defaultBranchRef") or {}).get("name", "")),
                 repository["isArchived"],
             ),
-            prs,
+            tuple(prs),
             connection["pageInfo"]["endCursor"],
             connection["pageInfo"]["hasNextPage"],
-            min((pr.updated_at for pr in prs), default=None),
-            max((pr.updated_at for pr in prs), default=None),
+            min(updated_at, default=None),
+            max(updated_at, default=None),
             cost,
+            skipped,
         )
 
     async def ci_runs(

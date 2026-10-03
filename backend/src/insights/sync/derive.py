@@ -5,6 +5,7 @@ from dataclasses import asdict
 from datetime import datetime
 from typing import Any, cast
 
+import structlog
 from sqlalchemy import Table, bindparam, delete, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +22,8 @@ from insights.db.models import OwnershipRule as StoredRule
 from insights.db.models import PrFact, PrInterval, PullRequest, Repository
 from insights.db.records import facts_from_row, load_records
 from insights.domain import OwnershipRule
+
+logger = structlog.get_logger(__name__)
 
 
 def current_key(settings: Settings) -> str:
@@ -41,9 +44,9 @@ async def derivation_complete(session: AsyncSession, repo_id: int, key: str) -> 
 
 async def derive_prs(
     session: AsyncSession, pr_ids: Sequence[int], *, settings: Settings, now: datetime
-) -> None:
+) -> int:
     if not pr_ids:
-        return
+        return 0
     prs = (await session.scalars(select(PullRequest).where(PullRequest.id.in_(pr_ids)))).all()
     repositories = {
         r.id: r
@@ -62,13 +65,20 @@ async def derive_prs(
         )
     fact_values: list[dict[str, Any]] = []
     interval_values: list[dict[str, Any]] = []
+    invariant_violations = 0
     for pr in prs:
         record = records[pr.id]
         ci_intervals = union_intervals(ci.by_pr.get(pr.id, ()))
         result = build_timeline(pr_input(record), record.events, ci_intervals, now)
         errors = check_invariants(result, pr_input(record))
         if errors:
-            raise ValueError(f"Timeline invariant violation for PR {pr.id}: {','.join(errors)}")
+            invariant_violations += 1
+            logger.warning(
+                "timeline_invariant_violation",
+                repo=repositories[pr.repo_id].full_name,
+                number=pr.number,
+                codes=errors,
+            )
         facts = compute_facts(
             record,
             record.events,
@@ -108,6 +118,7 @@ async def derive_prs(
                 },
             )
         )
+    return invariant_violations
 
 
 async def link_repo(session: AsyncSession, repo_id: int, *, increment_version: bool = True) -> int:

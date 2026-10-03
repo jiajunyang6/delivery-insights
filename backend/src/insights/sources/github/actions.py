@@ -5,11 +5,13 @@ import structlog
 
 from insights.domain import CiRun, RepoRef
 from insights.sources.github.client import GitHubClient
+from insights.sources.github.normalize import remove_nulls
 
 logger = structlog.get_logger(__name__)
 
 
 def normalize_run(raw: dict[str, Any]) -> CiRun:
+    raw = remove_nulls(raw)
     return CiRun(
         int(raw["id"]),
         raw.get("name") or "Unnamed workflow",

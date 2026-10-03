@@ -55,8 +55,19 @@ def parse_time(value: str) -> datetime:
     return parsed.astimezone(UTC)
 
 
+def remove_nulls(value: Any) -> Any:
+    """Remove characters PostgreSQL cannot store, including nested JSON strings."""
+    if isinstance(value, str):
+        return value.replace("\x00", "")
+    if isinstance(value, dict):
+        return {remove_nulls(key): remove_nulls(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [remove_nulls(item) for item in value]
+    return value
+
+
 def actor(node: dict[str, Any] | None, extra_bots: frozenset[str] = frozenset()) -> Actor:
-    node = node or {}
+    node = remove_nulls(node or {})
     login = node.get("login")
     lowered = (login or "").lower()
     return Actor(
@@ -75,6 +86,7 @@ def dedup_key(kind: str, occurred_at: datetime, actor_login: str | None, stable:
 def normalize_events(
     nodes: list[dict[str, Any]], extra_bots: frozenset[str] = frozenset()
 ) -> tuple[Event, ...]:
+    nodes = remove_nulls(nodes)
     dismissed = {
         n["review"]["id"]: n
         for n in nodes
@@ -158,6 +170,7 @@ def normalize_events(
 def normalize_pr(
     node: dict[str, Any], extra_bots: frozenset[str] = frozenset()
 ) -> PullRequestRecord:
+    node = remove_nulls(node)
     author = node.get("author") or {}
     typename = author.get("__typename", "Unknown")
     return PullRequestRecord(

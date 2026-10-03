@@ -30,6 +30,13 @@ def test_area_table_reads_only_owner_columns_and_unions_duplicates():
     assert "@ignored" not in rules[0].owners
 
 
+def test_ownership_strings_are_cleaned():
+    assert parse_codeowners("/s\x00rc/ @te\x00am/one") == parse_codeowners("/src/ @team/one")
+    assert parse_area_owners("| area-F\x00oo | @te\x00am/one |") == parse_area_owners(
+        "| area-Foo | @team/one |"
+    )
+
+
 async def test_codeowners_priority_raw_accept_and_missing_area_file(respx_mock):
     first = respx_mock.get("https://api.github.com/repos/a/b/contents/.github/CODEOWNERS")
     first.respond(404)

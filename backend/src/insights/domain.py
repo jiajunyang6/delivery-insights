@@ -92,6 +92,7 @@ class PageResult:
     oldest_updated_at: datetime | None
     newest_updated_at: datetime | None
     graphql_cost: int
+    skipped_prs: int = 0
 
 
 @dataclass(frozen=True, slots=True)

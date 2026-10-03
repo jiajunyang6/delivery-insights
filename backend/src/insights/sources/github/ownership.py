@@ -7,6 +7,7 @@ OWNER = re.compile(r"@[A-Za-z0-9._/-]+")
 
 
 def parse_codeowners(text: str) -> list[OwnershipRule]:
+    text = text.replace("\x00", "")
     rules = []
     for number, raw in enumerate(text.splitlines(), 1):
         escaped = False
@@ -24,6 +25,7 @@ def parse_codeowners(text: str) -> list[OwnershipRule]:
 
 
 def parse_area_owners(text: str) -> list[OwnershipRule]:
+    text = text.replace("\x00", "")
     rules = []
     for number, raw in enumerate(text.splitlines(), 1):
         cells = [c.strip() for c in raw.strip().strip("|").split("|")]

@@ -42,6 +42,7 @@ async def rederive_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job
             return "skipped_locked"
         await set_job(ctx, job_id, status="running", started_at=now_for(ctx), phase=kind)
         processed = 0
+        violations = 0
         try:
             async with sessions_for(ctx)() as session:
                 repo = (
@@ -75,7 +76,9 @@ async def rederive_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job
                         ).all()
                         if not ids:
                             break
-                        await derive_prs(session, ids, settings=settings, now=now_for(ctx))
+                        violations += await derive_prs(
+                            session, ids, settings=settings, now=now_for(ctx)
+                        )
                         after = ids[-1]
                         processed += len(ids)
                 async with sessions_for(ctx)() as session, session.begin():
@@ -94,7 +97,7 @@ async def rederive_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job
                 status="failed",
                 finished_at=now_for(ctx),
                 error=type(exc).__name__,
-                stats={"prs_derived": processed},
+                stats={"prs_derived": processed, "invariant_violations": violations},
             )
             logger.error(
                 "rederive_failed", repo=repo_full_name, job=job_id, error=type(exc).__name__
@@ -105,7 +108,7 @@ async def rederive_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job
             job_id,
             status="succeeded",
             finished_at=now_for(ctx),
-            stats={"prs_derived": processed},
+            stats={"prs_derived": processed, "invariant_violations": violations},
         )
         if not complete:
             await ctx["redis"].enqueue_job(

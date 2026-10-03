@@ -41,6 +41,7 @@ async def test_ci_number_and_sha_mapping_rederive_idempotency_and_pipeline_parit
         assert await save_runs(session, repo_id, runs, settings=context["settings"], now=NOW) == (
             2,
             2,
+            0,
         )
         assert await session.scalar(select(Repository.data_version)) == before + 1
         assert (await session.scalars(select(PrFact.ci_covered))).all() == [True, True]
@@ -50,6 +51,7 @@ async def test_ci_number_and_sha_mapping_rederive_idempotency_and_pipeline_parit
             await session.scalars(select(PrInterval).where(PrInterval.state == "waiting_ci"))
         ).all()
         assert await save_runs(session, repo_id, runs, settings=context["settings"], now=NOW) == (
+            0,
             0,
             0,
         )
@@ -75,7 +77,7 @@ async def test_ci_number_and_sha_mapping_rederive_idempotency_and_pipeline_parit
         moved = replace(runs[0], head_sha="unknown", pr_numbers=(2,))
         assert await save_runs(
             session, repo_id, [moved], settings=context["settings"], now=NOW
-        ) == (1, 2)
+        ) == (1, 2, 0)
         facts = (await session.scalars(select(PrFact).order_by(PrFact.number))).all()
         assert not facts[0].ci_covered and facts[1].ci_covered
 

@@ -95,6 +95,8 @@ class SyncRun:
             "events": 0,
             "pages": 0,
             "graphql_cost": 0,
+            "skipped_prs": 0,
+            "invariant_violations": 0,
         }
 
     async def fetch(
@@ -116,11 +118,13 @@ class SyncRun:
                     .where(Repository.id == self.repo.id)
                     .values(backfill_cursor=page.end_cursor)
                 )
-        self.stats["prs_fetched"] += len(page.prs)
+        self.stats["prs_fetched"] += len(page.prs) + page.skipped_prs
         self.stats["prs_changed"] += result.prs_changed
         self.stats["events"] += result.events
         self.stats["pages"] += 1
         self.stats["graphql_cost"] += page.graphql_cost
+        self.stats["skipped_prs"] += page.skipped_prs
+        self.stats["invariant_violations"] += result.invariant_violations
         return page
 
     async def incremental(self, cutoff: datetime) -> None:
