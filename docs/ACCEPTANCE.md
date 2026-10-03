@@ -2,6 +2,32 @@
 
 ## Pre-delivery review (2026-10-03, analytics 1.4.0)
 
+The original M0-M12 implementation remains complete; this review adds six focused
+corrections/optimizations and documents four deferred follow-ups without a scope switch.
+Each review commit runs the full required gate set. The final code checks passed:
+Ruff check and format (123 files), strict mypy (77 source/eval files), 327 unit tests,
+381 total tests including 54 Docker-backed integrations, all eight 20-case stub
+evaluation gates, and frontend typecheck/production build.
+
+| Review part | Result | Unit / full tests |
+|---|---|---|
+| 1: Net review demand, E23, analytics 1.4.0 and refreshed golden | Passed | 310 / 361 |
+| 2: Period scope copy and README exclusions | Passed | 310 / 361 |
+| 3: V7b exemption only for no output hypotheses | Passed | 313 / 364 |
+| 4: NUL cleanup, bad-PR isolation, warning/count/persistence for timeline anomalies | Passed | 323 / 377 |
+| 5: Non-JSON errors and stale-page refresh recovery | Passed, including live browser | 323 / 377 |
+| 6: Optional cohort memoization and binary activity lookup | Passed | 327 / 381 |
+
+Caching left `snapshot_seed42.json` unchanged, SHA256
+`731f3b535cc53c86a37a48ab8c6c8b924ed2a9621a46919961347ae60d79b915`.
+The golden test checks generated output against it, not just its file hash.
+The stub eval passes validity/numeric/citation/hedge consistency 20/20, root-cause
+hits 14/16, no-signal abstention 4/4, high precision 14/14 and fallback 0/20.
+See `eval-offline.json` and `review-fixes-verification.json` for current evidence.
+Historical M0-M12 counts, model evaluations and timing measurements below describe
+their original commits. Human golden/UI review, README confirmations, remote CI,
+production release and public submission remain unverified.
+
 ### Pagination recovery after sync
 
 Agent-operated browser acceptance against the rebuilt local Compose stack:
@@ -147,7 +173,8 @@ and causal validity remain unverified; all eight synthetic Bedrock evaluation ga
 
 ## Interpreting these results
 
-`eval-offline.json` and `eval-bedrock.json` are final prompt-v3 reports; `synthetic-http.json` records
+`eval-offline.json` is the current analytics 1.4.0 stub report; `eval-bedrock.json` is
+the earlier analytics 1.2.0 prompt-v3 model report. `synthetic-http.json` records
 the standalone local performance/reconciliation run. The latter is not a load benchmark.
 The quality-tradeoff seed-101 scenario correctly abstains under the unchanged five-event
 gate; this accounts for the two root-cause misses. Size-duration coupling is an explicit

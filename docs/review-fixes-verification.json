@@ -1,0 +1,209 @@
+{
+  "date": "2026-10-03",
+  "analytics_version": "1.4.0",
+  "scope": "PRs opened or with identified human activity during the selected period; no scope switch",
+  "baseline_commit": "12c2fd4",
+  "review_commits": [
+    {
+      "part": 1,
+      "commit": "86402dc",
+      "change": "Net review-demand finding and E23; intentional golden/version update"
+    },
+    {
+      "part": 2,
+      "commit": "2f58acf",
+      "change": "Period-scope UI and README disclosures"
+    },
+    {
+      "part": 3,
+      "commit": "62f157d",
+      "change": "V7b exemption only with no output hypotheses"
+    },
+    {
+      "part": 4,
+      "commit": "a2f4b5d",
+      "change": "NUL cleanup, malformed PR isolation, anomaly persistence and counters"
+    },
+    {
+      "part": 5,
+      "commit": "41134cd",
+      "change": "HTTP content-type errors and stale pagination refresh"
+    },
+    {
+      "part": 6,
+      "commit": "e2bbcd9",
+      "change": "Cohort caching and binary activity lookup; unchanged snapshots"
+    }
+  ],
+  "checks_by_part": [
+    {
+      "part": 1,
+      "unit": 310,
+      "full": 361,
+      "integration": 51,
+      "ruff": true,
+      "mypy": true,
+      "eval": "8/8",
+      "frontend": true
+    },
+    {
+      "part": 2,
+      "unit": 310,
+      "full": 361,
+      "integration": 51,
+      "ruff": true,
+      "mypy": true,
+      "eval": "8/8",
+      "frontend": true
+    },
+    {
+      "part": 3,
+      "unit": 313,
+      "full": 364,
+      "integration": 51,
+      "ruff": true,
+      "mypy": true,
+      "eval": "8/8",
+      "frontend": true
+    },
+    {
+      "part": 4,
+      "unit": 323,
+      "full": 377,
+      "integration": 54,
+      "ruff": true,
+      "mypy": true,
+      "eval": "8/8",
+      "frontend": true
+    },
+    {
+      "part": 5,
+      "unit": 323,
+      "full": 377,
+      "integration": 54,
+      "ruff": true,
+      "mypy": true,
+      "eval": "8/8",
+      "frontend": true,
+      "browser": true
+    },
+    {
+      "part": 6,
+      "unit": 327,
+      "full": 381,
+      "integration": 54,
+      "ruff": true,
+      "mypy": true,
+      "eval": "8/8",
+      "frontend": true
+    },
+    {
+      "part": 7,
+      "unit": 327,
+      "full": 381,
+      "integration": 54,
+      "ruff": true,
+      "mypy": true,
+      "eval": "8/8",
+      "frontend": true
+    }
+  ],
+  "commands": {
+    "backend": [
+      "python -m ruff check .",
+      "python -m ruff format --check .",
+      "python -m mypy",
+      "python -m pytest -m 'not integration' -q",
+      "python -m pytest -q",
+      "python -m insights_eval.run --llm stub"
+    ],
+    "frontend": [
+      "npm run typecheck",
+      "npm run build"
+    ]
+  },
+  "golden_cache_before_and_after_sha256": "731f3b535cc53c86a37a48ab8c6c8b924ed2a9621a46919961347ae60d79b915",
+  "browser": {
+    "driver": "Agent-operated Codex browser",
+    "repo": "dotnet/runtime",
+    "period_from": "2026-09-04",
+    "period_to": "2026-10-03",
+    "initial_snapshot": "s_ce54abc139296b38",
+    "initial_rows": 5,
+    "loaded_rows": 50,
+    "total": 150,
+    "sync_job": "cbdd8ace-1bd7-4143-9d19-725cde124b76",
+    "sync_status": "succeeded",
+    "sync_finished_at": "2026-10-03T17:51:09Z",
+    "sync_stats": {
+      "pages": 2,
+      "prs_fetched": 50,
+      "prs_changed": 0,
+      "skipped_prs": 0,
+      "invariant_violations": 0
+    },
+    "stale_request_id": "7c0466338b50efb95dee32faa7d9a625",
+    "stale_http_status": 422,
+    "stale_rows": 0,
+    "stale_load_more_buttons": 0,
+    "refresh_prompt": "Data changed since this report. Refresh the report to load matching PRs.",
+    "refreshed_snapshot": "s_fb42eb48c813c9b2",
+    "refreshed_initial_rows": 5,
+    "recovered_rows": 50,
+    "recovered_alerts": 0,
+    "screenshots": [
+      "review-pagination-stale.png",
+      "review-pagination-recovered.png"
+    ]
+  },
+  "api_client_checks": [
+    "HTML 502 status/message",
+    "HTML 503 status/message",
+    "Structured cursor errors[]",
+    "loadInsights no-cache propagation"
+  ],
+  "live_model_check": {
+    "audience": "manager",
+    "lang": "en",
+    "generated_by": "llm",
+    "model": "us.anthropic.claude-sonnet-4-6",
+    "validation": "passed",
+    "full_20_case_eval_rerun": false
+  },
+  "deferred": [
+    "180-day repository-linking optimization",
+    "Interrupted jobs and arq dedup reconciliation",
+    "HTTP-200 GraphQL throttling and RemoteProtocolError retry",
+    "Point-in-time all-open stock scope"
+  ],
+  "pending_human": [
+    "Golden numeric review",
+    "UI sign-off",
+    "Three README AI assistance confirmations",
+    "Public push/upload/submission"
+  ],
+  "not_verified_this_review": [
+    "Full 20-case Bedrock evaluation on analytics 1.4.0",
+    "180-day timing/memory benchmark",
+    "90/180-day live acceptance",
+    "Remote CI",
+    "Production deployment"
+  ],
+  "final_checks": {
+    "ruff_files": 123,
+    "mypy_source_files": 77,
+    "unit": 327,
+    "integration": 54,
+    "total": 381,
+    "eval_cases": 20,
+    "eval_gates_passed": 8,
+    "frontend_typecheck": true,
+    "frontend_build": true,
+    "stub_report": "eval-offline.json",
+    "stub_report_run": "20261003T180650Z",
+    "credential_pattern_matches": 0,
+    "tracked_env": false,
+    "readme_lines": 450,
+    "human_confirmation_placeholders": 3
+  }
+}
