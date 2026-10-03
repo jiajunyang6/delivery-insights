@@ -243,6 +243,24 @@ def test_all_low_omitted_has_no_causal_license():
 
 
 @pytest.mark.parametrize(
+    "sentence",
+    [
+        "Insufficient review capacity in area-Foo causes the slower cycle time [E15][E22].",
+        "Not enough review capacity causes the slower cycle time [E15][E22].",
+        "Review capacity is not strong enough and causes the slower cycle time [E15][E22].",
+    ],
+)
+def test_abstention_words_do_not_exempt_claims_with_a_low_hypothesis(sentence):
+    snapshot, pack, output = validation_fixture()
+    pack["hypotheses"][0]["level"] = "low"
+    output["hypotheses"][0]["statement"] = (
+        "There are early signs that review capacity is the main cause [E1][E15]."
+    )
+    output["narrative"] = "Median cycle time was 41.3 h [E1]. " + sentence
+    assert codes(output, pack, snapshot) == {"V7b:overclaim"}
+
+
+@pytest.mark.parametrize(
     ("text", "bad"),
     [
         ("这一定会导致周期变长 [E1]。", True),

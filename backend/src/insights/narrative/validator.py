@@ -389,7 +389,7 @@ def validate(
             )
         levels.append(0)
     for sentence in body_sentences:
-        if CAUSAL.search(sentence) and not ABSTAIN.search(sentence):
+        if CAUSAL.search(sentence) and (levels or not ABSTAIN.search(sentence)):
             hedges = hedge_levels(sentence, lang)
             if not levels or not hedges or max(hedges) > max(levels):
                 fail("V7b:overclaim", "Body causal language exceeds the supported level.")
