@@ -1,9 +1,10 @@
-from dataclasses import replace
+from dataclasses import asdict, replace
 
 import pytest
 
 from insights.domain import EventKind
-from insights.sources.github.normalize import actor, content_hash, normalize_pr
+from insights.sources.github.actions import normalize_run
+from insights.sources.github.normalize import actor, content_hash, normalize_pr, remove_nulls
 
 
 @pytest.mark.parametrize(
@@ -12,6 +13,7 @@ from insights.sources.github.normalize import actor, content_hash, normalize_pr
         ({"__typename": "Bot", "login": "service"}, frozenset(), True),
         ({"__typename": "User", "login": "service[bot]"}, frozenset(), True),
         ({"__typename": "User", "login": "CoPiLoT"}, frozenset(), True),
+        ({"__typename": "User", "login": "copi\x00lot"}, frozenset(), True),
         ({"__typename": "User", "login": "custom"}, frozenset({"custom"}), True),
         (None, frozenset(), False),
         ({"__typename": "Mannequin", "login": "human"}, frozenset(), False),
@@ -33,6 +35,59 @@ def test_normalization_and_hash(github_page):
     assert pr.files == ("src/A/file.cs",)
     assert content_hash(pr) == content_hash(replace(pr, events=tuple(reversed(pr.events))))
     assert pr.events[0].payload["reverts"] == ["1234567"]
+
+
+def test_all_upstream_strings_are_cleaned_before_hashing(github_page):
+    node = github_page["data"]["repository"]["pullRequests"]["nodes"][0]
+    node["body"] = "Body with text"
+    node["mergedBy"] = {"login": "merger"}
+    node["mergeCommit"] = {"oid": "abc"}
+    node["timelineItems"]["nodes"].append(
+        {
+            "__typename": "LabeledEvent",
+            "id": "label-event",
+            "createdAt": "2026-01-02T00:00:00Z",
+            "actor": {"__typename": "User", "login": "labeler"},
+            "label": {"name": "area-A"},
+        }
+    )
+    clean = normalize_pr(node)
+
+    def inject(value):
+        if isinstance(value, str):
+            return "\x00" + value + "\x00"
+        if isinstance(value, dict):
+            return {inject(key): inject(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [inject(item) for item in value]
+        return value
+
+    dirty = normalize_pr(inject(node))
+    assert asdict(dirty) == asdict(clean)
+    assert content_hash(dirty) == content_hash(clean)
+    assert remove_nulls({"nested\x00": ["a\x00", {"b": "c\x00"}]}) == {"nested": ["a", {"b": "c"}]}
+
+
+def test_workflow_strings_are_cleaned():
+    run = normalize_run(
+        {
+            "id": 1,
+            "name": "work\x00flow",
+            "event": "pull\x00_request",
+            "head_sha": "a\x00bc",
+            "status": "com\x00pleted",
+            "conclusion": "suc\x00cess",
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T01:00:00Z",
+        }
+    )
+    assert (run.workflow_name, run.event, run.head_sha, run.status, run.conclusion) == (
+        "workflow",
+        "pull_request",
+        "abc",
+        "completed",
+        "success",
+    )
 
 
 def test_dismissals_keep_original_decision_and_distinct_ids(github_page):

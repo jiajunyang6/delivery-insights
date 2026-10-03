@@ -18,6 +18,7 @@ class SaveResult:
     prs_changed: int
     events: int
     pr_ids: tuple[int, ...]
+    invariant_violations: int = 0
 
 
 def pr_values(record: PullRequestRecord, repo_id: int, now: datetime) -> dict[str, Any]:
@@ -121,5 +122,5 @@ async def save_page(
         .where(Repository.id == repo_id)
         .values(data_version=Repository.data_version + 1)
     )
-    await derive_prs(session, pr_ids, settings=settings or Settings(), now=now)
-    return SaveResult(len(records), len(events), pr_ids)
+    violations = await derive_prs(session, pr_ids, settings=settings or Settings(), now=now)
+    return SaveResult(len(records), len(events), pr_ids, violations)
