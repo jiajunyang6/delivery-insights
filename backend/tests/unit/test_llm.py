@@ -65,7 +65,7 @@ async def test_converse_forces_tool_and_parses_usage(monkeypatch):
         reply = await llm.submit(system=SYSTEM_PROMPT, messages=messages, tool_spec=TOOL_SPEC)
     assert reply.tool_input == output and reply.assistant_message == message
     assert reply.input_tokens == 123 and reply.output_tokens == 45
-    assert reply.tool_use_id == "tool-1" and reply.stop_reason == "tool_use"
+    assert reply.tool_use_id == "tool-1"
     sdk.close()
 
 

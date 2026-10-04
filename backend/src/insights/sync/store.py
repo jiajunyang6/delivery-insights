@@ -66,7 +66,7 @@ async def save_page(
     page: PageResult,
     *,
     now: datetime,
-    settings: Settings | None = None,
+    settings: Settings,
 ) -> SaveResult:
     existing = {
         number: (stored_hash, updated_at)
@@ -139,5 +139,5 @@ async def save_page(
             links_pending=True,
         )
     )
-    violations = await derive_prs(session, pr_ids, settings=settings or Settings(), now=now)
+    violations = await derive_prs(session, pr_ids, settings=settings, now=now)
     return SaveResult(len(records), len(events), pr_ids, violations, created)

@@ -132,5 +132,4 @@ async def manual_sync(
             "The sync queue is unavailable.",
         ) from exc
     response.headers["Location"] = f"/v1/sync-jobs/{job.id}"
-    response.headers["Cache-Control"] = "no-store"
     return job_response(job, repo)

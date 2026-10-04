@@ -19,7 +19,6 @@ class LLMReply:
     assistant_message: dict[str, Any]
     input_tokens: int
     output_tokens: int
-    stop_reason: str
 
 
 class LLMClient(Protocol):
@@ -83,5 +82,4 @@ class BedrockClient:
             message,
             response["usage"]["inputTokens"],
             response["usage"]["outputTokens"],
-            response["stopReason"],
         )

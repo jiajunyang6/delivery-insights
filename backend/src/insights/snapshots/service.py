@@ -151,7 +151,7 @@ class SnapshotService:
                 extensions={"repos": blocked},
             )
         if pending:
-            headers = {"Retry-After": "30", "Cache-Control": "no-store"}
+            headers = {"Retry-After": "30"}
             if pending[0]["job"]:
                 headers["Location"] = pending[0]["job"]["url"]
             return Reply(

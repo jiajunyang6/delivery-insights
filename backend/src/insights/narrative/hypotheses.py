@@ -284,7 +284,7 @@ def score_hypotheses(
     for identifier, definition in definitions.items():
         main_id = str(definition["main"])
         main = evidence.get(main_id, {})
-        signals = cast_signals(definition["signals"])
+        signals: list[Signal] = list(definition["signals"])
         symptom = any(s.present for s in signals if s.role == "symptom")
         mechanisms = [s for s in signals if s.role == "mechanism" and s.available]
         mechanism = any(s.present for s in mechanisms)
@@ -439,7 +439,3 @@ def abstain_reason(
 
 def stage_ids(*items: tuple[str, bool]) -> tuple[str, ...]:
     return tuple(identifier for identifier, shows_change in items if shows_change)
-
-
-def cast_signals(value: Any) -> list[Signal]:
-    return list(value)

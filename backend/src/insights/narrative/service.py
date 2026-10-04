@@ -30,8 +30,8 @@ from insights.snapshots.service import SnapshotService, not_found
 NARRATIVE_DEADLINE_SECONDS = 150
 LOCK_WAIT_SECONDS = 160
 UNLOCK = (
-    "if redis.call('get',KEYS[1]) == ARGV[1] then return red"
-    "is.call('del',KEYS[1]) else return 0 end"
+    "if redis.call('get',KEYS[1]) == ARGV[1] then "
+    "return redis.call('del',KEYS[1]) else return 0 end"
 )
 logger = structlog.get_logger(__name__)
 
@@ -196,8 +196,8 @@ async def generate(
                 "Your previous answer failed validation:\n"
                 + "\n".join(f"- {v.code}: {v.message}" for v in violations)
                 + (
-                    "\nCall submit_narrative again with a corrected answer. K"
-                    "eep everything that was valid."
+                    "\nCall submit_narrative again with a corrected answer. "
+                    "Keep everything that was valid."
                 )
             )
             content = (
@@ -217,7 +217,6 @@ async def generate(
         "narrative_generated",
         snapshot_id=snapshot["snapshot_id"],
         audience=audience,
-        lang="en",
         generated_by=meta["generated_by"],
         attempts=meta["attempts"],
         validation=meta["validation"],
@@ -357,7 +356,7 @@ class NarrativeService:
                 result = await self.fallback(
                     snapshot, audience, "llm_error", counted.attempts if counted else 0
                 )
-            body, tag = canonical(result.payload), ""
+            body = canonical(result.payload)
             tag = etag(body)
             if result.persist:
                 try:

@@ -43,9 +43,7 @@ class GitHubTransientError(GitHubError):
 
 @dataclass(frozen=True, slots=True)
 class RestResponse:
-    status: int
     body: Any
-    etag: str | None
 
 
 class GitHubClient:
@@ -198,7 +196,7 @@ class GitHubClient:
             if response.status_code == 304:
                 if b"body" not in cached:
                     raise GitHubQueryError("conditional_response_without_cache")
-                return RestResponse(304, orjson.loads(cached[b"body"]), cached[b"etag"].decode())
+                return RestResponse(orjson.loads(cached[b"body"]))
             body: Any = response.text if accept and "raw" in accept else response.json()
             etag = response.headers.get("etag")
             if self.redis is not None and etag:
@@ -209,4 +207,4 @@ class GitHubClient:
                         await pipeline.execute()
                 except RedisError:
                     logger.warning("github_cache_unavailable")
-            return RestResponse(response.status_code, body, etag)
+            return RestResponse(body)

@@ -34,4 +34,4 @@ class FakeLLMClient:
                 }
             ],
         }
-        return LLMReply(deepcopy(item), identifier, message, 0, 0, "tool_use")
+        return LLMReply(deepcopy(item), identifier, message, 0, 0)

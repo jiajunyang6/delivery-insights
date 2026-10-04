@@ -31,4 +31,4 @@ class StubLLMClient:
                 }
             ],
         }
-        return LLMReply(output, "stub-submit", message, 0, 0, "tool_use")
+        return LLMReply(output, "stub-submit", message, 0, 0)
