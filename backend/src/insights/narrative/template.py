@@ -1,13 +1,9 @@
 from collections.abc import Mapping
 from typing import Any
 
-from insights.narrative.validator import ABSTAIN_SENTENCES, chain_ids
+from insights.narrative.hypotheses import HYPOTHESES, abstention, chain_ids
+from insights.narrative.validator import ABSTAIN_SENTENCES
 
-SUBJECTS = {
-    "H_ci_bottleneck": "Slow or congested CI",
-    "H_pr_size_growth": "Larger pull requests",
-    "H_quality_tradeoff": "Lighter review in exchange for speed",
-}
 FINDINGS = {
     "review_queue_growth": "review demand exceeding first reviews",
     "review_concentration": "reviews concentrated on a few people",
@@ -37,7 +33,7 @@ def phrase(candidate: Mapping[str, Any]) -> str:
             "Limited review capacity" if not location else f"Limited review capacity in {location}"
         )
     else:
-        subject = SUBJECTS[candidate["id"]]
+        subject = HYPOTHESES[candidate["id"]].subject
     level = candidate["level"]
     return (
         f"{subject} is likely the main cause"
@@ -118,8 +114,8 @@ def build_template(pack: Mapping[str, Any], snapshot: Mapping[str, Any]) -> dict
     if candidates:
         parts["S5"] = sentence(phrase(candidates[0]), chain_ids(candidates[0]))
     else:
-        reason = pack.get("abstain_reason") or "insufficient_signal"
-        parts["S5"] = sentence(ABSTAIN_SENTENCES[reason], ["E1" if cycle else "E3"])
+        reason, identifier = abstention(pack)
+        parts["S5"] = sentence(ABSTAIN_SENTENCES[reason], [identifier])
     if snapshot["guardrail"]["verdict"] != "ok" and "E10" in evidence:
         share = percent(evidence["E10"]["value"])
         parts["S6"] = sentence(

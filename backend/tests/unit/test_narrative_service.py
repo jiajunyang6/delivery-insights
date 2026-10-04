@@ -90,7 +90,7 @@ async def test_generate_downgrade_is_code_owned(target, expected, monkeypatch):
     pack.update(audience="director", lang="en", abstain_reason=None, top_bottlenecks=[])
     import insights.narrative.service as service
 
-    monkeypatch.setattr(service, "build_evidence_pack", lambda *args: (pack, candidates))
+    monkeypatch.setattr(service, "build_evidence_pack", lambda *args, **kwargs: (pack, candidates))
     h = output["hypotheses"][0]
     h["downgrade"] = {"level": target, "reason": "The location evidence remains limited [E53]."}
     h["statement"] = (

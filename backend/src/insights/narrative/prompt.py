@@ -1,6 +1,7 @@
 from typing import Any
 
 from insights.analytics.snapshot import canonical
+from insights.narrative.hypotheses import abstention, allowed_ids
 from insights.narrative.validator import ABSTAIN_SENTENCES
 
 PROMPT_VERSION = "v7"
@@ -151,20 +152,14 @@ TOOL_SPEC = {
 def user_message(pack: dict[str, Any]) -> dict[str, Any]:
     constraints = []
     for candidate in pack["hypotheses"]:
-        allowed = {identifier for step in candidate["chain"].values() for identifier in step}
-        allowed.update(candidate["counter_evidence"])
-        allowed.update(
-            identifier
-            for alternative in candidate["ruled_out"]
-            for identifier in alternative["evidence_ids"]
-        )
+        allowed = allowed_ids(candidate)
         constraints.append(
             f"- {candidate['id']}: calculated band {candidate['level']}; statement may cite ONLY "
             + ", ".join(f"[{identifier}]" for identifier in sorted(allowed))
         )
     if not constraints:
-        identifier = "E1" if any(e["id"] == "E1" for e in pack["evidence"]) else "E3"
-        required = ABSTAIN_SENTENCES[pack.get("abstain_reason") or "insufficient_signal"]
+        reason, identifier = abstention(pack)
+        required = ABSTAIN_SENTENCES[reason]
         constraints.append(
             "No hypothesis candidates: keep hypotheses empty, omit llm_hypothesis, and include "
             f"this exact narrative sentence: {required} [{identifier}]. In the other "

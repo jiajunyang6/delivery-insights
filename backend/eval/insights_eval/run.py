@@ -12,7 +12,7 @@ from insights.analytics import ANALYTICS_VERSION
 from insights.config import Settings
 from insights.logging import configure_logging
 from insights.narrative.evidence import build_evidence_pack
-from insights.narrative.llm import BedrockClient, LLMClient, LLMReply
+from insights.narrative.llm import BedrockClient, LLMClient, LLMReply, LLMUsage
 from insights.narrative.prompt import PROMPT_VERSION
 from insights.narrative.service import generate as narrate
 from insights.narrative.validator import validate
@@ -26,20 +26,26 @@ from insights_eval.stub_llm import StubLLMClient
 class TracedClient:
     def __init__(self, client: LLMClient) -> None:
         self.client, self.model_id = client, client.model_id
-        self.calls = 0
-        self.first: LLMReply | None = None
-        self.input_tokens = 0
-        self.output_tokens = 0
+        self.usage = LLMUsage()
+
+    @property
+    def first(self) -> LLMReply | None:
+        return self.usage.first
+
+    @property
+    def input_tokens(self) -> int:
+        return self.usage.input_tokens
+
+    @property
+    def output_tokens(self) -> int:
+        return self.usage.output_tokens
 
     async def submit(
         self, *, system: str, messages: list[dict[str, Any]], tool_spec: dict[str, Any]
     ) -> LLMReply:
-        self.calls += 1
+        self.usage.attempts += 1
         reply = await self.client.submit(system=system, messages=messages, tool_spec=tool_spec)
-        if self.calls == 1:
-            self.first = reply
-        self.input_tokens += reply.input_tokens
-        self.output_tokens += reply.output_tokens
+        self.usage.record(reply)
         return reply
 
 

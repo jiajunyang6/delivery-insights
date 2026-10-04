@@ -240,3 +240,35 @@ async def test_busy_and_deadline_fallbacks_release_only_owned_locks(api, monkeyp
     assert result.status_code == 200 and result.json()["meta"]["fallback_reason"] == "llm_error"
     assert result.json()["meta"]["attempts"] == 1
     assert not await ctx["redis"].exists(key)
+
+
+async def test_repair_uses_remaining_deadline_and_extracts_evidence_once(api, monkeypatch):
+    client, app, _, _ = api
+    _, valid, url = await prepare(api, enabled=True)
+    import insights.narrative.evidence as evidence_module
+    import insights.narrative.service as service
+
+    extracted = []
+    original = evidence_module.extract_evidence
+
+    def extract(snapshot):
+        extracted.append(snapshot["snapshot_id"])
+        return original(snapshot)
+
+    monkeypatch.setattr(evidence_module, "extract_evidence", extract)
+    monkeypatch.setattr(service, "extract_evidence", extract)
+    monkeypatch.setattr(service, "NARRATIVE_DEADLINE_SECONDS", 0.05)
+
+    class RepairTimeoutClient(FakeLLMClient):
+        async def submit(self, **kwargs):
+            if self.calls:
+                await asyncio.sleep(1)
+            return await super().submit(**kwargs)
+
+    app.state.llm = RepairTimeoutClient([{"narrative": "Bad.", "hypotheses": []}, valid])
+    response = await client.get(url)
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["meta"]["attempts"] == 2
+    assert response.json()["meta"]["fallback_reason"] == "llm_error"
+    assert len(extracted) == 1

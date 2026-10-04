@@ -21,6 +21,20 @@ class LLMReply:
     output_tokens: int
 
 
+@dataclass(slots=True)
+class LLMUsage:
+    attempts: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    first: LLMReply | None = None
+
+    def record(self, reply: LLMReply) -> None:
+        if self.attempts == 1:
+            self.first = reply
+        self.input_tokens += reply.input_tokens
+        self.output_tokens += reply.output_tokens
+
+
 class LLMClient(Protocol):
     model_id: str
 

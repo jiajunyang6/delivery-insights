@@ -5,7 +5,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from insights.narrative.hypotheses import LEVEL_ORDER
+from insights.narrative.hypotheses import LEVEL_ORDER, abstention, allowed_ids, chain_ids
 
 CITATION = re.compile(r"\[(E\d+)\]")
 NUMBER = re.compile(r"(?<![A-Za-z0-9_.])\d+(?:,\d{3})*(?:\.\d+)?")
@@ -44,7 +44,6 @@ SUFFIXES = (
     ("minutes", r"^\s*(?:min\b|minutes?\b)"),
     ("ratio", r"^\s*(?:x\b|×|times\b)"),
 )
-STEPS = ("symptom", "stage", "location", "mechanism")
 
 
 class ToolModel(BaseModel):
@@ -95,10 +94,6 @@ def sentences(text: str) -> list[str]:
 
 def citations(text: str) -> set[str]:
     return set(CITATION.findall(text))
-
-
-def chain_ids(candidate: Mapping[str, Any]) -> list[str]:
-    return list(dict.fromkeys(i for step in STEPS for i in candidate["chain"].get(step, [])))
 
 
 def hedge_levels(text: str) -> set[int]:
@@ -174,17 +169,12 @@ def allowed_numbers(entry: Mapping[str, Any]) -> list[AllowedNumber]:
     return result
 
 
-def check_numbers(
-    sentence: str, pack: Mapping[str, Any], evidence: Mapping[str, dict[str, Any]]
-) -> list[Violation]:
-    cited = citations(sentence) & evidence.keys()
-    allowed = [number for i in cited for number in allowed_numbers(evidence[i])]
-    if cited:
-        days = pack["period"]["days"]
-        allowed += [AllowedNumber(days, "plain"), AllowedNumber(days, "days")]
-        for hypothesis in pack["hypotheses"]:
-            if cited & set(chain_ids(hypothesis)):
-                allowed += [AllowedNumber(v, "plain") for v in hypothesis["persistence"].values()]
+def match_numbers(
+    sentence: str,
+    pack: Mapping[str, Any],
+    evidence: Mapping[str, dict[str, Any]],
+    allowed: list[AllowedNumber],
+) -> tuple[list[Violation], dict[str, set[str]]]:
     cleaned = CITATION.sub("", sentence)
     remove = [*pack["scope"]["repos"], *(e["location"] for e in evidence.values() if e["location"])]
     period = pack["period"]
@@ -209,6 +199,21 @@ def check_numbers(
         for a in compatible:
             if a.evidence:
                 matched.setdefault(a.evidence, set()).add(a.field)
+    return errors, matched
+
+
+def check_numbers(
+    sentence: str, pack: Mapping[str, Any], evidence: Mapping[str, dict[str, Any]]
+) -> list[Violation]:
+    cited = citations(sentence) & evidence.keys()
+    allowed = [number for i in cited for number in allowed_numbers(evidence[i])]
+    if cited:
+        days = pack["period"]["days"]
+        allowed += [AllowedNumber(days, "plain"), AllowedNumber(days, "days")]
+        for hypothesis in pack["hypotheses"]:
+            if cited & set(chain_ids(hypothesis)):
+                allowed += [AllowedNumber(v, "plain") for v in hypothesis["persistence"].values()]
+    errors, matched = match_numbers(sentence, pack, evidence, allowed)
     up, down = bool(UP.search(sentence)), bool(DOWN.search(sentence))
     if up != down:
         changed = {
@@ -237,6 +242,60 @@ def check_numbers(
                     )
                 )
     return errors
+
+
+def validate_hypotheses(
+    hypotheses: list[dict[str, Any]],
+    candidates: Mapping[str, dict[str, Any]],
+    evidence: Mapping[str, dict[str, Any]],
+    body: str,
+    errors: list[Violation],
+) -> list[int]:
+    def fail(code: str, message: str) -> None:
+        errors.append(Violation(code, message))
+
+    seen: set[str] = set()
+    levels: list[int] = []
+    for hypothesis in hypotheses:
+        identifier, statement = hypothesis["id"], hypothesis["statement"]
+        if identifier in seen:
+            fail("V6:duplicate_hypothesis", f"Duplicate hypothesis {identifier}.")
+        seen.add(identifier)
+        if identifier not in candidates:
+            fail("V6:unknown_hypothesis", "Hypothesis is not a candidate.")
+            continue
+        candidate = candidates[identifier]
+        final_level = candidate["level"]
+        allowed = allowed_ids(candidate)
+        cites = citations(statement)
+        if not cites or cites - allowed:
+            fail("V6:citation_outside_chain", f"Statement must cite the chain for {identifier}.")
+        if candidate["counter_evidence"] and not set(candidate["counter_evidence"]) & (
+            cites | citations(body)
+        ):
+            fail(
+                "V6:counter_evidence_not_cited", f"Counter-evidence for {identifier} must be cited."
+            )
+        downgrade = hypothesis.get("downgrade")
+        if isinstance(downgrade, dict):
+            proposed = downgrade.get("level")
+            reason = downgrade.get("reason", "")
+            if (
+                proposed not in {"medium", "low"}
+                or LEVEL_ORDER[proposed] >= LEVEL_ORDER[final_level]
+                or not isinstance(reason, str)
+                or not citations(reason) & evidence.keys()
+            ):
+                fail("V8:invalid_downgrade", f"Invalid downgrade for {identifier}.")
+            else:
+                final_level = proposed
+        levels.append(LEVEL_ORDER[final_level])
+        if not hedge_ok(statement, final_level):
+            fail("V7:hedge_mismatch", f"Statement must use {final_level} language.")
+    for identifier, candidate in candidates.items():
+        if candidate["level"] in {"high", "medium"} and identifier not in seen:
+            fail("V6:missing_required_hypothesis", f"Required hypothesis {identifier} is missing.")
+    return levels
 
 
 def validate(
@@ -323,48 +382,7 @@ def validate(
             if len(name) >= 3
         ):
             fail("V10:personal_name", "Personal login names must not appear.")
-    seen: set[str] = set()
-    levels: list[int] = []
-    for hypothesis in hypotheses:
-        identifier, statement = hypothesis["id"], hypothesis["statement"]
-        if identifier in seen:
-            fail("V6:duplicate_hypothesis", f"Duplicate hypothesis {identifier}.")
-        seen.add(identifier)
-        if identifier not in candidates:
-            fail("V6:unknown_hypothesis", "Hypothesis is not a candidate.")
-            continue
-        candidate = candidates[identifier]
-        final_level = candidate["level"]
-        allowed = set(chain_ids(candidate)) | set(candidate["counter_evidence"])
-        allowed.update(i for a in candidate["ruled_out"] for i in a["evidence_ids"])
-        cites = citations(statement)
-        if not cites or cites - allowed:
-            fail("V6:citation_outside_chain", f"Statement must cite the chain for {identifier}.")
-        if candidate["counter_evidence"] and not set(candidate["counter_evidence"]) & (
-            cites | citations(body)
-        ):
-            fail(
-                "V6:counter_evidence_not_cited", f"Counter-evidence for {identifier} must be cited."
-            )
-        downgrade = hypothesis.get("downgrade")
-        if isinstance(downgrade, dict):
-            proposed = downgrade.get("level")
-            reason = downgrade.get("reason", "")
-            if (
-                proposed not in {"medium", "low"}
-                or LEVEL_ORDER[proposed] >= LEVEL_ORDER[final_level]
-                or not isinstance(reason, str)
-                or not citations(reason) & evidence.keys()
-            ):
-                fail("V8:invalid_downgrade", f"Invalid downgrade for {identifier}.")
-            else:
-                final_level = proposed
-        levels.append(LEVEL_ORDER[final_level])
-        if not hedge_ok(statement, final_level):
-            fail("V7:hedge_mismatch", f"Statement must use {final_level} language.")
-    for identifier, candidate in candidates.items():
-        if candidate["level"] in {"high", "medium"} and identifier not in seen:
-            fail("V6:missing_required_hypothesis", f"Required hypothesis {identifier} is missing.")
+    levels = validate_hypotheses(hypotheses, candidates, evidence, body, errors)
     if outside:
         ids = outside.get("evidence_ids", [])
         ids = set(ids) if isinstance(ids, list) and all(isinstance(i, str) for i in ids) else set()
@@ -396,9 +414,7 @@ def validate(
             if not levels or not hedges or max(hedges) > max(levels):
                 fail("V7b:overclaim", "Body causal language exceeds the supported level.")
     if not candidates:
-        pattern = ABSTAIN_REQUIRED.get(
-            pack.get("abstain_reason") or "", ABSTAIN_REQUIRED["insufficient_signal"]
-        )
+        pattern = ABSTAIN_REQUIRED.get(abstention(pack)[0], ABSTAIN_REQUIRED["insufficient_signal"])
         required = pattern.search(body)
         if (
             hypotheses

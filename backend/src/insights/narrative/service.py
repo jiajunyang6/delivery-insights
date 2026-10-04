@@ -18,17 +18,17 @@ from sqlalchemy.exc import IntegrityError
 from insights.analytics.snapshot import canonical, digest, etag, iso
 from insights.db.models import Narrative, Snapshot
 from insights.narrative.evidence import build_evidence_pack, extract_evidence
-from insights.narrative.hypotheses import actions
-from insights.narrative.llm import LLMClient, LLMReply, LLMUnavailable
+from insights.narrative.hypotheses import LEVELS, STEPS, actions, allowed_ids
+from insights.narrative.llm import LLMClient, LLMUnavailable, LLMUsage
 from insights.narrative.prompt import PROMPT_VERSION, SYSTEM_PROMPT, TOOL_SPEC, user_message
 from insights.narrative.template import build_template
-from insights.narrative.validator import STEPS, citations, validate
+from insights.narrative.validator import citations, validate
 from insights.redis import narrative_key, narrative_lock_key
 from insights.snapshots.caching import Reply, cache_ttl, matches_etag
 from insights.snapshots.service import SnapshotService, not_found
 
 NARRATIVE_DEADLINE_SECONDS = 150
-LOCK_WAIT_SECONDS = 160
+LOCK_WAIT_SECONDS = NARRATIVE_DEADLINE_SECONDS + 10
 UNLOCK = (
     "if redis.call('get',KEYS[1]) == ARGV[1] then "
     "return redis.call('del',KEYS[1]) else return 0 end"
@@ -48,6 +48,8 @@ def assemble(
     pack: dict[str, Any],
     candidates: list[dict[str, Any]],
     meta: dict[str, Any],
+    *,
+    evidence: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     by_id = {c["id"]: c for c in candidates}
     hypotheses: list[dict[str, Any]] = []
@@ -57,7 +59,7 @@ def assemble(
         confidence, final_level = candidate["confidence"], candidate["confidence_level"]
         if downgrade := text.get("downgrade"):
             final_level = downgrade["level"]
-            confidence = min(confidence, {"medium": 0.74, "low": 0.5}[final_level])
+            confidence = min(confidence, LEVELS[final_level].downgrade_cap)
             candidate["confidence_basis"]["llm_downgrade"] = {
                 "from": candidate["confidence_level"],
                 "to": final_level,
@@ -89,9 +91,7 @@ def assemble(
             }
         )
         evidence_ids.update(citations(text["statement"]))
-        evidence_ids.update(candidate["counter_evidence"])
-        evidence_ids.update(i for step in chain for i in step["evidence"])
-        evidence_ids.update(i for a in candidate["alternatives_ruled_out"] for i in a["evidence"])
+        evidence_ids.update(allowed_ids(candidate))
     if outside := output.get("llm_hypothesis"):
         basis = dict.fromkeys(candidates[0]["confidence_basis"])
         basis["cap_reason"] = "outside_library"
@@ -102,7 +102,7 @@ def assemble(
                 "title": "Other explanation",
                 "location": None,
                 "statement": outside["statement"],
-                "confidence": 0.35,
+                "confidence": LEVELS["low"].minimum,
                 "confidence_level": "low",
                 "confidence_basis": basis,
                 "evidence_chain": [{"step": "cited", "evidence": outside["evidence_ids"]}],
@@ -116,8 +116,10 @@ def assemble(
         evidence_ids.update(outside["evidence_ids"])
         evidence_ids.update(citations(outside["statement"]))
     hypotheses.sort(key=lambda h: (-h["confidence"], h["source"] != "library", h["id"]))
+    if evidence is None:
+        evidence = extract_evidence(snapshot)
     evidence = sorted(
-        (e for e in extract_evidence(snapshot) if e["id"] in evidence_ids),
+        (e for e in evidence if e["id"] in evidence_ids),
         key=lambda e: int(e["id"][1:]),
     )
     return {
@@ -141,38 +143,49 @@ async def generate(
     llm: LLMClient | None,
     ci_complete: bool,
     now: datetime,
+    prepared: tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]] | None = None,
+    fallback_reason: str | None = None,
 ) -> NarrativeResult:
     started = perf_counter()
-    pack, candidates = build_evidence_pack(snapshot, audience, ci_complete)
+    deadline = monotonic() + NARRATIVE_DEADLINE_SECONDS
+    if prepared is None:
+        evidence = extract_evidence(snapshot)
+        pack, candidates = build_evidence_pack(snapshot, audience, ci_complete, evidence=evidence)
+    else:
+        pack, candidates, evidence = prepared
     meta: dict[str, Any] = {
         "generated_by": "template",
         "model": "template",
         "prompt_version": PROMPT_VERSION,
         "validation": "not_run",
         "attempts": 0,
-        "fallback_reason": "llm_disabled",
+        "fallback_reason": fallback_reason or "llm_disabled",
         "violations": [],
         "confidence_method": "deterministic-v1",
         "pack_hash": digest(pack)[:16],
         "generated_at": iso(now),
     }
     output = build_template(pack, snapshot)
-    persist = llm is None
-    input_tokens, output_tokens = 0, 0
+    persist = llm is None and fallback_reason is None
+    usage = LLMUsage()
     if llm is not None:
         messages = [user_message(pack)]
         for attempt in (1, 2):
-            meta["attempts"] = attempt
+            usage.attempts += 1
+            meta["attempts"] = usage.attempts
             try:
-                reply = await llm.submit(
-                    system=SYSTEM_PROMPT, messages=messages, tool_spec=TOOL_SPEC
+                reply = await asyncio.wait_for(
+                    llm.submit(system=SYSTEM_PROMPT, messages=messages, tool_spec=TOOL_SPEC),
+                    timeout=max(0, deadline - monotonic()),
                 )
+            except TimeoutError:
+                meta.update(fallback_reason="llm_error", validation="not_run")
+                break
             except LLMUnavailable as exc:
                 meta.update(fallback_reason="llm_error", validation="not_run")
                 logger.warning("llm_unavailable", reason=exc.reason)
                 break
-            input_tokens += reply.input_tokens
-            output_tokens += reply.output_tokens
+            usage.record(reply)
             violations = validate(reply.tool_input, pack, snapshot, audience=audience)
             if not violations and reply.tool_input is not None:
                 output = reply.tool_input
@@ -212,7 +225,7 @@ async def generate(
                 else {"text": feedback}
             )
             messages += [reply.assistant_message, {"role": "user", "content": [content]}]
-    payload = assemble(output, snapshot, pack, candidates, meta)
+    payload = assemble(output, snapshot, pack, candidates, meta, evidence=evidence)
     logger.info(
         "narrative_generated",
         snapshot_id=snapshot["snapshot_id"],
@@ -222,24 +235,11 @@ async def generate(
         validation=meta["validation"],
         fallback_reason=meta["fallback_reason"],
         violations=meta["violations"],
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
         duration_ms=round((perf_counter() - started) * 1000, 2),
     )
     return NarrativeResult(payload, persist)
-
-
-class CountingClient:
-    def __init__(self, client: LLMClient) -> None:
-        self.client = client
-        self.model_id = client.model_id
-        self.attempts = 0
-
-    async def submit(
-        self, *, system: str, messages: list[dict[str, Any]], tool_spec: dict[str, Any]
-    ) -> LLMReply:
-        self.attempts += 1
-        return await self.client.submit(system=system, messages=messages, tool_spec=tool_spec)
 
 
 def narrative_reply(body: bytes, tag: str, conditional: str | None, persist: bool) -> Reply:
@@ -276,24 +276,15 @@ class NarrativeService:
             pipe.expire(key, ttl)
             await self.snapshots.cache(pipe.execute())
 
-    async def fallback(
-        self, snapshot: dict[str, Any], audience: str, reason: str, attempts: int = 0
-    ) -> NarrativeResult:
-        result = await generate(
-            snapshot,
-            audience=audience,
-            llm=None,
-            ci_complete=self.snapshots.settings.ci_complete,
-            now=self.snapshots.now,
-        )
-        result.payload["meta"].update(fallback_reason=reason, attempts=attempts)
-        return NarrativeResult(result.payload, False)
-
     async def get(self, sid: str, audience: str, conditional: str | None) -> Reply:
         lang = "en"
         snapshot = orjson.loads((await self.snapshots.by_id(sid, None)).body)
         settings, redis = self.snapshots.settings, self.snapshots.redis
-        pack, _ = build_evidence_pack(snapshot, audience, settings.ci_complete)
+        evidence = extract_evidence(snapshot)
+        pack, candidates = build_evidence_pack(
+            snapshot, audience, settings.ci_complete, evidence=evidence
+        )
+        prepared = (pack, candidates, evidence)
         pack_hash = digest(pack)[:16]
         model_key = settings.bedrock_model_id if settings.llm_enabled else "template"
         key = narrative_key(sid, audience, lang, PROMPT_VERSION, model_key, pack_hash)
@@ -322,7 +313,9 @@ class NarrativeService:
         lock, token, locked = narrative_lock_key(sid, audience, lang), uuid4().hex, False
         if settings.llm_enabled:
             try:
-                acquired = await redis.set(lock, token, nx=True, ex=180)
+                acquired = await redis.set(
+                    lock, token, nx=True, ex=int(NARRATIVE_DEADLINE_SECONDS + 30)
+                )
             except (RedisError, OSError, TimeoutError):
                 acquired = True  # Cache failure is a documented fail-open condition.
                 logger.warning("narrative_lock_unavailable")
@@ -334,28 +327,27 @@ class NarrativeService:
                     await asyncio.sleep(1)
                     if cached := await self.cached(key, conditional):
                         return cached
-                result = await self.fallback(snapshot, audience, "llm_busy")
+                result = await generate(
+                    snapshot,
+                    audience=audience,
+                    llm=None,
+                    ci_complete=settings.ci_complete,
+                    now=self.snapshots.now,
+                    prepared=prepared,
+                    fallback_reason="llm_busy",
+                )
                 body = canonical(result.payload)
                 return narrative_reply(body, etag(body), conditional, False)
         try:
-            counted = CountingClient(self.llm) if settings.llm_enabled and self.llm else None
-            try:
-                result = await asyncio.wait_for(
-                    generate(
-                        snapshot,
-                        audience=audience,
-                        llm=counted,
-                        ci_complete=settings.ci_complete,
-                        now=self.snapshots.now,
-                    ),
-                    timeout=NARRATIVE_DEADLINE_SECONDS,
-                )
-                if settings.llm_enabled and counted is None:
-                    result = await self.fallback(snapshot, audience, "llm_error")
-            except TimeoutError:
-                result = await self.fallback(
-                    snapshot, audience, "llm_error", counted.attempts if counted else 0
-                )
+            result = await generate(
+                snapshot,
+                audience=audience,
+                llm=self.llm if settings.llm_enabled else None,
+                ci_complete=settings.ci_complete,
+                now=self.snapshots.now,
+                prepared=prepared,
+                fallback_reason="llm_error" if settings.llm_enabled and self.llm is None else None,
+            )
             body = canonical(result.payload)
             tag = etag(body)
             if result.persist:
