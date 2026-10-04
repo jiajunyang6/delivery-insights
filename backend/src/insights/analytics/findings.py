@@ -148,7 +148,7 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
             states["waiting_merge"]["pr_hours"],
             [
                 (
-                    "Share of PR time waiting to merge",
+                    "Share of merged-PR waiting time spent waiting to merge",
                     "/time_ledger/states/waiting_merge/share",
                     "share",
                 ),
@@ -179,7 +179,7 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
             states["waiting_ci"]["pr_hours"],
             [
                 (
-                    "Share of PR time waiting for CI",
+                    "Share of merged-PR waiting time spent waiting for CI",
                     "/time_ledger/states/waiting_ci/share",
                     "share",
                 ),

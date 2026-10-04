@@ -203,7 +203,7 @@ def extract_evidence(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
         add(
             f"E{71 + i}",
             "finding_impact",
-            f"Share of all PR time, merged and unmerged: {finding['id']}",
+            f"Share of finished PR waiting time (merged and closed unmerged): {finding['id']}",
             f"/bottlenecks/{i}/impact_share",
             "share",
             location=finding["location"],

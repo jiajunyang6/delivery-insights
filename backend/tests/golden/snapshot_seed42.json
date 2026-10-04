@@ -587,7 +587,7 @@
     {
       "evidence": [
         {
-          "label": "Share of PR time waiting to merge",
+          "label": "Share of merged-PR waiting time spent waiting to merge",
           "ref": "/time_ledger/states/waiting_merge/share",
           "unit": "share",
           "value": 0.1909

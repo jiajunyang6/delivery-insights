@@ -23,10 +23,14 @@ export function Bottlenecks({
         <p>
           PR-hours add time across PRs: two PRs waiting for three hours contribute
           six PR-hours. Each finding's impact compares its affected time with the
-          post-ready time of all PRs finished this period, merged or closed
-          unmerged, so each percentage is at most 100%. Findings can overlap, so
-          the percentages need not add to 100%. Severity reflects configured
-          evidence thresholds.
+          finished PR waiting time: the post-ready waiting time of eligible PRs
+          that merged or closed unmerged this period. It excludes open PRs,
+          bot and backport PRs and pre-ready coding time, and can include
+          waiting that happened before the period. Each percentage is at most
+          100%; findings can overlap, so they need not add to 100%. Evidence
+          rows such as "share of waiting time spent waiting to merge" use merged
+          PRs only, so they can differ from the card's percentage. Severity
+          reflects configured evidence thresholds.
         </p>
         <p>
           Capping a stage is an illustrative estimate of the median cycle time
@@ -50,7 +54,7 @@ export function Bottlenecks({
               <span className="rank">{String(f.rank).padStart(2, "0")}</span>
               <span className={"badge " + f.severity}>{f.severity}</span>
               <span className="impact">
-                {percent(f.impact_share)} of all PR time
+                {percent(f.impact_share)} of finished PR waiting time
               </span>
             </div>
             <h3>{f.title}</h3>
