@@ -1,3 +1,5 @@
+"""CLI evaluation runner: trace narrative attempts, aggregate gates and save JSON reports."""
+
 import argparse
 import asyncio
 import logging
@@ -12,7 +14,7 @@ from insights.analytics import ANALYTICS_VERSION
 from insights.config import Settings
 from insights.logging import configure_logging
 from insights.narrative.evidence import build_evidence_pack
-from insights.narrative.llm import BedrockClient, LLMClient, LLMReply
+from insights.narrative.llm import BedrockClient, LLMClient, LLMReply, LLMUsage
 from insights.narrative.prompt import PROMPT_VERSION
 from insights.narrative.service import generate as narrate
 from insights.narrative.validator import validate
@@ -24,28 +26,47 @@ from insights_eval.stub_llm import StubLLMClient
 
 
 class TracedClient:
+    """Wrap the LLM protocol to observe the first attempt and usage without changing replies."""
+
     def __init__(self, client: LLMClient) -> None:
+        """Start a fresh trace for one narrative; repairs contribute to the same usage totals."""
         self.client, self.model_id = client, client.model_id
-        self.calls = 0
-        self.first: LLMReply | None = None
-        self.input_tokens = 0
-        self.output_tokens = 0
+        self.usage = LLMUsage()
+
+    @property
+    def first(self) -> LLMReply | None:
+        """Reply from attempt one, or None if that attempt has not returned successfully."""
+        return self.usage.first
+
+    @property
+    def input_tokens(self) -> int:
+        """Input tokens from returned replies across initial generation and any repair."""
+        return self.usage.input_tokens
+
+    @property
+    def output_tokens(self) -> int:
+        """Output tokens from returned replies; failed calls with no usage are not counted."""
+        return self.usage.output_tokens
 
     async def submit(
         self, *, system: str, messages: list[dict[str, Any]], tool_spec: dict[str, Any]
     ) -> LLMReply:
-        self.calls += 1
+        """Count the attempt before delegation, then record usage only when a reply returns."""
+        self.usage.attempts += 1
         reply = await self.client.submit(system=system, messages=messages, tool_spec=tool_spec)
-        if self.calls == 1:
-            self.first = reply
-        self.input_tokens += reply.input_tokens
-        self.output_tokens += reply.output_tokens
+        self.usage.record(reply)
         return reply
 
 
 async def evaluate(
     client: LLMClient, *, seeds: list[int], scenarios: list[str]
 ) -> list[dict[str, Any]]:
+    """Run each scenario/seed for both English audiences through production narrative generation.
+
+    Each audience gets a fresh trace over the same snapshot. A top hit requires the expected
+    ID and any specified location; no-signal cases require abstention with no hypotheses.
+    Recheck final wording separately so successful repair cannot mask an invalid first reply.
+    """
     runs = []
     print("scenario          seed audience/lang top hypothesis         level   hit fallback")
     for scenario in scenarios:
@@ -70,6 +91,8 @@ async def evaluate(
                     if expected_id
                     else payload["abstained"] and not hypotheses
                 )
+                # Generation may repair or fall back; score its original reply separately so
+                # final validation success does not inflate first-attempt validity.
                 first_errors = (
                     validate(traced.first.tool_input, pack, snapshot, audience=audience)
                     if traced.first is not None
@@ -114,6 +137,11 @@ async def evaluate(
 
 
 def previous_report(out: Path, mode: str) -> dict[str, Any] | None:
+    """Read the newest usable report for this LLM mode, or None if none can be read.
+
+    Timestamped filenames sort newest first; unreadable/invalid JSON files are skipped. This
+    is a display baseline only: scenario sets, seeds and versions are not matched here.
+    """
     for path in sorted(out.glob(f"eval-*-{mode}.json"), reverse=True):
         try:
             result: dict[str, Any] = orjson.loads(path.read_bytes())
@@ -125,6 +153,12 @@ def previous_report(out: Path, mode: str) -> dict[str, Any] | None:
 
 
 async def run(mode: str, seeds: list[int], scenarios: list[str], out: Path) -> int:
+    """Evaluate, write a timestamped JSON report and return the gate-based CLI exit code.
+
+    Return 0 if all gates pass, 1 for failed gates, or 2 for a missing Bedrock API key.
+    Stub mode makes no model request; Bedrock mode calls the configured model and closes its
+    SDK client even if evaluation raises. File operations run off the event loop.
+    """
     settings = Settings()
     if mode == "bedrock" and not settings.aws_bearer_token_bedrock:
         print("AWS_BEARER_TOKEN_BEDROCK is not set")
@@ -178,6 +212,11 @@ async def run(mode: str, seeds: list[int], scenarios: list[str], out: Path) -> i
 
 
 def main() -> int:
+    """Parse CLI options, deduplicate seeds/scenarios in input order and start the async runner.
+
+    Defaults cover five scenarios, two seeds and both audiences (20 cases). Argument errors
+    exit through argparse; reports go to --out, relative to the process working directory.
+    """
     parser = argparse.ArgumentParser(
         description="Evaluate evidence-grounded narratives on synthetic data."
     )

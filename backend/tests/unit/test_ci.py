@@ -6,12 +6,8 @@ import pytest
 from tests.analytics_factory import dataset, pr
 from tests.factories import at, event, record
 
-from insights.analytics.bottlenecks import merge_blockers
 from insights.analytics.ci import (
     build_ci,
-    map_runs,
-    mapped_flow_runs,
-    overlap_hours,
     union_intervals,
 )
 from insights.analytics.dataset import SnapshotParams
@@ -22,7 +18,7 @@ from insights.domain import CiRun, RepoRef
 from insights.sources.github.actions import fetch_runs
 from insights.sources.github.client import GitHubClient
 from insights_eval.generator import generate
-from insights_eval.pipeline import build_snapshot_from_repo
+from insights_eval.pipeline import build_snapshot_from_repo, map_runs, mapped_flow_runs
 from insights_eval.scenarios import SCENARIOS
 
 
@@ -73,7 +69,6 @@ def test_union_and_fork_sha_mapping_preserves_all_matching_prs():
     assert {r.run_id for r in mapped[11]} == {1, 2, 3}
     ranges = union_intervals(mapped[11])
     assert ranges == ((at(50), at(55)),)
-    assert overlap_hours(ranges, at(52), at(56)) == 3
     assert union_intervals([run(start=50, end=50)]) == ()
     flow = mapped_flow_runs(mapped, {11: 1, 13: 3})
     assert flow[0].pr_numbers == (1,)
@@ -87,23 +82,12 @@ def test_ci_cohort_gates_comparison_and_workflow_sorting():
     runs += (("a/b", run(90, start=30, end=32)),)
     runs += (("a/b", run(91, pr_numbers=())),)
     d = replace(dataset([pr(i) for i in range(30)]), ci_runs=runs)
-    ci = build_ci(d, "fixed", 0.75)
+    ci = build_ci(d, "fixed")
     assert ci["queue_p50_minutes"]["value"] == 30
     assert ci["run_p50_minutes"]["value"] == 90
-    assert ci["rerun_rate"]["value"] == pytest.approx(1 / 3)
     assert ci["flaky_rerun_rate"]["value"] == pytest.approx(1 / 3)
-    assert ci["runs_per_pr_p50"]["value"] == 1
     assert ci["queue_p50_minutes"]["n_previous"] == 1
     assert ci["queue_p50_minutes"]["previous"] is None
-    assert ci["top_workflows"][0]["runs"] == 30
-    assert ci["coverage"] == 0.75
-
-
-def test_approval_ci_uses_raw_union_even_when_state_is_waiting_merge():
-    prs = [replace(pr(i, ci_covered=True), ci_intervals=((at(58), at(65)),)) for i in range(10)]
-    blockers = merge_blockers(dataset(prs))
-    assert blockers["ci_after_approval_p50_hours"] == 5
-    assert merge_blockers(dataset(prs[:9]))["ci_after_approval_p50_hours"] is None
 
 
 def test_ci_scenario_contract_finding_and_no_ci_mode():
@@ -112,13 +96,14 @@ def test_ci_scenario_contract_finding_and_no_ci_mode():
     assert snapshot["time_ledger"]["ci_data_available"]
     assert snapshot["time_ledger"]["ci_coverage"] > 0.9
     assert snapshot["bottleneck_analysis"]["ci"]["run_p50_minutes"]["n"] > 20
-    assert any(f["type"] == "ci_wait" for f in snapshot["bottlenecks"])
-    assert any(w["stage"] == "ci" for w in snapshot["bottleneck_analysis"]["what_if"])
+    assert any(
+        f["type"] == "ci_wait" and f["what_if"]["stage"] == "ci" for f in snapshot["bottlenecks"]
+    )
     d = dataset([pr(i) for i in range(25)])
     empty = build_snapshot(
         d, params=SnapshotParams(("a/b",), d.period_from, d.period_to, ci_source="actions")
     )
-    assert empty["bottleneck_analysis"]["ci"]["coverage"] == 0
+    assert empty["time_ledger"]["ci_coverage"] == 0
     assert not empty["time_ledger"]["ci_data_available"]
 
 

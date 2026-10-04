@@ -51,7 +51,7 @@ def test_comparison_significance_and_zero_baseline():
 
 def test_as_of_and_closed_final_outcome():
     future = pr(1)
-    d = dataset([future], repos=(dataset([]).repos[0],), observation_time=at(60))
+    d = dataset([future], repos=(replace(dataset([]).repos[0], last_synced_at=at(60)),))
     result = measures(d, d.current)
     assert result["merged_prs"].value == 0
     assert result["waste_share"].n == 0

@@ -1,3 +1,5 @@
+"""Efficiency metrics for the current vs previous period with bootstrap significance."""
+
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -46,6 +48,11 @@ def compare(
     params_hash: str,
     statistic: Statistic | None = None,
 ) -> dict[str, Any]:
+    """Compare a measure with the previous period's.
+
+    significant is None without a statistic, a previous value, or samples on both sides.
+    change_rel is None when the previous value is missing or 0.
+    """
     old = previous.value if previous else None
     delta = current.value - old if current.value is not None and old is not None else None
     relative = delta / old if delta is not None and old else None
@@ -54,6 +61,7 @@ def compare(
         low, high = bootstrap_diff(
             current.samples, previous.samples, statistic, seed_for(params_hash, name)
         )
+        # The CI rules out sampling noise; the minimum relative change rules out trivial shifts.
         significant = bool((low > 0 or high < 0) and abs(relative) >= t.CHANGE_MIN_RELATIVE)
     return {
         "value": current.value,
@@ -70,16 +78,19 @@ def compare(
 
 
 def quantile(values: Sequence[float], q: float = 50, minimum: int = t.MIN_SAMPLES_P50) -> Measure:
+    """Wrap a percentile with its sample count and raw values; too few samples yield None."""
     return Measure(percentile(values, q, minimum), len(values), tuple(values))
 
 
 def mean(values: Sequence[float], minimum: int = t.MIN_SAMPLES_P50) -> Measure:
+    """Wrap the arithmetic mean and raw samples; return a missing value below minimum."""
     return Measure(
         sum(values) / len(values) if len(values) >= minimum else None, len(values), tuple(values)
     )
 
 
 def rate(values: Sequence[float], *, extra: dict[str, Any] | None = None) -> Measure:
+    """Compute a binary-event share only when denominator and event-count thresholds are met."""
     count, events = len(values), int(sum(values))
     return Measure(
         events / count if count >= t.MIN_RATE_DENOMINATOR and events >= t.MIN_RATE_EVENTS else None,
@@ -90,19 +101,28 @@ def rate(values: Sequence[float], *, extra: dict[str, Any] | None = None) -> Mea
 
 
 def values(prs: Sequence[PrData], field: str) -> list[float]:
+    """Extract non-None numeric fact values, preserving zero-valued observations."""
     return [float(value) for pr in prs if (value := getattr(pr.facts, field)) is not None]
 
 
 def measures(dataset: Dataset, window: Window) -> dict[str, Measure]:
+    """Collect unrounded metric samples for one period-active cohort.
+
+    Duration/round metrics use merged PRs; closure and review metrics have their own samples.
+    Keep these raw samples for bootstrap comparisons rather than resampling displayed values.
+    """
     prs, lost = merged(dataset, window), closed(dataset, window)
     counts = Counter(r.reviewer for r in dataset.reviews_in(window))
     review_count = sum(counts.values())
     pairs = []
+    # Aggregate hours before dividing: a long PR contributes more than a short PR. Author wait
+    # and pre-ready coding stay in the denominator but are not reviewer/CI/merge waiting.
     for pr in prs:
         ledger = hours(pr, end=window.end)
         numerator = sum(ledger[s] for s in ("waiting_reviewer", "waiting_ci", "waiting_merge"))
         denominator = sum(ledger.values()) + (pr.facts.coding_hours or 0)
         pairs.append((numerator, denominator))
+    # Only PRs ready at least N days before the window ends had the full N days to merge.
     eligible = [
         p
         for p in dataset.flow_in(window)
@@ -135,10 +155,12 @@ def measures(dataset: Dataset, window: Window) -> dict[str, Measure]:
             len(prs),
             tuple(pairs),
         ),
+        # Superseded closes are not waste: their work landed through another merged PR.
         "waste_share": rate(
             [float(p.facts.close_class != "superseded") for p in lost]
             + [float(reverted(p, window.end)) for p in prs]
         ),
+        # Zero-round PRs remain in the sample; excluding them would inflate the average.
         "avg_review_rounds": mean(values(prs, "review_rounds")),
         "post_review_commit_share": rate(
             [float(p.facts.commits_after_first_review > 0) for p in prs]
@@ -159,6 +181,7 @@ def measures(dataset: Dataset, window: Window) -> dict[str, Measure]:
 
 
 def build_efficiency(dataset: Dataset, params_hash: str) -> dict[str, Any]:
+    """Assemble current/previous metrics with units and the matching bootstrap statistic."""
     current = measures(dataset, dataset.current)
     previous = measures(dataset, dataset.previous) if dataset.comparison_available else {}
     result: dict[str, Any] = {
@@ -202,6 +225,10 @@ def build_efficiency(dataset: Dataset, params_hash: str) -> dict[str, Any]:
 
 
 def survival_cohort(dataset: Dataset, window: Window) -> dict[str, Any] | None:
+    """Estimate ready-to-merge duration for PRs ready in the window, including censored PRs.
+
+    Unmerged PRs are censored at closure or period end; this differs from merged-only medians.
+    """
     samples = []
     for pr in dataset.flow_in(window):
         f = pr.facts
@@ -215,7 +242,13 @@ def survival_cohort(dataset: Dataset, window: Window) -> dict[str, Any] | None:
 
 
 def predictability(dataset: Dataset, params_hash: str) -> dict[str, Any]:
+    """Compare delivery to pre-period history and full-week throughput variability.
+
+    Historical p85 uses the 90 days before each period; incomplete coverage yields None.
+    """
+
     def historical(window: Window) -> Measure:
+        """Measure delivery within historical p85; missing baseline coverage yields no value."""
         prs = merged(dataset, window)
         start = window.start - timedelta(days=90)
         if any(repo.covered_since > start for repo in dataset.repos):
@@ -230,6 +263,7 @@ def predictability(dataset: Dataset, params_hash: str) -> dict[str, Any]:
         )
 
     def weekly_cv(window: Window) -> Measure:
+        """Compute population standard deviation divided by mean for at least four full weeks."""
         counts = [
             len(merged(dataset, week, scope=window))
             for week in weeks(window)

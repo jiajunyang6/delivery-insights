@@ -1,3 +1,5 @@
+"""Liveness and readiness probes; readiness pings Postgres and Redis with 2 s timeouts."""
+
 import asyncio
 from typing import Annotated
 
@@ -26,6 +28,7 @@ class Readiness(Health):
 
 @router.get("/healthz", response_model=Health)
 async def healthz() -> Health:
+    """Report process liveness without checking database, Redis or upstream services."""
     return Health(status="ok")
 
 
@@ -34,6 +37,7 @@ async def readyz(
     session: Annotated[AsyncSession, Depends(get_session)],
     redis: Annotated[Redis, Depends(get_redis)],
 ) -> Readiness:
+    """Probe Postgres and Redis with separate two-second limits; raise 503 if either fails."""
     checks: dict[str, str] = {}
     try:
         async with asyncio.timeout(2):

@@ -1,4 +1,4 @@
-.PHONY: up down logs lint fmt test test-unit eval eval-offline smoke
+.PHONY: up down logs lint fmt test test-unit eval eval-offline
 up:
 	docker compose up --build -d
 down:
@@ -17,5 +17,3 @@ eval:
 	cd backend && uv run --env-file ../.env python -m insights_eval.run --llm bedrock
 eval-offline:
 	cd backend && uv run python -m insights_eval.run --llm stub
-smoke:
-	./scripts/smoke.sh

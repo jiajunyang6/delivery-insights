@@ -1,6 +1,7 @@
 import type { DateLimits, Params } from "./types";
 
 const DAY = 86_400_000;
+// Round-trips through UTC so impossible dates such as 2024-02-31 are rejected.
 function validDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(value + "T00:00:00Z");
@@ -15,6 +16,10 @@ export function isPeriodSelected(
   return (Date.parse(params.to) - Date.parse(params.from)) / DAY + 1 === days;
 }
 
+/**
+ * Mirrors the API's period checks against the UTC date limits from /v1/repos, so invalid
+ * ranges are caught before a request. ISO dates compare correctly as strings.
+ */
 export function periodError(
   params: Pick<Params, "from" | "to">,
   limits: DateLimits | null,

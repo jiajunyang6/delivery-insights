@@ -1,3 +1,5 @@
+"""Outermost ASGI middleware: request ids, rate limiting, default headers, access logs."""
+
 import math
 import re
 from time import perf_counter
@@ -17,10 +19,17 @@ REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 
 class RequestMiddleware:
+    """Tag requests with an id, rate-limit /v1/ per client IP and minute, and log completion."""
+
     def __init__(self, app: ASGIApp) -> None:
+        """Wrap the downstream ASGI application."""
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Attach request context/security headers and rate-limit HTTP /v1/ requests.
+
+        Redis failure leaves reads available; uncaught errors become problems before headers start.
+        """
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -37,6 +46,7 @@ class RequestMiddleware:
         limited = request.url.path.startswith("/v1/")
 
         async def wrapped_send(message: Message) -> None:
+            """Track response start/status and append request, cache and rate-limit headers."""
             nonlocal status, response_started
             if message["type"] == "http.response.start":
                 response_started = True
@@ -59,6 +69,7 @@ class RequestMiddleware:
 
         try:
             if limited:
+                # Honor a get_now override so tests that freeze time also control the window.
                 clock = request.app.dependency_overrides.get(get_now, get_now)
                 epoch = clock().timestamp()
                 key = rate_limit_key(
@@ -80,10 +91,12 @@ class RequestMiddleware:
                         )
                         await problem_response(request, error)(scope, receive, wrapped_send)
                         return
+                # Fail open: a Redis outage should not take down reads served from Postgres.
                 except (RedisError, OSError, TimeoutError) as exc:
                     logger.warning("rate_limit_unavailable", error_type=type(exc).__name__)
             await self.app(scope, receive, wrapped_send)
         except Exception as exc:
+            # Once headers are sent a problem body can no longer replace the response.
             if response_started:
                 raise
             response = await handle_problem(request, exc)

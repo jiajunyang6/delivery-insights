@@ -1,91 +1,46 @@
+"""Sync runs for one repository: staged backfill, incremental windows and open-PR sweeps.
+
+Pages come from the source adapter and are persisted through store.save_page.
+"""
+
 import asyncio
-from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
-from contextlib import aclosing, asynccontextmanager, suppress
-from datetime import UTC, datetime, timedelta
+from collections.abc import AsyncGenerator, Callable
+from contextlib import aclosing, suppress
+from datetime import datetime, timedelta
 from typing import Any, cast
-from uuid import UUID
 
 import structlog
-from arq.connections import ArqRedis
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from insights.config import Settings
-from insights.db.models import Repository, SyncJob
+from insights.db.models import Repository
 from insights.domain import PageResult, RepoRef
-from insights.redis import sync_lock_key
-from insights.sources.github.adapter import GitHubAdapter
-from insights.sources.github.client import GitHubAuthError, GitHubError, GitHubNotFoundError
-from insights.sync.derive import current_key, derivation_complete, link_repo
-from insights.sync.queue import enqueue_sync, ensure_repo
+from insights.sources.base import SourceAdapter
+from insights.sources.github.client import GitHubError
+from insights.sync.derive import current_key, derivation_complete, enqueue_rederivation, link_repo
+from insights.sync.queue import (
+    enqueue_precompute,
+    enqueue_sync,
+    ensure_repo,
+    last_success,
+    now_for,
+    run_job,
+    sessions_for,
+    set_job,
+    set_repo,
+)
 from insights.sync.store import save_page
 
 logger = structlog.get_logger(__name__)
-RELEASE_LOCK = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) end"
-RENEW_LOCK = (
-    "if redis.call('get', KEYS[1]) == ARGV[1] then "
-    "return redis.call('expire', KEYS[1], ARGV[2]) end"
-)
-
-
-def now_for(ctx: dict[str, Any]) -> datetime:
-    clock = cast(Callable[[], datetime], ctx.get("now", lambda: datetime.now(UTC)))
-    return clock()
-
-
-def sessions_for(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
-    return cast(async_sessionmaker[AsyncSession], ctx["session_factory"])
-
-
-async def set_repo(ctx: dict[str, Any], repo_id: int, **values: Any) -> None:
-    async with sessions_for(ctx)() as session, session.begin():
-        await session.execute(update(Repository).where(Repository.id == repo_id).values(**values))
-
-
-async def set_job(ctx: dict[str, Any], job_id: str, **values: Any) -> None:
-    async with sessions_for(ctx)() as session, session.begin():
-        await session.execute(update(SyncJob).where(SyncJob.id == UUID(job_id)).values(**values))
-
-
-@asynccontextmanager
-async def repository_lock(ctx: dict[str, Any], repo: str, job_id: str) -> AsyncIterator[bool]:
-    redis = cast(ArqRedis, ctx["redis"])
-    key = sync_lock_key(repo)
-    acquired = await redis.set(key, job_id, nx=True, ex=7200)
-    if not acquired:
-        await set_job(
-            ctx,
-            job_id,
-            status="failed",
-            finished_at=now_for(ctx),
-            error="skipped: repository is locked by another job",
-        )
-        yield False
-        return
-
-    async def renew() -> None:
-        while True:
-            await asyncio.sleep(600)
-            renewed = await cast(Awaitable[Any], redis.eval(RENEW_LOCK, 1, key, job_id, "7200"))
-            if not renewed:
-                raise RuntimeError("Repository lock was lost")
-
-    task = asyncio.create_task(renew())
-    try:
-        yield True
-        if task.done():
-            task.result()
-    finally:
-        task.cancel()
-        with suppress(asyncio.CancelledError):
-            await task
-        await cast(Awaitable[Any], redis.eval(RELEASE_LOCK, 1, key, job_id))
 
 
 class SyncRun:
+    """One sync job: resumes the backfill cursor, advances the watermark, records coverage."""
+
     def __init__(self, ctx: dict[str, Any], repo: Repository, job_id: str) -> None:
+        """Bind one repo/job, capture start time and initialize ingestion/derivation counters."""
         self.ctx, self.repo, self.job_id = ctx, repo, job_id
-        self.adapter = cast(GitHubAdapter, ctx["adapter"])
+        self.adapter = cast(SourceAdapter, ctx["adapter"])
         self.settings = cast(Settings, ctx["settings"])
         self.started = now_for(ctx)
         self.previous_checkpoint = self.started
@@ -100,6 +55,7 @@ class SyncRun:
         }
 
     async def fetch(self, cursor: str | None, *, open_only: bool = False) -> PageResult:
+        """Fetch one source page using the run's repository and configured maximum page size."""
         return await self.adapter.pull_requests_page(
             RepoRef(self.repo.owner, self.repo.name),
             cursor=cursor,
@@ -108,6 +64,10 @@ class SyncRun:
         )
 
     async def store(self, page: PageResult, *, backfill: bool = False) -> None:
+        """Commit a page's records, derived facts and optional resume cursor in one transaction.
+
+        Stats advance after commit; a failure leaves the previous cursor available for replay.
+        """
         async with sessions_for(self.ctx)() as session, session.begin():
             result = await save_page(
                 session, self.repo.id, page, now=now_for(self.ctx), settings=self.settings
@@ -135,7 +95,11 @@ class SyncRun:
         stop: Callable[[PageResult], bool] | None = None,
         cursor_error: str = "pagination_did_not_advance",
     ) -> AsyncGenerator[PageResult, None]:
-        """Overlap one page's download with the preceding page's committed write."""
+        """Yield committed pages, downloading the next page while the current one is written.
+
+        If more pages remain but the cursor is missing or repeats, raise GitHubError(cursor_error)
+        after the last good page has been stored and yielded.
+        """
         seen = {cursor} if cursor else set()
         pending: asyncio.Task[PageResult] | None = asyncio.create_task(
             self.fetch(cursor, open_only=open_only)
@@ -163,10 +127,13 @@ class SyncRun:
                     await pending
 
     async def incremental(self, cutoff: datetime) -> None:
+        """Re-read PRs updated since `cutoff` and advance the sync watermark."""
         first = True
         watermark = None
 
+        # Read 10 minutes past the cutoff; PRs that did not change are skipped by content hash.
         def stop(page: PageResult) -> bool:
+            """Stop once a page reaches before the watermark's ten-minute overlap margin."""
             return (
                 page.oldest_updated_at is not None
                 and page.oldest_updated_at < cutoff - timedelta(minutes=10)
@@ -176,11 +143,13 @@ class SyncRun:
             async for page in pages:
                 if first:
                     watermark, first = page.newest_updated_at, False
+        # Pages are newest-first; save the watermark only after the whole window is stored.
         if watermark is not None:
             self.repo.sync_watermark = watermark
             await set_repo(self.ctx, self.repo.id, sync_watermark=watermark)
 
     async def open_sweep(self) -> None:
+        """Re-read every open PR, including ones not updated within the synced window."""
         async with aclosing(
             self.pages(open_only=True, cursor_error="open_cursor_did_not_advance")
         ) as pages:
@@ -190,10 +159,17 @@ class SyncRun:
         await set_repo(self.ctx, self.repo.id, last_open_sweep_at=self.repo.last_open_sweep_at)
 
     async def checkpoint(self, **values: Any) -> None:
+        """Catch up on changes since the previous checkpoint, then publish progress.
+
+        Relinks if pages changed, sets `derived_key` only when every PR is derived with the
+        current key (otherwise queues a rederive), and writes `values` with `last_synced_at`.
+        """
+        # Taken before the catch-up, so last_synced_at never claims changes made during it.
         checkpoint_time = now_for(self.ctx)
         await self.incremental(self.previous_checkpoint)
         key = current_key(self.settings)
         async with sessions_for(self.ctx)() as session, session.begin():
+            # Linking scans every PR in the repository, so it runs per checkpoint, not per page.
             if await session.scalar(
                 select(Repository.links_pending).where(Repository.id == self.repo.id)
             ):
@@ -218,6 +194,11 @@ class SyncRun:
         self.previous_checkpoint = checkpoint_time
 
     async def backfill(self) -> None:
+        """Walk PRs newest-updated first from the saved cursor through each uncovered phase.
+
+        A phase is checkpointed as `covered_since` only once a stored page reaches past its
+        threshold or the listing ends, so coverage never includes a range still downloading.
+        """
         phases = [
             days
             for days in self.settings.backfill_phases
@@ -235,6 +216,7 @@ class SyncRun:
         )
 
         def stop(page: PageResult) -> bool:
+            """Stop once a page's oldest update precedes the final history threshold."""
             return page.oldest_updated_at is not None and page.oldest_updated_at < final_threshold
 
         async with aclosing(
@@ -260,6 +242,8 @@ class SyncRun:
                         page.oldest_updated_at is None or page.oldest_updated_at >= threshold
                     ):
                         break
+                    # The updated-at walk misses open PRs idle since the threshold, so sweep
+                    # them before the first coverage claim.
                     if self.repo.last_open_sweep_at is None:
                         await self.open_sweep()
                     self.repo.covered_since = threshold
@@ -269,6 +253,10 @@ class SyncRun:
                     index += 1
 
     async def execute(self) -> None:
+        """Resume changes/backfill, refresh open PRs, then publish the final successful checkpoint.
+
+        Completing incremental pagination alone does not establish historical period coverage.
+        """
         if self.repo.sync_watermark:
             await set_job(self.ctx, self.job_id, phase="incremental")
             await self.incremental(self.repo.sync_watermark)
@@ -284,71 +272,11 @@ class SyncRun:
         )
 
 
-async def sync_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
-    async with sessions_for(ctx)() as session:
-        repo = await ensure_repo(session, repo_full_name, now_for(ctx))
-        await session.commit()
-    async with repository_lock(ctx, repo_full_name, job_id) as acquired:
-        if not acquired:
-            return "skipped_locked"
-        await set_job(ctx, job_id, status="running", started_at=now_for(ctx))
-        run = SyncRun(ctx, repo, job_id)
-        log = logger.bind(job=job_id, repo=repo_full_name, phase=kind)
-        try:
-            if not cast(Settings, ctx["settings"]).github_token:
-                await set_repo(
-                    ctx,
-                    repo.id,
-                    last_sync_status="missing_token",
-                    last_sync_error="GITHUB_TOKEN is not set",
-                )
-                await set_job(
-                    ctx, job_id, status="failed", error="missing_token", finished_at=now_for(ctx)
-                )
-                return "missing_token"
-            run.adapter.client.page_size = run.settings.graphql_page_size
-            run.adapter.client.successful_pages = 0
-            await run.execute()
-        except Exception as exc:
-            status = (
-                "auth_error"
-                if isinstance(exc, GitHubAuthError)
-                else ("not_found" if isinstance(exc, GitHubNotFoundError) else "failed")
-            )
-            # Only our sanitized upstream errors may include their messages.
-            error = (
-                f"{type(exc).__name__}: {exc}"
-                if isinstance(exc, GitHubError)
-                else type(exc).__name__
-            )
-            await set_repo(ctx, repo.id, last_sync_status=status, last_sync_error=error[:500])
-            await set_job(
-                ctx,
-                job_id,
-                status="failed",
-                error=error[:500],
-                stats=run.stats,
-                finished_at=now_for(ctx),
-            )
-            log.error("sync_failed", error=error[:500])
-            return "failed"
-        await set_job(ctx, job_id, status="succeeded", stats=run.stats, finished_at=now_for(ctx))
-        async with sessions_for(ctx)() as session:
-            version = await session.scalar(
-                select(Repository.data_version).where(Repository.id == repo.id)
-            )
-        if version != repo.data_version:
-            await ctx["redis"].enqueue_job(
-                "precompute_snapshots",
-                repo_full_name,
-                _job_id=f"precompute:{repo_full_name.lower()}",
-            )
-        await enqueue_enrichment(ctx, repo)
-        log.info("sync_completed", **run.stats)
-        return "succeeded"
-
-
 async def reconcile_tracked_repos(ctx: dict[str, Any]) -> None:
+    """Reconcile the configured allowlist and queue missing history plus stale derivations.
+
+    Without a GitHub token, record missing_token rather than scheduling source ingestion.
+    """
     settings = cast(Settings, ctx["settings"])
     async with sessions_for(ctx)() as session:
         await session.execute(update(Repository).values(tracked=False))
@@ -371,14 +299,11 @@ async def reconcile_tracked_repos(ctx: dict[str, Any]) -> None:
         else:
             logger.error("github_token_missing", job="startup", repo="tracked", phase="startup")
 
-    from insights.sync.rederive import enqueue_rederivation
-
     await enqueue_rederivation(ctx)
 
 
 async def incremental_sync_all(ctx: dict[str, Any]) -> None:
-    from insights.sync.rederive import enqueue_rederivation
-
+    """Queue stale derivations and, when credentials exist, incremental sync for tracked repos."""
     await enqueue_rederivation(ctx)
     if not cast(Settings, ctx["settings"]).github_token:
         return
@@ -391,18 +316,47 @@ async def incremental_sync_all(ctx: dict[str, Any]) -> None:
 
 
 async def enqueue_enrichment(ctx: dict[str, Any], repo: Repository) -> None:
+    """Queue due CI and ownership refreshes based on their last successful completion times."""
     settings = cast(Settings, ctx["settings"])
     async with sessions_for(ctx)() as session:
         for kind, interval in (("ci_runs", timedelta(hours=1)), ("ownership", timedelta(days=1))):
             if kind == "ci_runs" and settings.ci_source != "actions":
                 continue
-            previous = await session.scalar(
-                select(SyncJob.finished_at)
-                .where(
-                    SyncJob.repo_id == repo.id, SyncJob.kind == kind, SyncJob.status == "succeeded"
-                )
-                .order_by(SyncJob.finished_at.desc())
-                .limit(1)
-            )
+            previous = await last_success(ctx, repo.id, kind)
             if previous is None or previous < now_for(ctx) - interval:
                 await enqueue_sync(ctx["redis"], session, repo.full_name, kind, now=now_for(ctx))
+
+
+async def sync_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
+    """arq entry point for backfill, incremental and manual syncs of one repository.
+
+    Returns the job result, "skipped_locked" or "missing_token". Snapshots are precomputed only
+    when the run changed `data_version`; due CI and ownership enrichment is queued afterwards.
+    """
+    async with run_job(ctx, repo_full_name, kind, job_id) as job:
+        if job is None:
+            return "skipped_locked"
+        repo = job.repo
+        run = SyncRun(ctx, repo, job_id)
+        job.stats = run.stats
+        if not run.settings.github_token:
+            await set_repo(
+                ctx,
+                repo.id,
+                last_sync_status="missing_token",
+                last_sync_error="GITHUB_TOKEN is not set",
+            )
+            await job.finish("failed", "missing_token", include_stats=False)
+            return "missing_token"
+        run.adapter.reset()
+        await run.execute()
+        await job.finish()
+        async with sessions_for(ctx)() as session:
+            version = await session.scalar(
+                select(Repository.data_version).where(Repository.id == repo.id)
+            )
+        if version != repo.data_version:
+            await enqueue_precompute(ctx, repo)
+        await enqueue_enrichment(ctx, repo)
+        logger.info("sync_completed", job=job_id, repo=repo_full_name, phase=kind, **run.stats)
+    return job.result

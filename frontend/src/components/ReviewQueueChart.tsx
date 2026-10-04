@@ -1,3 +1,4 @@
+import { chartColors } from "../format";
 import {
   Bar,
   CartesianGrid,
@@ -17,8 +18,8 @@ export function ReviewQueueChart({ weeks }: { weeks: Week[] }) {
         <div>
           <h2>Review demand & capacity</h2>
           <p>
-            PRs opened or active this period: weekly arrivals, first reviews and
-            open queue
+            Weekly review demand for PRs opened or active this period: entering
+            review, receiving a first review and still waiting for one.
           </p>
         </div>
       </div>
@@ -35,7 +36,7 @@ export function ReviewQueueChart({ weeks }: { weeks: Week[] }) {
             <CartesianGrid
               strokeDasharray="3 4"
               vertical={false}
-              stroke="#e4e9e7"
+              stroke={chartColors.grid}
             />
             <XAxis
               dataKey="week_start"
@@ -48,15 +49,15 @@ export function ReviewQueueChart({ weeks }: { weeks: Week[] }) {
             <Legend />
             <Bar
               dataKey="inflow"
-              name="Inflow"
-              fill="#a3c4bd"
+              name="Ready for review"
+              fill={chartColors.inflow}
               radius={[3, 3, 0, 0]}
               isAnimationActive={false}
             />
             <Bar
               dataKey="outflow"
               name="First reviews"
-              fill="#208577"
+              fill={chartColors.outflow}
               radius={[3, 3, 0, 0]}
               isAnimationActive={false}
             />
@@ -64,7 +65,7 @@ export function ReviewQueueChart({ weeks }: { weeks: Week[] }) {
               type="monotone"
               dataKey="open_at_week_end"
               name="Open queue"
-              stroke="#b17b28"
+              stroke={chartColors.queue}
               strokeWidth={2}
               dot={{ r: 3 }}
               isAnimationActive={false}
@@ -72,6 +73,11 @@ export function ReviewQueueChart({ weeks }: { weeks: Week[] }) {
           </ComposedChart>
         </ResponsiveContainer>
       </div>
+      <p className="footnote">
+        Ready for review: PRs entering review that week. First reviews: PRs
+        receiving their first review. Open queue: PRs still open and awaiting
+        their first review at week end.
+      </p>
     </section>
   );
 }

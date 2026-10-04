@@ -1,3 +1,5 @@
+"""Per-PR facts derived during sync, persisted, and read back as analytics input."""
+
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -10,7 +12,6 @@ class PrFacts:
     external_contributor: bool = False
     first_commit_at: datetime | None = None
     ready_at: datetime | None = None
-    first_response_at: datetime | None = None
     first_review_at: datetime | None = None
     first_approval_at: datetime | None = None
     approved_at: datetime | None = None
@@ -25,7 +26,6 @@ class PrFacts:
     review_rounds: int = 0
     feedback_before_approval: int = 0
     commits_after_first_review: int = 0
-    force_pushes_after_first_review: int = 0
     updates_after_approval: int = 0
     distinct_approvers: int = 0
     second_approval_wait_hours: float | None = None
@@ -40,13 +40,8 @@ class PrFacts:
     reverts_pr_id: int | None = None
     reverted_by_pr_id: int | None = None
     reverted_at: datetime | None = None
-    is_reland: bool = False
     reland_of_pr_id: int | None = None
-    superseded_by_pr_id: int | None = None
     close_class: str | None = None
     state_at_close: str | None = None
     late_rejection: bool = False
     ci_covered: bool = False
-    author_open_prs_at_ready: int | None = None
-    ready_weekday: int | None = None
-    ready_hour: int | None = None

@@ -1,10 +1,10 @@
+"""Convert raw GraphQL PR nodes into domain records, including bot detection and event dedup."""
+
 import re
-from dataclasses import asdict, replace
 from datetime import UTC, datetime
-from hashlib import sha1, sha256
+from hashlib import sha1
 from typing import Any
 
-import orjson
 import structlog
 
 from insights.domain import Actor, Event, EventKind, PullRequestRecord
@@ -49,6 +49,7 @@ KINDS = {
 
 
 def parse_time(value: str) -> datetime:
+    """Parse an aware upstream timestamp and normalize to UTC; reject missing timezones."""
     parsed = datetime.fromisoformat(value)
     if parsed.tzinfo is None:
         raise ValueError("Upstream timestamps must include a timezone")
@@ -67,9 +68,11 @@ def remove_nulls(value: Any) -> Any:
 
 
 def actor(node: dict[str, Any] | None, extra_bots: frozenset[str] = frozenset()) -> Actor:
+    """Normalize actors and detect bots from GraphQL type, login suffix and configured names."""
     node = remove_nulls(node or {})
     login = node.get("login")
     lowered = (login or "").lower()
+    # `__typename` is queried only for this check; it is never stored.
     return Actor(
         login,
         node.get("__typename") == "Bot"
@@ -79,6 +82,7 @@ def actor(node: dict[str, Any] | None, extra_bots: frozenset[str] = frozenset())
 
 
 def dedup_key(kind: str, occurred_at: datetime, actor_login: str | None, stable: str) -> str:
+    """Build a stable 16-hex event identity hash; SHA-1 here is for deduplication, not security."""
     value = f"{kind}|{occurred_at.isoformat()}|{actor_login or ''}|{stable}"
     return sha1(value.encode(), usedforsecurity=False).hexdigest()[:16]
 
@@ -86,6 +90,11 @@ def dedup_key(kind: str, occurred_at: datetime, actor_login: str | None, stable:
 def normalize_events(
     nodes: list[dict[str, Any]], extra_bots: frozenset[str] = frozenset()
 ) -> tuple[Event, ...]:
+    """Map timeline nodes to deduplicated events in deterministic order.
+
+    Pending reviews are dropped. A dismissed review keeps the state recorded by its dismissal
+    event and is dropped without one. Cross-references are kept only from pull requests.
+    """
     nodes = remove_nulls(nodes)
     dismissed = {
         n["review"]["id"]: n
@@ -170,11 +179,10 @@ def normalize_events(
 def normalize_pr(
     node: dict[str, Any], extra_bots: frozenset[str] = frozenset()
 ) -> PullRequestRecord:
+    """Convert a GraphQL PR node to a record, clipping the body excerpt to 4,000 characters."""
     node = remove_nulls(node)
     author = node.get("author") or {}
-    typename = author.get("__typename", "Unknown")
     return PullRequestRecord(
-        source_id=node["id"],
         number=node["number"],
         title=node["title"],
         body_excerpt=(node.get("body") or "")[:4000],
@@ -182,7 +190,6 @@ def normalize_pr(
         state=node["state"],
         is_draft=node["isDraft"],
         author=actor(author, extra_bots),
-        author_type=typename if typename in {"User", "Bot", "Mannequin"} else "Unknown",
         author_association=node["authorAssociation"],
         base_ref=node["baseRefName"],
         head_ref=node["headRefName"],
@@ -190,20 +197,10 @@ def normalize_pr(
         updated_at=parse_time(node["updatedAt"]),
         closed_at=parse_time(node["closedAt"]) if node.get("closedAt") else None,
         merged_at=parse_time(node["mergedAt"]) if node.get("mergedAt") else None,
-        merged_by=(node.get("mergedBy") or {}).get("login"),
         merge_commit_oid=(node.get("mergeCommit") or {}).get("oid"),
         additions=node["additions"],
         deletions=node["deletions"],
-        changed_files=node["changedFiles"],
         labels=tuple(dict.fromkeys(n["name"] for n in node["labels"]["nodes"])),
         files=tuple(dict.fromkeys(n["path"] for n in (node.get("files") or {}).get("nodes", []))),
-        files_truncated=bool((node.get("files") or {}).get("pageInfo", {}).get("hasNextPage")),
         events=normalize_events(node["timelineItems"]["nodes"], extra_bots),
     )
-
-
-def content_hash(pr: PullRequestRecord) -> str:
-    normalized = replace(
-        pr, events=tuple(sorted(pr.events, key=lambda e: (e.occurred_at, e.kind, e.dedup_key)))
-    )
-    return sha256(orjson.dumps(asdict(normalized), option=orjson.OPT_SORT_KEYS)).hexdigest()

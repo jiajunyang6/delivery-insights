@@ -1,3 +1,8 @@
+"""Analytics thresholds and minimum sample sizes.
+
+THRESHOLDS_VERSION feeds snapshot IDs, bootstrap seeds and the derive key; bump it with any change.
+"""
+
 THRESHOLDS_VERSION = "1.0.0"
 
 MIN_SAMPLES_P50 = 20

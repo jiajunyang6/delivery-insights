@@ -10,6 +10,7 @@ from tests.factories import at
 from tests.integration.test_derive import seed
 from tests.integration.test_sync import NOW
 
+from insights.analytics import ANALYTICS_VERSION
 from insights.api.deps import get_now
 from insights.api.schemas import (
     Pending,
@@ -74,6 +75,28 @@ async def test_snapshot_caches_etags_and_schema(api, monkeypatch):
     assert cached.status_code == 304 and cached.content == b""
     async with ctx["session_factory"]() as session:
         assert await session.scalar(select(func.count()).select_from(Snapshot)) == 1
+
+
+async def test_analytics_version_isolates_postgres_redis_and_http_cache(api, monkeypatch):
+    client, _, _, ctx = api
+    with monkeypatch.context() as legacy:
+        for module in ("dataset", "snapshot"):
+            legacy.setattr(f"insights.analytics.{module}.ANALYTICS_VERSION", "1.4.0")
+        legacy.setattr("insights.snapshots.service.ANALYTICS_VERSION", "1.4.0")
+        old = await client.get(DELIVERY)
+    assert old.status_code == 200
+    fresh = await client.get(DELIVERY, headers={"If-None-Match": old.headers["etag"]})
+    assert fresh.status_code == 200
+    old_sid, new_sid = old.json()["snapshot_id"], fresh.json()["snapshot_id"]
+    assert new_sid != old_sid
+    assert fresh.json()["meta"]["analytics_version"] == ANALYTICS_VERSION
+    assert fresh.headers["etag"] != old.headers["etag"]
+    for sid in (old_sid, new_sid):
+        assert await ctx["redis"].exists(snapshot_key(sid))
+    async with ctx["session_factory"]() as session:
+        assert await session.scalar(select(func.count()).select_from(Snapshot)) == 2
+    cached = await client.get(DELIVERY, headers={"If-None-Match": fresh.headers["etag"]})
+    assert cached.status_code == 304 and not cached.content
 
 
 @pytest.mark.parametrize(

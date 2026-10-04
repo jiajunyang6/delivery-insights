@@ -1,3 +1,5 @@
+"""Source-neutral records shared by the GitHub adapter, sync pipeline and analytics."""
+
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
@@ -29,6 +31,7 @@ class RepoRef:
 
     @property
     def full_name(self) -> str:
+        """Repository identity in owner/name form, preserving the stored spelling."""
         return f"{self.owner}/{self.name}"
 
 
@@ -56,7 +59,6 @@ class Event:
 
 @dataclass(frozen=True, slots=True)
 class PullRequestRecord:
-    source_id: str
     number: int
     title: str
     body_excerpt: str
@@ -64,7 +66,6 @@ class PullRequestRecord:
     state: str
     is_draft: bool
     author: Actor
-    author_type: str
     author_association: str
     base_ref: str
     head_ref: str
@@ -72,14 +73,11 @@ class PullRequestRecord:
     updated_at: datetime
     closed_at: datetime | None
     merged_at: datetime | None
-    merged_by: str | None
     merge_commit_oid: str | None
     additions: int
     deletions: int
-    changed_files: int
     labels: tuple[str, ...]
     files: tuple[str, ...]
-    files_truncated: bool
     events: tuple[Event, ...]
 
 
@@ -116,3 +114,27 @@ class OwnershipRule:
     pattern: str
     owners: tuple[str, ...]
     line_no: int
+
+
+class GitHubError(Exception):
+    """Sanitized upstream error; never includes headers or response bodies."""
+
+
+class GitHubAuthError(GitHubError):
+    pass
+
+
+class GitHubNotFoundError(GitHubError):
+    pass
+
+
+class GitHubRateLimited(GitHubError):  # noqa: N818
+    pass
+
+
+class GitHubQueryError(GitHubError):
+    pass
+
+
+class GitHubTransientError(GitHubError):
+    pass

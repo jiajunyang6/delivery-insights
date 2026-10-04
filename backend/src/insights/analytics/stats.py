@@ -1,3 +1,5 @@
+"""Percentiles, seeded bootstrap intervals and Kaplan-Meier; deterministic for a given seed."""
+
 import hashlib
 from collections.abc import Sequence
 from itertools import groupby
@@ -8,10 +10,15 @@ from numpy.typing import NDArray
 
 from insights.analytics.thresholds import BOOTSTRAP_CI, BOOTSTRAP_ITERATIONS
 
+# Change this only when intentionally changing statistical sampling results. It stands in for
+# ANALYTICS_VERSION in sampling_hash, so analytics releases keep the same bootstrap seeds.
+SAMPLING_SEED_VERSION = "1.4.0"
+
 Statistic = Literal["median", "p90", "mean", "ratio"]
 
 
 def percentile(values: Sequence[float], q: float, min_samples: int) -> float | None:
+    """Compute a linear percentile (q from 0 to 100), or None below the minimum sample count."""
     return (
         float(np.percentile(values, q, method="linear"))
         if len(values) >= max(1, min_samples)
@@ -20,6 +27,7 @@ def percentile(values: Sequence[float], q: float, min_samples: int) -> float | N
 
 
 def seed_for(params_hash: str, metric_name: str) -> int:
+    """Stable 64-bit RNG seed per (sampling hash, metric) so each comparison is reproducible."""
     return int.from_bytes(
         hashlib.sha256(f"{params_hash}:{metric_name}".encode()).digest()[:8], "big"
     )
@@ -31,12 +39,20 @@ def bootstrap_diff(
     statistic: Statistic,
     seed: int,
 ) -> tuple[float, float]:
+    """Bootstrap BOOTSTRAP_CI interval for statistic(current) - statistic(previous).
+
+    Deterministic for a given seed. "ratio" samples are (numerator, denominator) pairs, reduced
+    as sum/sum per draw (0 when the denominator is 0). Raises ValueError on an empty sample.
+    """
     if not current or not previous:
         raise ValueError("Bootstrap requires two nonempty samples")
     rng = np.random.default_rng(seed)
 
     def sample(values: Sequence[float] | Sequence[tuple[float, float]]) -> NDArray[np.float64]:
+        """Resample observations with the shared seeded RNG and compute each draw's statistic."""
         array = np.asarray(values, dtype=np.float64)
+        # Resample whole observations. In ratio mode this preserves each numerator's
+        # relationship to its denominator instead of drawing the two components independently.
         draws = array[rng.integers(0, len(values), size=(BOOTSTRAP_ITERATIONS, len(values)))]
         if statistic == "ratio":
             numerator, denominator = draws[:, :, 0].sum(axis=1), draws[:, :, 1].sum(axis=1)
@@ -57,51 +73,26 @@ def bootstrap_diff(
 
 
 def ratio(numerator: float, denominator: float) -> float:
+    """Divide numerator by denominator, returning 0.0 when the denominator is zero."""
     return numerator / denominator if denominator else 0.0
 
 
 def kaplan_meier(samples: Sequence[tuple[float, bool]]) -> dict[str, Any]:
-    """Estimate time-to-event survival; tied events precede censoring."""
+    """Estimate time-to-event survival; tied events precede censoring.
+
+    Samples are (duration, event_observed). median_hours is None if survival never reaches 0.5.
+    """
     survival = 1.0
     at_risk = len(samples)
     median: float | None = None
-    steps: list[tuple[float, float]] = []
     for duration, group in groupby(sorted(samples), key=lambda item: item[0]):
         outcomes = list(group)
         events = sum(event for _, event in outcomes)
         survival *= 1 - events / at_risk
-        steps.append((duration, survival))
         if median is None and survival <= 0.5:
             median = duration
         at_risk -= len(outcomes)
     return {
         "n": len(samples),
-        "events": sum(event for _, event in samples),
         "median_hours": median,
-        "s_at_hours": {
-            str(hour): next((s for t, s in reversed(steps) if t <= hour), 1.0)
-            for hour in (24, 72, 168, 336)
-        },
     }
-
-
-def spearman(x: Sequence[float], y: Sequence[float]) -> float | None:
-    if len(x) != len(y):
-        raise ValueError("Correlation requires paired samples")
-    if len(x) < 10 or len(set(x)) < 2 or len(set(y)) < 2:
-        return None
-
-    def ranks(values: Sequence[float]) -> NDArray[np.float64]:
-        array = np.asarray(values, dtype=np.float64)
-        order = np.argsort(array, kind="stable")
-        result = np.empty(len(array), dtype=np.float64)
-        start = 0
-        while start < len(order):
-            end = start + 1
-            while end < len(order) and array[order[end]] == array[order[start]]:
-                end += 1
-            result[order[start:end]] = (start + end - 1) / 2
-            start = end
-        return result
-
-    return float(np.corrcoef(ranks(x), ranks(y))[0, 1])

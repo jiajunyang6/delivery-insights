@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAbortable } from "./hooks/useAbortable";
 import {
   ApiProblem,
   fetchJson,
@@ -47,11 +48,10 @@ export default function App() {
   const [refresh, setRefresh] = useState(0);
   const validationError = periodError(params, dateLimits);
   const invalid = validationError !== null;
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchJson<RepoList>("/v1/repos", controller.signal)
+  useAbortable((signal) => {
+    fetchJson<RepoList>("/v1/repos", signal)
       .then((r) => {
-        if (controller.signal.aborted) return;
+        if (signal.aborted) return;
         setRepos(r.data.items);
         setDateLimits(r.data.date_limits);
         setParams((p) => ({
@@ -70,49 +70,46 @@ export default function App() {
           );
       })
       .catch((e) => {
-        if (!controller.signal.aborted) setError(message(e));
+        if (!signal.aborted) setError(message(e));
       });
-    return () => controller.abort();
   }, [refresh]);
   useEffect(() => {
     const query = new URLSearchParams({ ...params, audience });
     window.history.replaceState(null, "", "?" + query);
   }, [params, audience]);
-  useEffect(() => {
-    const controller = new AbortController();
+  useAbortable((signal) => {
     setSnapshot(null);
     setPending(null);
     if (!params.repo || invalid || !dateLimits) {
       if (params.repo && invalid) setError(null);
       setLoading(false);
-      return () => controller.abort();
+      return;
     }
     setLoading(true);
     setError(null);
     loadInsights(
       params,
-      controller.signal,
+      signal,
       (p) => {
-        if (!controller.signal.aborted) setPending(p);
+        if (!signal.aborted) setPending(p);
       },
       refresh > 0 ? "no-cache" : undefined,
     )
       .then((s) => {
-        if (!controller.signal.aborted) {
+        if (!signal.aborted) {
           setSnapshot(s);
           setPending(null);
         }
       })
       .catch((e) => {
-        if (!controller.signal.aborted) {
+        if (!signal.aborted) {
           setPending(null);
           setError(message(e));
         }
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!signal.aborted) setLoading(false);
       });
-    return () => controller.abort();
   }, [params.repo, params.from, params.to, refresh, invalid, dateLimits]);
   return (
     <>

@@ -8,7 +8,7 @@ import {
   YAxis,
 } from "recharts";
 import type { Snapshot, State } from "../types";
-import { hours, percent, stateColors, stateLabels, states } from "../format";
+import { chartColors, hours, percent, stateColors, stateLabels, states } from "../format";
 export function TimeLedgerChart({ snapshot: s }: { snapshot: Snapshot }) {
   const data = (
     s.meta.comparison_available ? ["Previous", "Current"] : ["Current"]
@@ -28,7 +28,7 @@ export function TimeLedgerChart({ snapshot: s }: { snapshot: Snapshot }) {
       <div className="section-heading">
         <div>
           <h2>Where PR time goes</h2>
-          <p>Post-ready time · merged PRs</p>
+          <p>How merged PRs spend their time after becoming ready for review.</p>
         </div>
         <span>{hours(s.time_ledger.total_pr_hours)} total</span>
       </div>
@@ -47,7 +47,7 @@ export function TimeLedgerChart({ snapshot: s }: { snapshot: Snapshot }) {
             <CartesianGrid
               strokeDasharray="3 4"
               horizontal={false}
-              stroke="#e4e9e7"
+              stroke={chartColors.grid}
             />
             <XAxis
               type="number"
@@ -104,6 +104,11 @@ export function TimeLedgerChart({ snapshot: s }: { snapshot: Snapshot }) {
           </span>
         ))}
       </div>
+      <p className="footnote">
+        Reviewer: awaiting review feedback. Author: awaiting author follow-up.
+        CI: running checks. Merge: approved and awaiting merge. Shares divide
+        post-ready PR-hours, excluding coding time; they describe observed waits.
+      </p>
       {!s.time_ledger.ci_data_available && (
         <p className="footnote">
           CI data not available. Observed waiting states do not establish

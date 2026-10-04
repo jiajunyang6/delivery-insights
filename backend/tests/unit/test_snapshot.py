@@ -9,7 +9,7 @@ from tests.factories import at
 
 from insights.analytics import ANALYTICS_VERSION, derive_key
 from insights.analytics.dataset import SnapshotParams
-from insights.analytics.findings import resolve_pointer
+from insights.analytics.pointer import resolve_pointer
 from insights.analytics.snapshot import build_snapshot, canonical, etag, identifiers, rounded
 from insights.api.schemas import Snapshot
 from insights_eval.generator import ScenarioSpec, generate
@@ -91,13 +91,16 @@ def test_identity_and_rounding():
 
 
 def test_partial_period_and_multi_repo_watermark():
-    d = dataset([pr(i) for i in range(30)], observation_time=at(60))
+    d = dataset(
+        [pr(i) for i in range(30)], repos=(replace(dataset([]).repos[0], last_synced_at=at(60)),)
+    )
     payload = build_snapshot(d, params=params(d))
     assert not payload["period"]["complete"]
     assert payload["efficiency"]["merged_prs"]["value"] == 0
     assert payload["meta"]["sample"]["open_prs_at_as_of"] == 30
     second = replace(d.repos[0], repo="c/d", last_synced_at=at(65))
     d = replace(d, repos=(d.repos[0], second))
-    assert d.for_repo("a/b").as_of == d.as_of
     payload = build_snapshot(d, params=params(d))
-    assert len(payload["per_repo"]) == 2
+    assert payload["repos"] == ["a/b", "c/d"]
+    assert "per_repo" not in payload
+    assert payload["as_of"] == "2026-01-03T12:00:00Z"

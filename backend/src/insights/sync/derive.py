@@ -1,4 +1,7 @@
-"""Transactional derivation. Pure computation lives in analytics."""
+"""Transactional derivation of timelines, facts and revert/reland links.
+
+Pure computation lives in analytics; this module loads its inputs and writes the results.
+"""
 
 from collections.abc import Sequence
 from dataclasses import asdict
@@ -22,15 +25,24 @@ from insights.db.models import OwnershipRule as StoredRule
 from insights.db.models import PrFact, PrInterval, PullRequest, Repository
 from insights.db.records import facts_from_row, load_records
 from insights.domain import OwnershipRule
+from insights.sync.queue import (
+    enqueue_precompute,
+    enqueue_sync,
+    now_for,
+    run_job,
+    sessions_for,
+)
 
 logger = structlog.get_logger(__name__)
 
 
 def current_key(settings: Settings) -> str:
+    """Compute the active derivation identity from location grouping and directory depth."""
     return derive_key(settings.location_dimension, settings.directory_depth)
 
 
 def pending_prs(repo_id: int, key: str) -> Select[int]:
+    """Find missing or outdated facts; IS DISTINCT FROM also treats a NULL derive key as stale."""
     return (
         select(PullRequest.id)
         .outerjoin(PrFact, PrFact.pr_id == PullRequest.id)
@@ -39,12 +51,19 @@ def pending_prs(repo_id: int, key: str) -> Select[int]:
 
 
 async def derivation_complete(session: AsyncSession, repo_id: int, key: str) -> bool:
+    """Test whether all repository PRs have facts matching this derivation key."""
     return await session.scalar(pending_prs(repo_id, key).limit(1)) is None
 
 
 async def derive_prs(
     session: AsyncSession, pr_ids: Sequence[int], *, settings: Settings, now: datetime
 ) -> int:
+    """Rebuild intervals and facts for the given PRs; return how many violate invariants.
+
+    Stored link fields are kept: they depend on other PRs and are owned by link_repo.
+    The caller owns commit/rollback. Invariant violations are logged and counted, not rejected;
+    intervals and facts are still rebuilt so the job can report all affected PRs.
+    """
     if not pr_ids:
         return 0
     prs = (await session.scalars(select(PullRequest).where(PullRequest.id.in_(pr_ids)))).all()
@@ -96,7 +115,6 @@ async def derive_prs(
                 "pr_id": pr.id,
                 "repo_id": pr.repo_id,
                 "derive_key": current_key(settings),
-                "computed_at": now,
             }
         )
         interval_values.extend(
@@ -104,6 +122,8 @@ async def derive_prs(
             for seq, interval in enumerate(result.intervals)
         )
     await session.execute(delete(PrInterval).where(PrInterval.pr_id.in_(pr_ids)))
+    # Replacement is atomic only inside the caller's transaction: readers must not see the
+    # deletion separately from the new intervals and facts.
     if interval_values:
         await session.execute(insert(PrInterval), interval_values)
     if fact_values:
@@ -122,6 +142,11 @@ async def derive_prs(
 
 
 async def link_repo(session: AsyncSession, repo_id: int, *, increment_version: bool = True) -> int:
+    """Recompute revert/reland links across the repository and clear `links_pending`.
+
+    Writes only changed link fields and returns their PR count. `data_version` is bumped on
+    change unless the caller bumps it itself.
+    """
     repo = await session.get(Repository, repo_id)
     if repo is None:
         raise ValueError("Repository is missing")
@@ -150,6 +175,7 @@ async def link_repo(session: AsyncSession, repo_id: int, *, increment_version: b
             changed,
         )
         if increment_version:
+            # Link changes affect historical waste/throughput even when raw PR rows are unchanged.
             await session.execute(
                 update(Repository)
                 .where(Repository.id == repo_id)
@@ -159,3 +185,83 @@ async def link_repo(session: AsyncSession, repo_id: int, *, increment_version: b
         update(Repository).where(Repository.id == repo_id).values(links_pending=False)
     )
     return len(changed)
+
+
+async def enqueue_rederivation(ctx: dict[str, Any]) -> None:
+    """Queue covered tracked repositories whose completed derivation identity is stale."""
+    key = current_key(cast(Settings, ctx["settings"]))
+    async with sessions_for(ctx)() as session:
+        repos = (
+            await session.scalars(
+                select(Repository).where(
+                    Repository.tracked,
+                    Repository.covered_since.is_not(None),
+                    Repository.derived_key.is_distinct_from(key),
+                )
+            )
+        ).all()
+        for repo in repos:
+            await enqueue_sync(ctx["redis"], session, repo.full_name, "rederive", now=now_for(ctx))
+
+
+async def rederive_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
+    """arq entry point: rederive PRs whose facts lack the current derive key.
+
+    Commits keyset batches of 500, then relinks and sets `derived_key` only after verifying
+    no PR is still pending.
+    """
+    settings = cast(Settings, ctx["settings"])
+    key = current_key(settings)
+    async with run_job(ctx, repo_full_name, kind, job_id) as job:
+        if job is None:
+            return "skipped_locked"
+        processed = violations = 0
+        job.stats = {"prs_derived": 0, "invariant_violations": 0}
+        async with sessions_for(ctx)() as session:
+            repo = (
+                await session.scalars(
+                    select(Repository).where(Repository.full_name_lower == repo_full_name.lower())
+                )
+            ).one()
+            complete = repo.derived_key == key and await derivation_complete(session, repo.id, key)
+        if not complete:
+            # Invalidate readiness even when a corrupted row had a current repository key.
+            async with sessions_for(ctx)() as session, session.begin():
+                await session.execute(
+                    update(Repository)
+                    .where(Repository.id == repo.id)
+                    .values(derived_key=None if repo.derived_key == key else repo.derived_key)
+                )
+            after = 0
+            while True:
+                async with sessions_for(ctx)() as session, session.begin():
+                    ids = (
+                        await session.scalars(
+                            pending_prs(repo.id, key)
+                            .where(PullRequest.id > after)
+                            .order_by(PullRequest.id)
+                            .limit(500)
+                        )
+                    ).all()
+                    if not ids:
+                        break
+                    violations += await derive_prs(
+                        session, ids, settings=settings, now=now_for(ctx)
+                    )
+                    after = ids[-1]
+                    processed += len(ids)
+                    job.stats.update(prs_derived=processed, invariant_violations=violations)
+            async with sessions_for(ctx)() as session, session.begin():
+                await link_repo(session, repo.id, increment_version=False)
+                if not await derivation_complete(session, repo.id, key):
+                    raise RuntimeError("Repository derivation is incomplete")
+                await session.execute(
+                    update(Repository)
+                    .where(Repository.id == repo.id)
+                    .values(derived_key=key, data_version=Repository.data_version + 1)
+                )
+        job.stats.update(prs_derived=processed, invariant_violations=violations)
+        await job.finish()
+        if not complete:
+            await enqueue_precompute(ctx, repo)
+    return job.result

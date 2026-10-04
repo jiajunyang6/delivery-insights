@@ -1,3 +1,9 @@
+"""Static evidence catalog: the snapshot metrics exposed to the narrative as numbered E-IDs.
+
+Rows are (ID, key, label, JSON pointer, unit, side). evidence.py adds location items (E51-E70)
+and top-finding items (E71-E73) at runtime, and resolves the {i} index in the E48 pointer.
+"""
+
 CATALOG = (
     (
         "E1",

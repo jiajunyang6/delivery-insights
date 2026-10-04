@@ -1,20 +1,21 @@
+"""Deterministic template narrative, used whenever no validated LLM answer is available.
+
+It follows the hedge bands and abstention sentences that the validator enforces on the LLM.
+"""
+
 from collections.abc import Mapping
 from typing import Any
 
-from insights.narrative.validator import ABSTAIN_SENTENCES, chain_ids
+from insights.narrative.hypotheses import HYPOTHESES, abstention, chain_ids
+from insights.narrative.validator import ABSTAIN_SENTENCES
 
-SUBJECTS = {
-    "H_ci_bottleneck": "Slow or congested CI",
-    "H_pr_size_growth": "Larger pull requests",
-    "H_quality_tradeoff": "Lighter review in exchange for speed",
-}
 FINDINGS = {
     "review_queue_growth": "review demand exceeding first reviews",
     "review_concentration": "reviews concentrated on a few people",
     "merge_blocked": "approved PRs waiting to merge",
     "ci_wait": "waiting on CI",
     "rework_high": "rework after review",
-    "waste_high": "work that never shipped",
+    "waste_high": "PRs closed without merging or later reverted",
     "quality_guardrail": "a quality warning",
     "external_contributor_wait": "slow first reviews for external contributors",
 }
@@ -27,17 +28,19 @@ WAITING = {
 
 
 def percent(value: float) -> str:
+    """Format a fractional share as percent, keeping one decimal below ten percent in magnitude."""
     return f"{value * 100:.1f}%" if abs(value * 100) < 10 else f"{value * 100:.0f}%"
 
 
 def phrase(candidate: Mapping[str, Any]) -> str:
+    """Render a candidate's location and confidence band using the matching uncertainty wording."""
     if candidate["id"] == "H_review_capacity":
         location = candidate["location"]
         subject = (
             "Limited review capacity" if not location else f"Limited review capacity in {location}"
         )
     else:
-        subject = SUBJECTS[candidate["id"]]
+        subject = HYPOTHESES[candidate["id"]].subject
     level = candidate["level"]
     return (
         f"{subject} is likely the main cause"
@@ -49,14 +52,22 @@ def phrase(candidate: Mapping[str, Any]) -> str:
 
 
 def build_template(pack: Mapping[str, Any], snapshot: Mapping[str, Any]) -> dict[str, Any]:
+    """Return output in the submit_narrative shape, built from the pack and guardrail verdict.
+
+    Directors get the key metric, the top cause or abstention, the top finding and a revert
+    warning; managers also get the waiting share and at-risk PRs. Each sentence cites at most
+    three evidence IDs.
+    """
     audience = pack["audience"]
     evidence = {e["id"]: e for e in pack["evidence"]}
     candidates = pack["hypotheses"]
 
     def hour(value: float) -> str:
+        """Format an elapsed-hour value with one decimal and its unit."""
         return f"{value:.1f} h"
 
     def sentence(text: str, ids: list[str]) -> str:
+        """Append up to three evidence citations and a final period to the supplied text."""
         return f"{text} {''.join(f'[{i}]' for i in ids[:3])}" + "."
 
     cycle = evidence.get("E1")
@@ -99,7 +110,9 @@ def build_template(pack: Mapping[str, Any], snapshot: Mapping[str, Any]) -> dict
             name = FINDINGS[finding["type"]]
         share = percent(evidence["E71"]["value"])
         parts["S3"] = sentence(
-            f"The largest time sink is {name}, about {share} of PR time", ["E71"]
+            f"The top finding by cumulative PR waiting time concerns {name}, "
+            f"about {share} of finished PR waiting time",
+            ["E71"],
         )
     elif waits := [i for i in WAITING if evidence.get(i, {}).get("value") is not None]:
         largest = max(waits, key=lambda i: (evidence[i]["value"], -int(i[1:])))
@@ -118,8 +131,8 @@ def build_template(pack: Mapping[str, Any], snapshot: Mapping[str, Any]) -> dict
     if candidates:
         parts["S5"] = sentence(phrase(candidates[0]), chain_ids(candidates[0]))
     else:
-        reason = pack.get("abstain_reason") or "insufficient_signal"
-        parts["S5"] = sentence(ABSTAIN_SENTENCES[reason], ["E1" if cycle else "E3"])
+        reason, identifier = abstention(pack)
+        parts["S5"] = sentence(ABSTAIN_SENTENCES[reason], [identifier])
     if snapshot["guardrail"]["verdict"] != "ok" and "E10" in evidence:
         share = percent(evidence["E10"]["value"])
         parts["S6"] = sentence(

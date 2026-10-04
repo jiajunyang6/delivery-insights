@@ -1,3 +1,5 @@
+"""Tracked repository status, selectable date limits and manual sync requests."""
+
 from datetime import datetime, timedelta
 from typing import Annotated
 
@@ -10,31 +12,16 @@ from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from insights.api.deps import get_arq, get_now, get_redis, get_session, get_settings
-from insights.api.errors import ProblemError
+from insights.api.errors import ProblemError, unavailable
 from insights.api.params import parse_repo_path
+from insights.api.responses import job_response
 from insights.api.schemas import DateLimits, RepoList, RepoStatus, SyncJobResponse
-from insights.config import Settings
+from insights.config import MAX_PERIOD_DAYS, Settings
 from insights.db.models import Repository, SyncJob
 from insights.redis import sync_cooldown_key
 from insights.sync.queue import enqueue_sync
 
 router = APIRouter(prefix="/v1/repos", tags=["Repositories"])
-
-
-def job_response(job: SyncJob, repo: str) -> SyncJobResponse:
-    return SyncJobResponse(
-        id=str(job.id),
-        repo=repo,
-        kind=job.kind,
-        status=job.status,
-        phase=job.phase,
-        stats=job.stats,
-        error=job.error,
-        created_at=job.created_at,
-        started_at=job.started_at,
-        finished_at=job.finished_at,
-        url=f"/v1/sync-jobs/{job.id}",
-    )
 
 
 @router.get("", response_model=RepoList)
@@ -43,6 +30,7 @@ async def repositories(
     settings: Annotated[Settings, Depends(get_settings)],
     now: Annotated[datetime, Depends(get_now)],
 ) -> RepoList:
+    """Report configured repositories, latest persisted jobs and allowed reporting dates."""
     configured = settings.tracked_repo_list
     repos = {
         r.full_name_lower: r
@@ -90,7 +78,7 @@ async def repositories(
         date_limits=DateLimits(
             earliest_from=now.date() - timedelta(days=settings.backfill_days),
             latest_to=now.date(),
-            max_days=366,
+            max_days=MAX_PERIOD_DAYS,
         ),
     )
 
@@ -98,6 +86,7 @@ async def repositories(
 def validated_repo_path(
     owner: str, name: str, settings: Annotated[Settings, Depends(get_settings)]
 ) -> str:
+    """Resolve route owner/name to an allowed repository through the shared validator."""
     return parse_repo_path(owner, name, settings)
 
 
@@ -111,8 +100,13 @@ async def manual_sync(
     arq: Annotated[ArqRedis, Depends(get_arq)],
     now: Annotated[datetime, Depends(get_now)],
 ) -> SyncJobResponse:
+    """Claim the repository cooldown, enqueue manual sync and return its status URL.
+
+    An existing cooldown raises 429; unavailable queue transport raises a sanitized 503.
+    """
     try:
         key = sync_cooldown_key(repo)
+        # SET NX EX claims the cooldown atomically, so concurrent requests enqueue one job.
         accepted = await redis.set(key, "1", nx=True, ex=settings.manual_sync_cooldown_seconds)
         if not accepted:
             ttl = max(1, await redis.ttl(key))
@@ -125,12 +119,6 @@ async def manual_sync(
             )
         job, _ = await enqueue_sync(arq, session, repo, "manual", now=now)
     except (RedisError, OSError, TimeoutError) as exc:
-        raise ProblemError(
-            503,
-            "dependency-unavailable",
-            "Dependency unavailable",
-            "The sync queue is unavailable.",
-        ) from exc
+        raise unavailable("The sync queue is unavailable.") from exc
     response.headers["Location"] = f"/v1/sync-jobs/{job.id}"
-    response.headers["Cache-Control"] = "no-store"
     return job_response(job, repo)

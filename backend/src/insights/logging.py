@@ -1,6 +1,9 @@
+"""Structured JSON logging shared by the API and worker processes."""
+
 import logging
 import sys
 from importlib.resources import files
+from logging.config import dictConfig
 from types import TracebackType
 from typing import Any
 
@@ -20,10 +23,12 @@ LOGGING_CONFIG: dict[str, Any] = orjson.loads(
 
 
 def json_dumps(value: Any, **kwargs: Any) -> str:
+    """Serialize sorted-key log JSON, ignoring extra serializer arguments."""
     return orjson.dumps(value, option=orjson.OPT_SORT_KEYS).decode()
 
 
 def sanitize_exception(logger: Any, method: str, event: EventDict) -> EventDict:
+    """Replace exception info with its type name so tracebacks and their data stay out of logs."""
     info = event.pop("exc_info", None)
     event.pop("stack_info", None)
     if info:
@@ -38,12 +43,14 @@ def sanitize_exception(logger: Any, method: str, event: EventDict) -> EventDict:
 def log_uncaught(
     kind: type[BaseException], error: BaseException, traceback: TracebackType | None
 ) -> None:
+    """Forward uncaught process exceptions to the configured sanitized logging pipeline."""
     logging.getLogger("insights.process").error(
         "unhandled_exception", exc_info=(kind, error, traceback)
     )
 
 
 def json_formatter() -> structlog.stdlib.ProcessorFormatter:
+    """Build a formatter shared by structlog and standard logs with sanitized exceptions."""
     return structlog.stdlib.ProcessorFormatter(
         foreign_pre_chain=SHARED,
         processors=[
@@ -55,6 +62,7 @@ def json_formatter() -> structlog.stdlib.ProcessorFormatter:
 
 
 def configure_logging(level: str = "INFO") -> None:
+    """Configure sanitized JSON logs and exception handling, reducing noisy transport logs."""
     sys.excepthook = log_uncaught
     structlog.configure(
         processors=[*SHARED, structlog.stdlib.ProcessorFormatter.wrap_for_formatter],
@@ -62,13 +70,8 @@ def configure_logging(level: str = "INFO") -> None:
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=False,
     )
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(json_formatter())
-    logging.basicConfig(level=level, handlers=[handler], force=True)
-    for name in ("arq", "uvicorn", "uvicorn.error"):
-        logger = logging.getLogger(name)
-        logger.handlers.clear()
-        logger.propagate = True
+    dictConfig({**LOGGING_CONFIG, "root": {**LOGGING_CONFIG["root"], "level": level}})
+    # RequestMiddleware emits its own request_completed line with the request id.
     logging.getLogger("uvicorn.access").disabled = True
     for name in ("httpx", "httpcore", "botocore", "urllib3"):
         logging.getLogger(name).setLevel(logging.WARNING)

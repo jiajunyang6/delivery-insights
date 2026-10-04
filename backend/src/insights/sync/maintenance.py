@@ -1,3 +1,5 @@
+"""Background maintenance: precompute default snapshots and expire retained data."""
+
 from datetime import timedelta
 from typing import Any, cast
 
@@ -6,17 +8,21 @@ from redis.exceptions import RedisError
 from sqlalchemy import delete
 
 from insights.analytics.dataset import SnapshotParams
-from insights.api.errors import ProblemError
 from insights.config import Settings, split_list
 from insights.db.models import Snapshot, SyncJob
 from insights.redis import rows_key, snapshot_key
+from insights.snapshots.errors import ResourceError
 from insights.snapshots.service import SnapshotService
-from insights.sync.jobs import now_for, sessions_for
+from insights.sync.queue import now_for, sessions_for
 
 logger = structlog.get_logger(__name__)
 
 
 async def precompute_snapshots(ctx: dict[str, Any], repo_full_name: str) -> None:
+    """Warm the snapshot cache for each configured trailing window ending today.
+
+    Windows that cannot be served yet (ResourceError) are logged and skipped.
+    """
     settings = cast(Settings, ctx["settings"])
     now = now_for(ctx)
     service = SnapshotService(sessions_for(ctx), ctx["redis"], settings, now)
@@ -33,11 +39,15 @@ async def precompute_snapshots(ctx: dict[str, Any], repo_full_name: str) -> None
         )
         try:
             await service.delivery(params)
-        except ProblemError as exc:
+        except ResourceError as exc:
             logger.info("precompute_skipped", repo=repo_full_name, status=exc.status)
 
 
 async def housekeeping(ctx: dict[str, Any]) -> None:
+    """Delete snapshots older than 7 days and finished job rows older than 30 days.
+
+    Cached snapshot rows and narratives are removed best effort; Redis errors are only logged.
+    """
     now = now_for(ctx)
     async with sessions_for(ctx)() as session, session.begin():
         expired = (

@@ -5,8 +5,12 @@ from tests.analytics_factory import dataset, pr
 from tests.unit.test_bottlenecks import half_unreviewed_dataset
 from tests.unit.test_snapshot import params
 
+from insights.analytics.dataset import closed, hours
 from insights.analytics.findings import build_findings, headline, resolve_pointer
 from insights.analytics.snapshot import build_snapshot
+from insights_eval.generator import generate
+from insights_eval.pipeline import build_snapshot_from_repo, dataset_from_repo
+from insights_eval.scenarios import SCENARIOS
 
 
 def base():
@@ -105,6 +109,55 @@ def test_balanced_review_flow_does_not_report_growing_period_queue():
     assert "review_queue_growth" not in {f["type"] for f in build_findings(s, d)}
 
 
+def test_headline_uses_finding_share_and_only_the_top_findings_estimate():
+    _, snapshot = base()
+    snapshot["efficiency"]["cycle_time_p50_hours"].update(
+        value=55.1, previous=26.75, change_rel=1.06, significant=False, n=38
+    )
+    snapshot["time_ledger"]["states"]["waiting_reviewer"]["share"] = 0.8
+    waste = {
+        "type": "waste_high",
+        "title": "This card title must not become headline prose",
+        "impact_pr_hours": 120983.9,
+        "impact_share": 0.432,
+        "location": None,
+        "what_if": None,
+    }
+    merge = {
+        **waste,
+        "type": "merge_blocked",
+        "impact_share": 0.25,
+        "what_if": {"stage": "merge", "target_hours": 8, "change_rel": -0.49},
+    }
+    snapshot["bottlenecks"] = [waste, merge]
+    assert headline(snapshot) == (
+        "Median cycle time is 55.1h (+106% vs previous period, within normal variation "
+        "for 38 merged PRs). The largest share of finished PR waiting time (43%) is "
+        "on PRs that were closed without merging or later reverted."
+    )
+    snapshot["bottlenecks"] = [{**waste, "type": "review_capacity", "location": "area-A"}]
+    assert headline(snapshot).endswith(
+        "The largest share of finished PR waiting time (43%) is "
+        "on PRs waiting for a first review in area-A."
+    )
+    snapshot["bottlenecks"] = [merge, waste]
+    assert headline(snapshot).endswith(
+        "The largest share of finished PR waiting time (25%) is on approved PRs waiting "
+        "to merge. Capping merge at 8h would cut median cycle time by about 49%."
+    )
+
+
+@pytest.mark.parametrize("kind", ["quality_guardrail", "review_concentration"])
+def test_headline_does_not_assign_waiting_share_to_unquantified_findings(kind):
+    _, snapshot = base()
+    snapshot["bottlenecks"] = []
+    cycle_only = headline(snapshot)
+    snapshot["bottlenecks"] = [
+        {"type": kind, "impact_pr_hours": 0, "impact_share": 0, "what_if": None}
+    ]
+    assert headline(snapshot) == cycle_only
+
+
 @pytest.mark.parametrize(
     ("unserved", "weeks", "severity"),
     [
@@ -141,3 +194,19 @@ def test_half_unreviewed_prs_trigger_high_demand_finding():
         "unit": "share",
         "ref": "/bottleneck_analysis/review_queue/net_inflow_share",
     }
+
+
+@pytest.mark.parametrize("seed", [101, 202])
+@pytest.mark.parametrize("name", sorted(SCENARIOS))
+def test_finding_shares_use_all_finished_pr_time_and_never_exceed_one(name, seed):
+    syn = generate(SCENARIOS[name], seed)
+    data = dataset_from_repo(syn)
+    snapshot = build_snapshot_from_repo(syn)
+    finished = snapshot["time_ledger"]["total_pr_hours"] + sum(
+        sum(hours(p, end=data.as_of).values()) for p in closed(data, data.current)
+    )
+    for finding in snapshot["bottlenecks"]:
+        assert 0 <= finding["impact_share"] <= 1
+        assert finding["impact_share"] == pytest.approx(
+            finding["impact_pr_hours"] / finished, abs=1e-3
+        )

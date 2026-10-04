@@ -19,6 +19,12 @@ AS_OF = datetime(2026, 3, 2, tzinfo=UTC)
 
 @dataclass(frozen=True, slots=True)
 class ScenarioSpec:
+    """Synthetic interventions applied after CURRENT, with baseline behavior before it.
+
+    Multipliers scale arrivals, PR size or elapsed hours; rates are (baseline, current).
+    This describes planted assumptions, not effect sizes inferred from a real repository.
+    """
+
     name: str
     pickup_mult: Mapping[str, float]
     arrival_mult: Mapping[str, float]
@@ -35,6 +41,7 @@ class ScenarioSpec:
 
     @classmethod
     def baseline(cls) -> "ScenarioSpec":
+        """Return the no-intervention spec; normal closures, reverts and random variation remain."""
         return cls(
             "no_signal",
             {},
@@ -54,6 +61,8 @@ class ScenarioSpec:
 
 @dataclass(frozen=True, slots=True)
 class SyntheticRepo:
+    """Observed records/runs plus inclusive reporting dates and the UTC observation cutoff."""
+
     repo: str
     default_branch: str
     records: tuple[PullRequestRecord, ...]
@@ -64,6 +73,12 @@ class SyntheticRepo:
 
 
 def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
+    """Build seeded GitHub-like records and optional CI runs without network or database I/O.
+
+    History starts at START, interventions start at CURRENT, and observations stop at AS_OF.
+    The returned report period ends on the preceding UTC date, inclusive. The same spec/seed
+    reproduces the records with this generator; changing a spec can change later RNG draws.
+    """
     rng = np.random.default_rng(seed)
     records: list[PullRequestRecord] = []
     runs: list[CiRun] = []
@@ -71,9 +86,11 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
     pending_supersedes: list[int] = []
 
     def ln(median: float, sigma: float) -> float:
+        """Draw a positive lognormal value with the given median and log-scale dispersion."""
         return float(median * np.exp(sigma * rng.normal()))
 
     def later(at: datetime, hours: float) -> datetime:
+        """Shift a timestamp by elapsed hours; negative values represent earlier authored work."""
         return at + timedelta(hours=hours)
 
     def make(
@@ -87,6 +104,11 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
         simple: bool = False,
         force_merge: bool = False,
     ) -> PullRequestRecord:
+        """Construct one lifecycle and append its CI runs and possible supersession candidate.
+
+        simple creates a short approval/merge path; force_merge bypasses random closure/open
+        outcomes. Either can still be open when its planned merge falls beyond AS_OF.
+        """
         current = created >= CURRENT
         size = max(1, round(ln(80, 1.1) * (spec.size_mult if current else 1)))
         external = rng.random() < 0.2
@@ -111,6 +133,7 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
         area_letter = area[-1].lower()
 
         def add(kind: EventKind, at: datetime, actor: Actor, **payload: Any) -> Event:
+            """Append an event with a stable synthetic ID and review metadata when applicable."""
             stable = f"syn-{number}-{len(events)}"
             if kind == EventKind.REVIEW:
                 payload.update(review_id=stable, dismissed=False)
@@ -119,6 +142,11 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
             return ev
 
         def commit(at: datetime, authored_at: datetime | None = None) -> None:
+            """Add a unique commit and, when enabled, a CI run linked by its SHA and PR number.
+
+            Flakiness is encoded as two attempts and longer runtime, with success if finished.
+            Runs still executing at AS_OF retain partial timestamps rather than a future result.
+            """
             oid = f"{number:020x}{len(events):020x}"
             add(
                 EventKind.COMMIT,
@@ -251,6 +279,8 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
             add(EventKind.MERGED, planned_merge, reviewer)
         if end >= AS_OF:
             state, merge_at = "OPEN", None
+        # Keep only observed events: future approvals/merges must not leak into the historical
+        # snapshot. Limit CI to the retained commit horizon after choosing a closure/open path.
         events = [e for e in events if e.occurred_at < AS_OF]
         local_runs = [
             run
@@ -268,7 +298,6 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
         file_count = int(rng.integers(1, 6))
         closed_at = end if state != "OPEN" else None
         return PullRequestRecord(
-            source_id=f"syn-{number}",
             number=number,
             title=title or f"Change {number} in {area}",
             body_excerpt=body,
@@ -276,7 +305,6 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
             state=state,
             is_draft=draft and ready >= AS_OF,
             author=author,
-            author_type="Bot" if author.is_bot else "User",
             author_association="CONTRIBUTOR" if external else "MEMBER",
             base_ref=base,
             head_ref=f"change-{number}",
@@ -284,14 +312,11 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
             updated_at=max([created, *(e.occurred_at for e in events)]),
             closed_at=closed_at,
             merged_at=merge_at,
-            merged_by=reviewer.login if merge_at else None,
             merge_commit_oid=f"{number:040x}" if merge_at else None,
             additions=round(0.7 * size),
             deletions=size - round(0.7 * size),
-            changed_files=max(1, size // 40),
             labels=tuple(sorted(set(labels))),
             files=tuple(f"src/{area[-1]}/file{k}.cs" for k in range(file_count)),
-            files_truncated=False,
             events=tuple(sorted(events, key=lambda e: (e.occurred_at, e.kind, e.dedup_key))),
         )
 
@@ -355,6 +380,8 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
             updated_at=max(original.updated_at, at),
         )
         records.append(successor)
+    # Iterate a frozen set of originals so newly appended reverts are not themselves randomly
+    # reverted in the same pass. Relands are added explicitly below when the revert has merged.
     for original in tuple(records):
         if (
             original.merged_at is None

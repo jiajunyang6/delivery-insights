@@ -1,3 +1,8 @@
+"""LLM client boundary for the narrative: the LLMClient protocol and its Bedrock implementation.
+
+The model only receives the system prompt and messages built in prompt.py.
+"""
+
 import asyncio
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, cast
@@ -19,25 +24,49 @@ class LLMReply:
     assistant_message: dict[str, Any]
     input_tokens: int
     output_tokens: int
-    stop_reason: str
+
+
+@dataclass(slots=True)
+class LLMUsage:
+    attempts: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    first: LLMReply | None = None
+
+    def record(self, reply: LLMReply) -> None:
+        """Accumulate returned token usage and retain the reply when attempts is one."""
+        if self.attempts == 1:
+            self.first = reply
+        self.input_tokens += reply.input_tokens
+        self.output_tokens += reply.output_tokens
 
 
 class LLMClient(Protocol):
+    """Makes one forced submit_narrative tool call per submit().
+
+    tool_input is None when the reply contains no such tool call. Service or transport
+    failures raise LLMUnavailable, which the caller turns into the template fallback.
+    """
+
     model_id: str
 
     async def submit(
         self, *, system: str, messages: list[dict[str, Any]], tool_spec: dict[str, Any]
-    ) -> LLMReply: ...
+    ) -> LLMReply:
+        """Submit one tool-constrained request; return its reply or raise LLMUnavailable."""
+        ...
 
 
 class LLMUnavailable(Exception):  # noqa: N818 - public name required by the plan
     def __init__(self, reason: str) -> None:
+        """Carry a sanitized transport/service failure reason into narrative fallback handling."""
         self.reason = reason
         super().__init__(reason)
 
 
 class BedrockClient:
     def __init__(self, settings: Settings) -> None:
+        """Create the configured regional Bedrock client with bounded network waits and retries."""
         self.model_id = settings.bedrock_model_id
         self.client = boto3.client(
             "bedrock-runtime",
@@ -52,6 +81,12 @@ class BedrockClient:
     async def submit(
         self, *, system: str, messages: list[dict[str, Any]], tool_spec: dict[str, Any]
     ) -> LLMReply:
+        """Run the blocking SDK off the event loop and extract the requested tool output.
+
+        Forced tool use does not establish numeric or causal validity; the local validator
+        checks those claims. Cancelling this coroutine need not stop the SDK thread, so SDK
+        timeouts still bound its network waits. Only error codes/types cross this boundary.
+        """
         try:
             response = await asyncio.to_thread(
                 self.client.converse,
@@ -83,5 +118,4 @@ class BedrockClient:
             message,
             response["usage"]["inputTokens"],
             response["usage"]["outputTokens"],
-            response["stopReason"],
         )

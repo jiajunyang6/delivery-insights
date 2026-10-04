@@ -12,9 +12,35 @@ export function Bottlenecks({
   return (
     <section id="bottlenecks">
       <div className="section-heading">
-        <h2>What to work on next</h2>
-        <span>Ranked by impact on PR time</span>
+        <div>
+          <h2>What to work on next</h2>
+          <p>Prioritized waiting patterns and suggested actions, supported by measured evidence.</p>
+        </div>
+        <span>Ranked by cumulative PR waiting time</span>
       </div>
+      <details className="metric-guide">
+        <summary>How impact and estimates are measured</summary>
+        <p>
+          PR-hours add time across PRs: two PRs waiting for three hours contribute
+          six PR-hours. This measures elapsed waiting, not labor hours: a PR can
+          accumulate waiting time while nobody is working on it. A high total
+          flags a pattern to investigate; it does not establish a cause of slower
+          delivery. Each finding's impact compares its affected time with the
+          finished PR waiting time: the post-ready waiting time of eligible PRs
+          that merged or closed unmerged this period. It excludes open PRs,
+          bot and backport PRs and pre-ready coding time, and can include
+          waiting that happened before the period. Each percentage is at most
+          100%; findings can overlap, so they need not add to 100%. Evidence
+          rows such as "share of waiting time spent waiting to merge" use merged
+          PRs only, so they can differ from the card's percentage. Severity
+          reflects configured evidence thresholds.
+        </p>
+        <p>
+          Capping a stage is an illustrative estimate of the median cycle time
+          if waits above the displayed target were shortened. It is not a
+          guaranteed improvement or proof of a root cause.
+        </p>
+      </details>
       {!findings.length && (
         <div className="panel empty">
           {s.meta.sample.merged_prs < 20
@@ -31,12 +57,12 @@ export function Bottlenecks({
               <span className="rank">{String(f.rank).padStart(2, "0")}</span>
               <span className={"badge " + f.severity}>{f.severity}</span>
               <span className="impact">
-                {percent(f.impact_share)} of PR time
+                {percent(f.impact_share)} of finished PR waiting time
               </span>
             </div>
             <h3>{f.title}</h3>
             <p className="muted">
-              {hours(f.impact_pr_hours)} PR-hours affected
+              {hours(f.impact_pr_hours)} accumulated across PRs while waiting
             </p>
             <dl className="finding-evidence">
               {f.evidence.map((e) => (

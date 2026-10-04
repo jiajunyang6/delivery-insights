@@ -1,9 +1,13 @@
+"""Environment-driven settings and the identifier patterns used to validate input."""
+
 import re
 from functools import lru_cache
 from typing import Literal, Self
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+MAX_PERIOD_DAYS = 366
 
 REPO_RE = re.compile(
     r"^(?P<owner>[A-Za-z0-9][A-Za-z0-9-]{0,38})/(?P<name>(?!\.{1,2}$)[A-Za-z0-9._-]{1,100})$"
@@ -13,6 +17,7 @@ NAME_RE = re.compile(r"^(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$")
 
 
 def split_list(value: str) -> list[str]:
+    """Split comma-separated configuration, trimming whitespace and omitting empty entries."""
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
@@ -47,10 +52,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_settings(self) -> Self:
+        """Validate repository syntax, scheduling relationships and analytics configuration."""
         if not self.tracked_repo_list or any(
             REPO_RE.fullmatch(repo) is None for repo in self.tracked_repo_list
         ):
             raise ValueError("TRACKED_REPOS must contain valid owner/name entries")
+        # The worker cron fires at range(0, 60, interval) minutes; a divisor keeps runs evenly
+        # spaced across the hour boundary.
         if 60 % self.sync_interval_minutes:
             raise ValueError("SYNC_INTERVAL_MINUTES must divide 60")
         if self.open_sweep_minutes % self.sync_interval_minutes:
@@ -60,7 +68,7 @@ class Settings(BaseSettings):
         ):
             raise ValueError("LOCATION_DIMENSION must be label:<prefix>, codeowners or directory")
         if any(
-            not value.isdigit() or not 1 <= int(value) <= 366
+            not value.isdigit() or not 1 <= int(value) <= MAX_PERIOD_DAYS
             for value in split_list(self.precompute_days)
         ):
             raise ValueError("PRECOMPUTE_DAYS must contain day counts between 1 and 366")
@@ -68,6 +76,7 @@ class Settings(BaseSettings):
 
     @property
     def tracked_repo_list(self) -> list[str]:
+        """Configured repos de-duplicated case-insensitively, keeping the first spelling."""
         seen: dict[str, str] = {}
         for repo in split_list(self.tracked_repos):
             seen.setdefault(repo.lower(), repo)
@@ -75,19 +84,23 @@ class Settings(BaseSettings):
 
     @property
     def llm_enabled(self) -> bool:
+        """Whether a nonempty Bedrock API key is configured for narrative generation."""
         return bool(
             self.aws_bearer_token_bedrock and self.aws_bearer_token_bedrock.get_secret_value()
         )
 
     @property
     def backfill_phases(self) -> list[int]:
+        """Sorted unique backfill targets: seven days, thirty days and the configured horizon."""
         return sorted({7, 30, self.backfill_days})
 
     @property
     def location_label_prefix(self) -> str | None:
+        """Label prefix for label:<prefix> grouping, or None for another location dimension."""
         return self.location_dimension[6:] if self.location_dimension.startswith("label:") else None
 
 
 @lru_cache
 def get_settings() -> Settings:
+    """Load and cache application settings on first use."""
     return Settings()

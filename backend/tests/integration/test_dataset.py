@@ -10,12 +10,58 @@ from tests.integration.test_sync import NOW
 from insights.analytics.dataset import SnapshotParams
 from insights.analytics.snapshot import build_snapshot
 from insights.db.dataset import load_dataset
-from insights.db.models import Repository
+from insights.db.models import OwnershipRule, Repository
+from insights.snapshots.service import SnapshotService
 from insights.sync.derive import current_key, link_repo
 from insights_eval.generator import SyntheticRepo
 from insights_eval.pipeline import dataset_from_repo
 
 pytestmark = pytest.mark.integration
+
+
+async def test_metadata_reuse_retains_codeowners_and_area_owner_counts(context):
+    repo_id, _, _ = await seed(context, 35)
+    async with context["session_factory"]() as session, session.begin():
+        await link_repo(session, repo_id)
+        await session.execute(
+            update(Repository).values(
+                covered_since=at(-5000),
+                last_synced_at=NOW,
+                last_open_sweep_at=NOW,
+                last_sync_status="ok",
+                derived_key=current_key(context["settings"]),
+            )
+        )
+        session.add_all(
+            [
+                OwnershipRule(
+                    repo_id=repo_id,
+                    source="area_owners",
+                    pattern="area-A",
+                    owners=["alice", "bob"],
+                    line_no=1,
+                ),
+                OwnershipRule(
+                    repo_id=repo_id,
+                    source="codeowners",
+                    pattern="src/*",
+                    owners=["carol"],
+                    line_no=1,
+                ),
+            ]
+        )
+    params = SnapshotParams(("a/b",), date(2026, 1, 1), date(2026, 1, 1))
+    service = SnapshotService(
+        context["session_factory"], context["redis"], context["settings"], NOW
+    )
+    async with context["session_factory"]() as session:
+        metadata = await service.metadata(session, params)
+        direct = await load_dataset(session, params, now=NOW)
+        reused = await load_dataset(session, params, now=NOW, metadata=metadata)
+    assert reused == direct
+    assert reused.repos[0].owners == (("area-A", 2), ("codeowners:src/*", 1))
+    snapshot = build_snapshot(reused, params=params)
+    assert snapshot["bottleneck_analysis"]["locations"][0]["owners_count"] == 2
 
 
 async def test_readonly_repeatable_snapshot_matches_pure_pipeline(context):

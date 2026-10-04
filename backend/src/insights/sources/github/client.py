@@ -1,3 +1,24 @@
+"""HTTP client for GitHub GraphQL and REST: retries, rate-limit waits and ETag caching."""
+
+from insights.domain import (
+    GitHubAuthError,
+    GitHubError,
+    GitHubNotFoundError,
+    GitHubQueryError,
+    GitHubRateLimited,
+    GitHubTransientError,
+)
+
+__all__ = [
+    "GitHubAuthError",
+    "GitHubClient",
+    "GitHubError",
+    "GitHubNotFoundError",
+    "GitHubQueryError",
+    "GitHubRateLimited",
+    "GitHubTransientError",
+    "RestResponse",
+]
 import asyncio
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
@@ -17,35 +38,9 @@ from insights.redis import github_etag_key
 logger = structlog.get_logger(__name__)
 
 
-class GitHubError(Exception):
-    """Sanitized upstream error; never includes headers or response bodies."""
-
-
-class GitHubAuthError(GitHubError):
-    pass
-
-
-class GitHubNotFoundError(GitHubError):
-    pass
-
-
-class GitHubRateLimited(GitHubError):  # noqa: N818
-    pass
-
-
-class GitHubQueryError(GitHubError):
-    pass
-
-
-class GitHubTransientError(GitHubError):
-    pass
-
-
 @dataclass(frozen=True, slots=True)
 class RestResponse:
-    status: int
     body: Any
-    etag: str | None
 
 
 class GitHubClient:
@@ -57,14 +52,13 @@ class GitHubClient:
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         clock: Callable[[], float] = time,
     ) -> None:
+        """Create authenticated HTTP/quota handling with injectable time and sleep."""
         self.settings = settings
         self.redis = redis
         self.sleep = sleep
         self.clock = clock
         self.lock = asyncio.Lock()
         self.rate_limit_remaining: int | None = None
-        self.page_size = settings.graphql_page_size
-        self.successful_pages = 0
         headers = {
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
@@ -77,9 +71,11 @@ class GitHubClient:
         )
 
     async def aclose(self) -> None:
+        """Close the owned HTTP client; supplied Redis remains caller-owned."""
         await self.http.aclose()
 
     async def _wait(self, delay: float, waited: float, reason: str) -> float:
+        """Sleep and return accumulated wait in seconds; reject totals above 900."""
         delay = max(0.0, delay)
         if waited + delay > 900:
             raise GitHubRateLimited("wait_budget_exceeded")
@@ -93,6 +89,11 @@ class GitHubClient:
         return waited + delay
 
     async def _request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+        """Send with up to four attempts, retrying network errors, 403/429 and 502-504.
+
+        Retry-After or the primary-limit reset sets the delay when present. Other 4xx fail at
+        once, and total sleep beyond 15 minutes raises GitHubRateLimited instead of stalling.
+        """
         waited = 0.0
         for attempt in range(4):
             response: httpx.Response | None = None
@@ -134,6 +135,12 @@ class GitHubClient:
         raise GitHubTransientError("retry_exhausted")
 
     async def graphql(self, query: str, variables: dict[str, Any]) -> dict[str, Any]:
+        """POST a query and return its `data`, mapping GraphQL errors to GitHubError types.
+
+        Requests are serialized, so a quota wait here pauses every caller of this client.
+        Reject errors even with HTTP 200 and partial data: storing an incomplete event history
+        as a successful page would make derived metrics and sync checkpoints unreliable.
+        """
         async with self.lock:
             response = await self._request(
                 "POST",
@@ -168,6 +175,7 @@ class GitHubClient:
                     graphql_cost=rate["cost"],
                     rate_limit_remaining=self.rate_limit_remaining,
                 )
+                # Below 200 points, wait for the reset rather than risk failing mid-sync.
                 if self.rate_limit_remaining < 200:
                     reset = datetime.fromisoformat(rate["resetAt"]).timestamp()
                     await self._wait(reset + 5 - self.clock(), 0, "low_quota")
@@ -180,6 +188,11 @@ class GitHubClient:
         *,
         accept: str | None = None,
     ) -> RestResponse:
+        """Fetch a relative API path, reusing an ETag only with its cached response body.
+
+        Relative paths keep authenticated requests on the configured GitHub API host.
+        Redis is best-effort; a 304 without a body is an error, never an empty success.
+        """
         if not path.startswith("/") or path.startswith("//") or "://" in path or "\\" in path:
             raise ValueError("REST path must be a relative API path")
         url = str(httpx.URL(self.settings.github_api_url.rstrip("/") + path, params=params))
@@ -198,7 +211,7 @@ class GitHubClient:
             if response.status_code == 304:
                 if b"body" not in cached:
                     raise GitHubQueryError("conditional_response_without_cache")
-                return RestResponse(304, orjson.loads(cached[b"body"]), cached[b"etag"].decode())
+                return RestResponse(orjson.loads(cached[b"body"]))
             body: Any = response.text if accept and "raw" in accept else response.json()
             etag = response.headers.get("etag")
             if self.redis is not None and etag:
@@ -209,4 +222,4 @@ class GitHubClient:
                         await pipeline.execute()
                 except RedisError:
                     logger.warning("github_cache_unavailable")
-            return RestResponse(response.status_code, body, etag)
+            return RestResponse(body)

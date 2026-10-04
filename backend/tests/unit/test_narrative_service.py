@@ -32,6 +32,7 @@ async def test_generation_repair_fallback_and_grounded_output(mode):
     llm = FakeLLMClient(script[mode]) if mode != "disabled" else None
     result = await generate(snapshot, audience="director", llm=llm, ci_complete=False, now=NOW)
     Narrative.model_validate(result.payload)
+    assert result.payload["lang"] == "en"
     meta = result.payload["meta"]
     assert meta["pack_hash"] == digest(pack)[:16]
     assert meta["generated_at"] == "2026-03-02T00:00:00Z"
@@ -71,7 +72,6 @@ async def test_missing_tool_use_repairs_with_text_message():
                     {"role": "assistant", "content": [{"text": "No tool"}]},
                     1,
                     2,
-                    "end_turn",
                 )
             return await super().submit(**kwargs)
 
@@ -90,7 +90,7 @@ async def test_generate_downgrade_is_code_owned(target, expected, monkeypatch):
     pack.update(audience="director", lang="en", abstain_reason=None, top_bottlenecks=[])
     import insights.narrative.service as service
 
-    monkeypatch.setattr(service, "build_evidence_pack", lambda *args: (pack, candidates))
+    monkeypatch.setattr(service, "build_evidence_pack", lambda *args, **kwargs: (pack, candidates))
     h = output["hypotheses"][0]
     h["downgrade"] = {"level": target, "reason": "The location evidence remains limited [E53]."}
     h["statement"] = (

@@ -4,7 +4,7 @@ from tests.analytics_factory import dataset, pr
 from tests.factories import at
 
 from insights.analytics.bottlenecks import at_risk
-from insights.analytics.rows import build_pr_rows
+from insights.analytics.snapshot import build_pr_rows
 from insights.analytics.timeline import Interval
 
 

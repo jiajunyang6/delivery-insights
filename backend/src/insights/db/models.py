@@ -1,3 +1,5 @@
+"""SQLAlchemy schema for synced source data, derived facts, snapshots and the job ledger."""
+
 from datetime import date, datetime
 from typing import Any
 from uuid import UUID
@@ -26,6 +28,14 @@ class Base(DeclarativeBase):
 
 
 class Repository(Base):
+    """A repository and its sync state.
+
+    `covered_since` starts the fully synced range, `sync_watermark` is the newest PR update
+    seen, `backfill_cursor` is where backfill resumes, and `data_version` increments when
+    stored data changes. `links_pending` marks links as stale; `derived_key` is set once every
+    PR is derived with that key.
+    """
+
     __tablename__ = "repositories"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -59,7 +69,6 @@ class PullRequest(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     repo_id: Mapped[int] = mapped_column(Integer, ForeignKey("repositories.id", ondelete="CASCADE"))
-    source_id: Mapped[str] = mapped_column(Text, unique=True)
     number: Mapped[int] = mapped_column(Integer)
     title: Mapped[str] = mapped_column(Text)
     body_excerpt: Mapped[str] = mapped_column(Text, server_default=text("''"))
@@ -67,7 +76,6 @@ class PullRequest(Base):
     state: Mapped[str] = mapped_column(Text)
     is_draft: Mapped[bool] = mapped_column(Boolean)
     author_login: Mapped[str | None] = mapped_column(Text)
-    author_type: Mapped[str] = mapped_column(Text)
     author_association: Mapped[str] = mapped_column(Text)
     is_bot_author: Mapped[bool] = mapped_column(Boolean)
     base_ref: Mapped[str] = mapped_column(Text)
@@ -76,15 +84,11 @@ class PullRequest(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     merged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    merged_by: Mapped[str | None] = mapped_column(Text)
     merge_commit_oid: Mapped[str | None] = mapped_column(Text)
     additions: Mapped[int] = mapped_column(Integer)
     deletions: Mapped[int] = mapped_column(Integer)
-    changed_files: Mapped[int] = mapped_column(Integer)
     labels: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'"))
-    files_truncated: Mapped[bool] = mapped_column(Boolean, server_default=text("FALSE"))
     content_hash: Mapped[str] = mapped_column(Text)
-    synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
         UniqueConstraint("repo_id", "number"),
         Index("ix_pr_repo_merged", "repo_id", "merged_at"),
@@ -137,7 +141,6 @@ class PrFact(Base):
     external_contributor: Mapped[bool] = mapped_column(Boolean)
     first_commit_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    first_response_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     first_review_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     first_approval_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -152,7 +155,6 @@ class PrFact(Base):
     review_rounds: Mapped[int] = mapped_column(Integer)
     feedback_before_approval: Mapped[int] = mapped_column(Integer)
     commits_after_first_review: Mapped[int] = mapped_column(Integer)
-    force_pushes_after_first_review: Mapped[int] = mapped_column(Integer)
     updates_after_approval: Mapped[int] = mapped_column(Integer)
     distinct_approvers: Mapped[int] = mapped_column(Integer)
     second_approval_wait_hours: Mapped[float | None] = mapped_column(Float)
@@ -171,22 +173,14 @@ class PrFact(Base):
         BigInteger, ForeignKey("pull_requests.id", ondelete="SET NULL")
     )
     reverted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    is_reland: Mapped[bool] = mapped_column(Boolean, server_default=text("FALSE"))
     reland_of_pr_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("pull_requests.id", ondelete="SET NULL")
-    )
-    superseded_by_pr_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("pull_requests.id", ondelete="SET NULL")
     )
     close_class: Mapped[str | None] = mapped_column(Text)
     state_at_close: Mapped[str | None] = mapped_column(Text)
     late_rejection: Mapped[bool] = mapped_column(Boolean, server_default=text("FALSE"))
     ci_covered: Mapped[bool] = mapped_column(Boolean, server_default=text("FALSE"))
-    author_open_prs_at_ready: Mapped[int | None] = mapped_column(Integer)
-    ready_weekday: Mapped[int | None] = mapped_column(SmallInteger)
-    ready_hour: Mapped[int | None] = mapped_column(SmallInteger)
     derive_key: Mapped[str | None] = mapped_column(Text)
-    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
         Index("ix_facts_repo_merged", "repo_id", "merged_at"),
         Index("ix_facts_repo_ready", "repo_id", "ready_at"),
@@ -209,7 +203,6 @@ class PrInterval(Base):
     __table_args__ = (
         UniqueConstraint("pr_id", "seq"),
         Index("ix_intervals_repo_state_start", "repo_id", "state", "start_at"),
-        Index("ix_intervals_pr", "pr_id"),
     )
 
 
@@ -243,7 +236,6 @@ class OwnershipRule(Base):
     pattern: Mapped[str] = mapped_column(Text)
     owners: Mapped[list[str]] = mapped_column(ARRAY(Text))
     line_no: Mapped[int] = mapped_column(Integer)
-    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     __table_args__ = (UniqueConstraint("repo_id", "source", "line_no"),)
 
 
@@ -255,7 +247,6 @@ class Snapshot(Base):
     repos: Mapped[list[str]] = mapped_column(ARRAY(Text))
     period_from: Mapped[date] = mapped_column(Date)
     period_to: Mapped[date] = mapped_column(Date)
-    data_versions: Mapped[dict[str, Any]] = mapped_column(JSONB)
     analytics_version: Mapped[str] = mapped_column(Text)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
     etag: Mapped[str] = mapped_column(Text)

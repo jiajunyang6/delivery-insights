@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { useAbortable } from "../hooks/useAbortable";
+import { GithubLink } from "./GithubLink";
 import { fetchJson, message, query } from "../api";
-import { hours, safeGithubUrl, stateLabels } from "../format";
+import { hours, stateLabels } from "../format";
 import type { Params, PrPage, RiskPr, Snapshot } from "../types";
 export function AtRiskTable({
   snapshot: s,
@@ -17,8 +19,7 @@ export function AtRiskTable({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [dataChanged, setDataChanged] = useState(false);
-  const controller = useRef<AbortController>();
-  useEffect(() => () => controller.current?.abort(), []);
+  const startRequest = useAbortable();
   function invalidate() {
     setExtra([]);
     setCursor(null);
@@ -28,9 +29,7 @@ export function AtRiskTable({
     );
   }
   async function load() {
-    controller.current?.abort();
-    const current = new AbortController();
-    controller.current = current;
+    const signal = startRequest();
     setBusy(true);
     setError("");
     try {
@@ -39,12 +38,13 @@ export function AtRiskTable({
         query(params) +
         "&at_risk=true&limit=50" +
         (cursor ? "&cursor=" + encodeURIComponent(cursor) : "");
-      const response = await fetchJson<PrPage>(path, current.signal, "no-cache");
-      if (current.signal.aborted) return;
+      const response = await fetchJson<PrPage>(path, signal, "no-cache");
+      if (signal.aborted) return;
       if (response.status !== 200)
         throw new Error(
           "Data is syncing. Refresh the report before loading more.",
         );
+      // Rows from a newer snapshot would not match the report shown, so stop paging.
       if (response.data.snapshot_id !== s.snapshot_id) {
         invalidate();
         return;
@@ -72,8 +72,9 @@ export function AtRiskTable({
       setCursor(response.data.next_cursor);
       setTotal(response.data.total);
     } catch (e) {
-      if (!current.signal.aborted) {
+      if (!signal.aborted) {
         const problem = message(e);
+        // Cursors are bound to a snapshot; the API rejects them once the data changes.
         if (
           problem.status === 422 &&
           problem.errors.some((p) => p.param === "cursor")
@@ -88,7 +89,7 @@ export function AtRiskTable({
         }
       }
     } finally {
-      if (!current.signal.aborted) setBusy(false);
+      if (!signal.aborted) setBusy(false);
     }
   }
   const rows = extra ?? s.at_risk_prs.slice(0, 5);
@@ -106,6 +107,12 @@ export function AtRiskTable({
         </div>
         <span>{s.at_risk_summary.critical} critical</span>
       </div>
+      <p className="footnote">
+        Age is time spent in the current waiting state; threshold is the
+        repository's historical limit for that state. Critical means the PR also
+        exceeds the higher critical threshold. These are waiting signals, not
+        individual performance scores.
+      </p>
       {dataChanged ? null : !rows.length ? (
         <p className="empty">
           No PRs opened or active this period exceed the waiting-time threshold.
@@ -126,15 +133,7 @@ export function AtRiskTable({
               {rows.map((p) => (
                 <tr key={p.repo + "/" + p.number}>
                   <td>
-                    {safeGithubUrl(p.url) ? (
-                      <a href={p.url} target="_blank" rel="noopener noreferrer">
-                        #{p.number} {p.title} ↗
-                      </a>
-                    ) : (
-                      <span>
-                        #{p.number} {p.title}
-                      </span>
-                    )}
+                    <GithubLink url={p.url}>#{p.number} {p.title}</GithubLink>
                   </td>
                   <td>{p.author ?? "deleted user"}</td>
                   <td>{stateLabels[p.state]}</td>

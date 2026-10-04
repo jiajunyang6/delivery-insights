@@ -1,3 +1,5 @@
+"""arq worker entry point: builds the job context and registers jobs and cron schedules."""
+
 from typing import Any, ClassVar
 
 from arq import cron
@@ -8,13 +10,14 @@ from insights.db.engine import create_database
 from insights.logging import configure_logging
 from insights.sources.github.adapter import GitHubAdapter
 from insights.sources.github.client import GitHubClient
-from insights.sync.enrichment import sync_ci_runs, sync_ownership
+from insights.sync.derive import rederive_repo
+from insights.sync.enrichment import enrich_repo
 from insights.sync.jobs import incremental_sync_all, reconcile_tracked_repos, sync_repo
 from insights.sync.maintenance import housekeeping, precompute_snapshots
-from insights.sync.rederive import rederive_repo
 
 
 async def startup(ctx: dict[str, Any]) -> None:
+    """Initialize worker database/GitHub dependencies and reconcile tracked sync/derivation jobs."""
     settings = Settings()
     configure_logging(settings.log_level)
     engine, sessions = create_database(settings)
@@ -30,6 +33,7 @@ async def startup(ctx: dict[str, Any]) -> None:
 
 
 async def shutdown(ctx: dict[str, Any]) -> None:
+    """Close the worker-owned GitHub client and dispose its database engine."""
     await ctx["client"].aclose()
     await ctx["engine"].dispose()
 
@@ -40,8 +44,7 @@ class WorkerSettings:
         rederive_repo,
         precompute_snapshots,
         housekeeping,
-        sync_ci_runs,
-        sync_ownership,
+        enrich_repo,
     ]
     cron_jobs: ClassVar[list[Any]] = [
         cron(incremental_sync_all, minute=set(range(0, 60, Settings().sync_interval_minutes))),

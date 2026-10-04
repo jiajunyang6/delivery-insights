@@ -1,20 +1,35 @@
+"""Rule-based findings and the headline sentence, derived from an assembled snapshot."""
+
 from typing import Any
 
 from insights.analytics import thresholds as t
 from insights.analytics.bottlenecks import what_if
-from insights.analytics.dataset import Dataset, hours, merged
+from insights.analytics.dataset import Dataset, closed, hours, merged
+from insights.analytics.pointer import resolve_pointer
 from insights.analytics.stats import ratio
 
-
-def resolve_pointer(payload: Any, pointer: str) -> Any:
-    current = payload
-    for part in pointer.lstrip("/").split("/") if pointer else []:
-        key = part.replace("~1", "/").replace("~0", "~")
-        current = current[int(key)] if isinstance(current, list) else current[key]
-    return current
+HEADLINE_PHRASES = {
+    "waste_high": "on PRs that were closed without merging or later reverted",
+    "merge_blocked": "on approved PRs waiting to merge",
+    "review_capacity": "on PRs waiting for a first review in {location}",
+    "review_queue_growth": (
+        "on PRs waiting for a first review while review demand outpaces first reviews"
+    ),
+    "review_concentration": (
+        "on PRs waiting for reviewers while reviews are concentrated on a few people"
+    ),
+    "ci_wait": "on PRs waiting for CI",
+    "rework_high": "on PRs waiting for authors to rework after review",
+    "external_contributor_wait": "on external contributors' PRs waiting for a first review",
+}
 
 
 def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str, Any]]:
+    """Evaluate finding rules against the unrounded snapshot and rank them.
+
+    Returns [] below MIN_SAMPLES_P50 merged PRs. Evidence refs are JSON pointers into the
+    snapshot. Ranked by impact hours, then severity, then id.
+    """
     if snapshot["efficiency"]["merged_prs"]["value"] < t.MIN_SAMPLES_P50:
         return []
     result: list[dict[str, Any]] = []
@@ -24,12 +39,21 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
         snapshot["efficiency"],
     )
     states = ledger["states"]
+    # Shares use the waiting time of every PR finished this period, merged or not. The
+    # time ledger covers merged PRs only, but waste also counts unmerged PRs; one shared
+    # denominator keeps every finding's share comparable and at most 100%. Findings may cover
+    # the same PR intervals, so their shares are not an exclusive partition summing to 100%.
+    finished_pr_hours = ledger["total_pr_hours"] + sum(
+        sum(hours(p, end=dataset.as_of).values()) for p in closed(dataset, dataset.current)
+    )
 
     def value(path: str) -> Any:
+        """Resolve a snapshot pointer and unwrap a metric's value when present."""
         resolved = resolve_pointer(snapshot, path)
         return resolved["value"] if isinstance(resolved, dict) and "value" in resolved else resolved
 
     def above(path: str, threshold: float) -> bool:
+        """Test a resolved value against an inclusive threshold; missing values do not qualify."""
         v = value(path)
         return v is not None and v >= threshold
 
@@ -44,6 +68,7 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
         location: str | None = None,
         stage: str | None = None,
     ) -> None:
+        """Append a finding with waiting-hour share, referenced evidence and optional what-if."""
         result.append(
             {
                 "id": f"{kind}:{location}" if location else kind,
@@ -53,7 +78,7 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
                 "title": title,
                 "location": location,
                 "impact_pr_hours": impact,
-                "impact_share": ratio(impact, ledger["total_pr_hours"]),
+                "impact_share": ratio(impact, finished_pr_hours),
                 "evidence": [
                     {"label": label, "value": value(ref), "unit": unit, "ref": ref}
                     for label, ref, unit in evidence
@@ -149,7 +174,7 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
             states["waiting_merge"]["pr_hours"],
             [
                 (
-                    "Share of PR time waiting to merge",
+                    "Share of merged-PR waiting time spent waiting to merge",
                     "/time_ledger/states/waiting_merge/share",
                     "share",
                 ),
@@ -180,7 +205,7 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
             states["waiting_ci"]["pr_hours"],
             [
                 (
-                    "Share of PR time waiting for CI",
+                    "Share of merged-PR waiting time spent waiting for CI",
                     "/time_ledger/states/waiting_ci/share",
                     "share",
                 ),
@@ -214,9 +239,9 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
     ):
         add(
             "waste_high",
-            "Significant work never ships",
-            "Review late rejections and PRs lost while waiting for review; "
-            "align on scope earlier and triage stale PRs.",
+            "Waiting time on unmerged or reverted PRs",
+            "Inspect PRs closed after long waits and reverted changes; "
+            "check review coverage, closure reasons and revert causes before choosing an action.",
             snapshot["waste"]["wasted_pr_hours"],
             [
                 ("Waste share", "/efficiency/waste_share", "share"),
@@ -269,6 +294,7 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
 
 
 def headline(snapshot: dict[str, Any]) -> str:
+    """One-sentence summary: cycle time change, then the top finding and its what-if."""
     cycle = snapshot["efficiency"]["cycle_time_p50_hours"]
     value, previous, change = cycle["value"], cycle["previous"], cycle["change_rel"]
     if value is None:
@@ -294,10 +320,12 @@ def headline(snapshot: dict[str, Any]) -> str:
         )
     if snapshot["bottlenecks"]:
         first = snapshot["bottlenecks"][0]
-        text += "; the main bottleneck is " + first["title"][0].lower() + first["title"][1:]
-        if first["type"] in {"review_capacity", "review_queue_growth"}:
-            share = snapshot["time_ledger"]["states"]["waiting_reviewer"]["share"]
-            text += f" ({share * 100:.0f}% of PR time waits on reviewers)"
+        phrase = HEADLINE_PHRASES.get(first["type"])
+        if phrase and first["impact_pr_hours"] > 0 and first["impact_share"] > 0:
+            text += (
+                f". The largest share of finished PR waiting time ({first['impact_share']:.0%}) "
+                f"is {phrase.format(location=first['location'])}"
+            )
         scenario = first["what_if"]
         if scenario and scenario["change_rel"] is not None:
             text += (

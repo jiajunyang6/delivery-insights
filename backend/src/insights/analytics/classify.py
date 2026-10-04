@@ -1,3 +1,5 @@
+"""Flow eligibility, location assignment and cross-PR revert/reland/close linking; no I/O."""
+
 import re
 from bisect import bisect_left, bisect_right
 from collections import Counter, defaultdict
@@ -22,22 +24,26 @@ LINK_FIELDS = (
     "reverts_pr_id",
     "reverted_by_pr_id",
     "reverted_at",
-    "is_reland",
     "reland_of_pr_id",
-    "superseded_by_pr_id",
     "close_class",
     "late_rejection",
-    "author_open_prs_at_ready",
 )
 
 
 def is_flow(facts: PrFacts) -> bool:
+    # Flow metrics cover human, ready-for-review PRs; bot and backport PRs are excluded.
+    """Return whether the PR is ready and eligible for human, non-backport flow metrics."""
     return not facts.is_bot_author and not facts.is_backport and facts.ready_at is not None
 
 
 def locations_for(
     pr: PullRequestRecord, dimension: str, depth: int, rules: Sequence[OwnershipRule]
 ) -> tuple[tuple[str, ...], str]:
+    """Return (locations, source), trying in order: matching labels, CODEOWNERS, directories.
+
+    CODEOWNERS follows GitHub semantics (last matching pattern wins). Directory locations are the
+    DIRECTORY_LOCATIONS_PER_PR most-touched paths at depth; a PR with no files is "unclassified".
+    """
     if dimension.startswith("label:"):
         prefix = dimension[6:].lower()
         labels = tuple(sorted({label for label in pr.labels if label.lower().startswith(prefix)}))
@@ -83,6 +89,7 @@ class HeadIndex:
     """Range minimum over creation times; avoids quadratic supersession scans."""
 
     def __init__(self, items: Sequence[LinkInput]) -> None:
+        """Index PR creation dates in a segment tree holding minimum merge-time/ID pairs."""
         ordered = sorted(items, key=lambda p: (p.record.created_at, p.pr_id))
         self.dates = [p.record.created_at for p in ordered]
         self.size = 1 << max(0, (len(ordered) - 1).bit_length())
@@ -99,9 +106,11 @@ class HeadIndex:
     def minimum(
         a: tuple[datetime, int] | None, b: tuple[datetime, int] | None
     ) -> tuple[datetime, int] | None:
+        """Return the earlier pair, treating None as an empty segment."""
         return b if a is None else (a if b is None else min(a, b))
 
     def earliest(self, start: datetime, end: datetime) -> tuple[datetime, int] | None:
+        """Earliest merge among indexed PRs created in inclusive [start, end]; None if empty."""
         left = self.size + bisect_left(self.dates, start)
         right = self.size + bisect_right(self.dates, end)
         result = None
@@ -117,28 +126,22 @@ class HeadIndex:
         return result
 
 
-def link_prs(
-    prs: Sequence[LinkInput], *, repo_full_name: str, default_branch: str
-) -> dict[int, PrFacts]:
-    wip = author_wip(prs)
-    by_number = {item.record.number: item for item in prs}
-    by_id = {item.pr_id: item for item in prs}
-    output = {
-        p.pr_id: replace(
-            p.facts,
-            is_revert=False,
-            reverts_pr_id=None,
-            reverted_by_pr_id=None,
-            reverted_at=None,
-            is_reland=False,
-            reland_of_pr_id=None,
-            superseded_by_pr_id=None,
-            close_class=None,
-            late_rejection=False,
-            author_open_prs_at_ready=wip.get(p.pr_id),
-        )
-        for p in prs
-    }
+@dataclass(frozen=True, slots=True)
+class LinkIndexes:
+    by_number: dict[int, LinkInput]
+    by_id: dict[int, LinkInput]
+    merged_titles: dict[str, list[LinkInput]]
+    sha_index: dict[str, list[LinkInput]]
+    head_indexes: dict[tuple[str, str], HeadIndex]
+    sha_dates: dict[str, list[datetime]]
+    title_dates: dict[str, list[datetime]]
+
+
+def build_link_indexes(prs: Sequence[LinkInput], default_branch: str) -> LinkIndexes:
+    """Build chronological title/SHA lookups and same-author/head supersession indexes.
+
+    SHA prefixes include abbreviated revert references; lookup positions use merge-time order.
+    """
     merged_titles: dict[str, list[LinkInput]] = defaultdict(list)
     sha_index: dict[str, list[LinkInput]] = defaultdict(list)
     heads: dict[tuple[str, str], list[LinkInput]] = defaultdict(list)
@@ -164,6 +167,29 @@ def link_prs(
         title: [p.record.merged_at for p in items if p.record.merged_at is not None]
         for title, items in merged_titles.items()
     }
+    return LinkIndexes(
+        {p.record.number: p for p in prs},
+        {p.pr_id: p for p in prs},
+        dict(merged_titles),
+        dict(sha_index),
+        head_indexes,
+        sha_dates,
+        title_dates,
+    )
+
+
+def link_reverts(
+    prs: Sequence[LinkInput],
+    output: dict[int, PrFacts],
+    indexes: LinkIndexes,
+    repo_full_name: str,
+) -> None:
+    """Update output in place, resolving explicit repo references before SHA/title heuristics.
+
+    SHA/title fallbacks consider only PRs merged before the revert was created. A detected
+    revert affects its original's reverted_at only after the revert itself is merged.
+    """
+    # Creation order lets a revert of a revert see its target already marked as a revert.
     for item in sorted(prs, key=lambda p: (p.record.created_at, p.pr_id)):
         pr, facts = item.record, output[item.pr_id]
         title = re.match(r'^Revert\s+"(?P<title>.+)"\s*$', pr.title, re.I)
@@ -177,12 +203,12 @@ def link_prs(
         is_revert = bool(title or body or (pr.title.lower().startswith("revert") and reverts))
         original: LinkInput | None = None
         if body and body[1].lower() == repo_full_name.lower():
-            original = by_number.get(int(body[2]))
+            original = indexes.by_number.get(int(body[2]))
         if original is None:
             candidates = []
             for sha in reverts:
-                entries = sha_index.get(sha, [])
-                index = bisect_left(sha_dates.get(sha, []), pr.created_at) - 1
+                entries = indexes.sha_index.get(sha, [])
+                index = bisect_left(indexes.sha_dates.get(sha, []), pr.created_at) - 1
                 if index >= 0:
                     candidates.append(entries[index])
             original = max(
@@ -190,16 +216,14 @@ def link_prs(
                 key=lambda p: (p.record.merged_at or p.record.created_at, p.pr_id),
                 default=None,
             )
-        if original is None and title and title[1] in merged_titles:
-            entries = merged_titles[title[1]]
-            index = bisect_left(title_dates[title[1]], pr.created_at) - 1
+        if original is None and title and title[1] in indexes.merged_titles:
+            entries = indexes.merged_titles[title[1]]
+            index = bisect_left(indexes.title_dates[title[1]], pr.created_at) - 1
             if index >= 0:
                 original = entries[index]
         if is_revert:
             if original and output[original.pr_id].is_revert:
-                facts = replace(
-                    facts, is_reland=True, reland_of_pr_id=output[original.pr_id].reverts_pr_id
-                )
+                facts = replace(facts, reland_of_pr_id=output[original.pr_id].reverts_pr_id)
             else:
                 facts = replace(
                     facts,
@@ -213,17 +237,30 @@ def link_prs(
                             old, reverted_by_pr_id=item.pr_id, reverted_at=pr.merged_at
                         )
         output[item.pr_id] = facts
+
+
+def link_relands_and_closes(
+    prs: Sequence[LinkInput],
+    output: dict[int, PrFacts],
+    indexes: LinkIndexes,
+    repo_full_name: str,
+) -> None:
+    """Update reland and closure classifications using the repository's already-resolved reverts.
+
+    A same-author merged successor takes precedence over no_review/abandoned/rejected, so
+    superseded PRs do not become waste simply because their original PR closed unmerged.
+    """
     reverted = {identifier: facts for identifier, facts in output.items() if facts.reverted_at}
     reverted_by_title = {
-        by_id[identifier].record.title: identifier for identifier in sorted(reverted)
+        indexes.by_id[identifier].record.title: identifier for identifier in sorted(reverted)
     }
     for item in prs:
         pr, facts = item.record, output[item.pr_id]
         if re.match(r"^(Reland|Re-land|Reapply|Re-apply)\b", pr.title, re.I):
             reference = re.search(r"#(\d+)", pr.title + "\n" + pr.body_excerpt)
             original_id = None
-            if reference and int(reference[1]) in by_number:
-                candidate_id = by_number[int(reference[1])].pr_id
+            if reference and int(reference[1]) in indexes.by_number:
+                candidate_id = indexes.by_number[int(reference[1])].pr_id
                 if candidate_id in reverted:
                     original_id = candidate_id
             quoted = re.search(r'"(.+)"', pr.title)
@@ -232,7 +269,7 @@ def link_prs(
             ).strip('" ')
             if original_id is None:
                 original_id = reverted_by_title.get(quoted[1] if quoted else raw_title)
-            facts = replace(facts, is_reland=True, reland_of_pr_id=original_id)
+            facts = replace(facts, reland_of_pr_id=original_id)
         if pr.state == "CLOSED" and pr.closed_at and is_flow(facts):
             author = pr.author.login.lower() if pr.author.login else None
             superseded: list[tuple[datetime, int | None]] = []
@@ -242,7 +279,7 @@ def link_prs(
                 payload = event.payload
                 if payload["source_repo"].lower() != repo_full_name.lower():
                     continue
-                source = by_number.get(payload["source_number"])
+                source = indexes.by_number.get(payload["source_number"])
                 source_author = (
                     source.record.author.login if source else payload.get("source_author")
                 )
@@ -268,8 +305,8 @@ def link_prs(
                 ):
                     superseded.append((merged_at, source.pr_id if source else None))
             key = (author or "", pr.head_ref)
-            if author and key in head_indexes:
-                successor_candidate = head_indexes[key].earliest(
+            if author and key in indexes.head_indexes:
+                successor_candidate = indexes.head_indexes[key].earliest(
                     pr.closed_at, pr.closed_at + timedelta(days=SUPERSEDE_WINDOW_DAYS)
                 )
                 if successor_candidate:
@@ -284,9 +321,6 @@ def link_prs(
                 final_close = max(closing, key=lambda e: e.occurred_at, default=None)
                 if final_close and human_event(final_close, pr.author.login):
                     close_class = "rejected"
-            successor = (
-                min(superseded, key=lambda pair: (pair[0], pair[1] or 0))[1] if superseded else None
-            )
             late = close_class == "rejected" and (
                 bool(
                     facts.ready_at
@@ -294,14 +328,46 @@ def link_prs(
                 )
                 or facts.review_rounds >= LATE_REJECTION_ROUNDS
             )
-            facts = replace(
-                facts, close_class=close_class, superseded_by_pr_id=successor, late_rejection=late
-            )
+            facts = replace(facts, close_class=close_class, late_rejection=late)
         output[item.pr_id] = facts
+
+
+def link_prs(
+    prs: Sequence[LinkInput],
+    *,
+    repo_full_name: str,
+    default_branch: str,
+) -> dict[int, PrFacts]:
+    """Recompute cross-PR link facts for one repo and return new facts keyed by pr_id.
+
+    Link fields are reset first, so the result depends only on the given PRs. Reverts find their
+    original via a "Reverts owner/repo#N" body line, reverted commit SHAs, or the quoted title;
+    reverting a revert records a reland. Unmerged flow closes are classified as superseded (the
+    same author merged a cross-referenced PR, or opened a merged one on the same head branch, by
+    SUPERSEDE_WINDOW_DAYS after the close), no_review, rejected (reviewed, then finally closed by
+    another human) or abandoned.
+    """
+    output = {
+        p.pr_id: replace(
+            p.facts,
+            is_revert=False,
+            reverts_pr_id=None,
+            reverted_by_pr_id=None,
+            reverted_at=None,
+            reland_of_pr_id=None,
+            close_class=None,
+            late_rejection=False,
+        )
+        for p in prs
+    }
+    indexes = build_link_indexes(prs, default_branch)
+    link_reverts(prs, output, indexes, repo_full_name)
+    link_relands_and_closes(prs, output, indexes, repo_full_name)
     return output
 
 
 def ownership_counts(rules: Sequence[OwnershipRule]) -> tuple[tuple[str, int], ...]:
+    """Count distinct area owners and last-rule CODEOWNERS owners in sorted pattern order."""
     areas: dict[str, set[str]] = {}
     code: dict[str, int] = {}
     for rule in sorted(rules, key=lambda r: (r.source, r.line_no)):
@@ -310,24 +376,3 @@ def ownership_counts(rules: Sequence[OwnershipRule]) -> tuple[tuple[str, int], .
         elif rule.source == "codeowners":
             code["codeowners:" + rule.pattern] = len(set(rule.owners))
     return tuple(sorted({**code, **{key: len(owners) for key, owners in areas.items()}}.items()))
-
-
-def author_wip(prs: Sequence[LinkInput]) -> dict[int, int]:
-    """Count simultaneous flow PRs using sorted start/end indexes, excluding self."""
-    groups: dict[str, list[LinkInput]] = defaultdict(list)
-    for item in prs:
-        author = item.record.author.login
-        if author and is_flow(item.facts):
-            groups[author.lower()].append(item)
-    result = {}
-    for group in groups.values():
-        starts = sorted(p.facts.ready_at for p in group if p.facts.ready_at is not None)
-        ends = sorted(p.facts.end_at for p in group if p.facts.end_at is not None)
-        for p in group:
-            at = p.facts.ready_at
-            if at is not None:
-                self_active = p.facts.end_at is None or at < p.facts.end_at
-                result[p.pr_id] = (
-                    bisect_right(starts, at) - bisect_right(ends, at) - int(self_active)
-                )
-    return result

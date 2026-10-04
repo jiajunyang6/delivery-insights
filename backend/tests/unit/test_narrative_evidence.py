@@ -2,7 +2,7 @@ from copy import deepcopy
 
 from tests.narrative_factory import entry, golden, scoring_fixture
 
-from insights.analytics.findings import resolve_pointer
+from insights.analytics.pointer import resolve_pointer
 from insights.analytics.snapshot import canonical
 from insights.narrative.evidence import build_evidence_pack, extract_evidence, observations
 from insights.narrative.hypotheses import level, score_hypotheses

@@ -1,38 +1,113 @@
-# Repository Guidelines
+# AGENTS.md
 
-## Project Structure & Module Organization
+Instructions for coding agents working in this repository. Read this file first; `README.md`
+and `NOTES.md` describe the product, `docs/REFERENCE.md` holds the current contracts.
 
-- `backend/src/insights/`: FastAPI routes, GitHub adapters, sync workers, database access, analytics, and narratives.
-- `backend/migrations/`: Alembic schema revisions. `backend/tests/`: unit/integration suites, fixtures, and golden snapshots. `backend/eval/`: synthetic scenarios and evaluation harness.
-- `frontend/src/`: React/TypeScript dashboard, components, and CSS assets.
-- `docs/plan/`: requirements; `docs/DECISIONS.md`: architectural decisions; `docs/EVALUATION.md`: evaluation records.
-- `scripts/smoke.sh`: HTTP smoke checks; `.github/workflows/ci.yml`: CI gates.
+## Ground rules
 
-## Build, Test, and Development Commands
+- Ask the user before anything destructive or irreversible: `docker compose down -v`, deleting
+  data or files, force-pushing, or rewriting published history.
+- Commits use Conventional Commits (`fix(analytics): ...`, `feat(web): ...`, `docs: ...`), stay
+  focused, and are authored by the repository owner. Never add AI attribution trailers
+  (`Co-Authored-By`, session links) or commit under an AI identity.
+- Never commit `.env`, credentials, local overrides (`docker-compose.override.yml`) or working
+  notes such as `REFACTOR_PLAN.md`. Keep tokens and secrets out of logs.
+- Code, docs and all user-facing text are English. Files use LF line endings (`.gitattributes`).
 
-Use Python 3.12, uv, Node 24, and Docker Compose v2. Preserve lockfiles.
+## Repository map
 
-- In `backend/`, run `uv sync --frozen`; in `frontend/`, run `npm ci`.
-- Copy `.env.example` to `.env` if absent, then run `docker compose up --build -d` from the root. Dashboard: `http://localhost:5173`; API docs: `http://localhost:8000/docs`.
-- `make lint`: Ruff lint/format checks and strict mypy. `make fmt`: apply backend formatting and lint fixes.
-- `make test-unit`: tests without Docker. `make test`: full suite, including container integration tests.
-- `make eval-offline`: synthetic evaluation with stub LLM. `make eval`: credentialed Bedrock evaluation. `make smoke`: live HTTP checks.
-- In `frontend/`, use `npm run dev`, `npm run typecheck`, and `npm run build` for development, type checking, and production output.
+| Path | Responsibility |
+|---|---|
+| `backend/src/insights/sources/github/` | GraphQL/REST client, queries and normalization (the only GitHub I/O) |
+| `backend/src/insights/sync/` | arq jobs: `queue.py` job lifecycle and locks, `jobs.py` sync runs, `store.py` writes, `derive.py` timelines/facts/links and rederivation, `enrichment.py` CI and CODEOWNERS |
+| `backend/src/insights/db/` | SQLAlchemy models and loaders that turn rows into immutable records |
+| `backend/src/insights/analytics/` | Pure computation of the snapshot: timeline, facts, efficiency, bottlenecks, findings, headline |
+| `backend/src/insights/snapshots/` | Snapshot orchestration, caching, filters and domain errors |
+| `backend/src/insights/narrative/` | Evidence pack, hypothesis scoring, prompt, validator, template fallback, LLM client |
+| `backend/src/insights/api/` | FastAPI routes, params, schemas (strict OpenAPI contract), errors, middleware |
+| `backend/migrations/` | Alembic, currently one initial revision |
+| `backend/tests/` | Unit and integration tests, factories, golden snapshot (`tests/golden/`) |
+| `backend/eval/` | Synthetic scenarios and the narrative evaluation harness |
+| `frontend/src/` | React dashboard: components, `format.ts`, `hooks/useAbortable.ts` |
+| `docs/` | `REFERENCE.md` contracts, `DECISIONS.md` why, `EVALUATION.md` eval runs, `PLAN.md` historical plan (not authoritative) |
 
-On Windows without Make, use the equivalent `uv run` commands documented in `README.md`.
+## Commands
 
-## Coding Style & Naming Conventions
+Python 3.12 with uv, Node 24, Docker Compose v2. Keep lockfiles; install with
+`uv sync --frozen` (backend) and `npm ci` (frontend).
 
-Use four-space Python indentation, type annotations, snake_case functions/modules, and PascalCase classes. Ruff targets 100-character lines; mypy is strict. Match frontend two-space indentation, double quotes, semicolons, PascalCase component files, and camelCase helpers. TypeScript uses strict checking. Write documentation and user-facing prose in English.
+| Command | Purpose |
+|---|---|
+| `docker compose up --build -d` | Run the stack (dashboard :5173, API docs :8000/docs); needs `.env` from `.env.example` |
+| `make lint` / `make fmt` | Ruff + strict mypy / apply formatting and fixes |
+| `make test-unit` / `make test` | Unit tests / full suite (integration tests need Docker) |
+| `make eval-offline` | 20-case narrative evaluation with the stub LLM |
+| `make eval` | Same against real Bedrock; needs the user's credentials, so ask the user to run it |
+| `npm test`, `npm run typecheck`, `npm run build` | Frontend checks (in `frontend/`) |
 
-## Testing Guidelines
+Without Make (Windows), run the equivalent `uv run` commands from the Makefile.
 
-Use pytest/pytest-asyncio; name files `test_*.py` and functions `test_*`. Mark integration tests `integration`; Testcontainers requires Docker for PostgreSQL 16 and Redis 7. Mock GitHub/Bedrock calls. Cover changed behavior, timeline invariants, deterministic snapshots, and narrative validation. No minimum coverage percentage is configured. For UI changes, run typecheck/build and verify affected browser flows.
+## Invariants
 
-## Commit & Pull Request Guidelines
+**Boundaries**
+- `analytics/` performs no database or HTTP I/O. API requests read local data only; workers
+  are the only callers of GitHub.
+- `snapshots/`, `narrative/` and `sync/` never import `api.*`.
+- Keep `analytics/types.py`, `analytics/facts.py` and `analytics/pointer.py` as separate
+  modules; merging them creates import cycles. After moving code, import every module in a
+  fresh interpreter to catch cycles.
 
-Follow history's Conventional Commits: `fix(analytics): ...`, `feat(web): ...`, or `docs: ...`. Keep commits focused. PRs should explain behavior changes, link relevant issues or plan sections, report checks and pending verification, and include screenshots for UI changes.
+**Determinism and versions** (constants live in code; do not copy their values into docs)
+- Snapshots are pure functions of their inputs: the same data and parameters give the same
+  bytes. The golden file pins this.
+- Bump `ANALYTICS_VERSION` (`analytics/__init__.py`) whenever snapshot output or derived facts
+  change. It is part of the snapshot ID and of the derive key: new requests get new snapshot
+  IDs (old snapshots stay readable by ID, so caches are isolated, not invalidated) and workers
+  rederive existing PRs in the background.
+- `SAMPLING_SEED_VERSION` (`analytics/stats.py`) freezes bootstrap seeds. Change it only to
+  change statistical sampling on purpose.
+- Bump `PROMPT_VERSION` (`narrative/prompt.py`) for any prompt or tool-schema change.
 
-## Architecture & Configuration
+**Metric semantics**
+- Every section uses the period-active cohort: PRs opened, or with identified human activity,
+  in the period. Comparisons apply the same rule to the previous period.
+- The time ledger covers merged PRs only. Finding `impact_share` divides by finished PR waiting
+  time: post-ready waiting time of eligible PRs merged or closed unmerged in the period (no open,
+  bot or backport PRs, no pre-ready coding time).
+- Wording must match what is measured: PR-hours are elapsed waiting, not effort; the top finding
+  is ranked by waiting time, not a proven cause; a large change can still be within normal
+  variation. Keep the frontend guides, narrative template and headline consistent.
 
-Keep analytics free of database/HTTP I/O; API requests read local data, while workers ingest GitHub. Apply the same period-active cohort across metrics, risks, narratives, and drilldowns. Keep `.env` and credentials out of Git/logs; send only structured, sanitized evidence to the LLM.
+**Narrative**
+- Code computes every number; the LLM only writes wording. Outputs must pass the validator
+  (numbers, citations, hedge levels, English-only check); otherwise one repair, then the
+  template. Never send PR titles, bodies, comments or user logins to the LLM.
+
+**Data collection and storage**
+- GraphQL queries must keep the PR `id` (timeline pagination) and actor `__typename` (bot
+  detection), even if those values are not stored.
+- Until the first release, schema changes edit the single initial migration and require a
+  database rebuild (ask before `down -v`). After release, use forward migrations only.
+
+## Comments
+
+- Every module starts with a one- or two-line docstring: responsibility and boundary.
+- Docstrings go on cross-layer entry points and contracts: one summary line, then only
+  non-obvious details (units, window semantics, when `None` is returned, determinism).
+- Inline comments explain why, not what; do not restate names or types.
+- No change history, ticket numbers, authorship or commented-out code. Lines stay within 100
+  characters. Update comments when behavior changes; long explanations belong in
+  `docs/REFERENCE.md`.
+
+## Verification
+
+- Every change: `make lint`, `make test`, `make eval-offline`, plus frontend checks when
+  `frontend/` changes.
+- Golden snapshot: regenerate with `UPDATE_GOLDEN=1 uv run pytest tests/unit/test_snapshot.py` (in `backend/`)
+  and review the diff; it may contain only the intended changes.
+- Prompt changes need a real `make eval`: all gates pass, first-attempt validity at least 0.90
+  and numeric, citation and hedge consistency 1.00. Record results in `docs/EVALUATION.md`.
+- UI changes: check both views, 7/30/60-day periods, the pending state, Load more and the
+  narrative panel in a browser.
+- Update the docs your change affects: README (run), NOTES (submission), REFERENCE (contracts),
+  DECISIONS (reasons).

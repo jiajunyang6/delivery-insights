@@ -1,3 +1,5 @@
+"""GitHub implementation of SourceAdapter. sources/github is the only package that calls GitHub."""
+
 from contextlib import suppress
 from datetime import datetime
 from urllib.parse import quote
@@ -24,29 +26,48 @@ logger = structlog.get_logger(__name__)
 
 class GitHubAdapter:
     def __init__(self, client: GitHubClient) -> None:
+        """Bind the shared GitHub client and initialize adaptive pagination state."""
         self.client = client
+        self.reset()
+
+    def reset(self) -> None:
+        """Restore configured page size and clear the consecutive-success counter."""
+        self.page_size = self.client.settings.graphql_page_size
+        self.successful_pages = 0
 
     async def pull_requests_page(
         self, repo: RepoRef, *, cursor: str | None, page_size: int, open_only: bool = False
     ) -> PageResult:
+        """Fetch one page of PRs, most recently updated first, with complete timelines.
+
+        Transient errors halve the page size (floor 5) and retry; the configured size returns
+        after two consecutive successful pages. PRs that fail normalization are counted in
+        `skipped_prs` instead of failing the page.
+        """
         try:
             page = await self._pull_requests_page(
                 repo, cursor=cursor, page_size=page_size, open_only=open_only
             )
         except Exception:
-            self.client.successful_pages = 0
+            self.successful_pages = 0
             raise
-        self.client.successful_pages = min(2, self.client.successful_pages + 1)
-        if self.client.successful_pages == 2:
-            self.client.page_size = self.client.settings.graphql_page_size
+        self.successful_pages = min(2, self.successful_pages + 1)
+        if self.successful_pages == 2:
+            self.page_size = self.client.settings.graphql_page_size
         return page
 
     async def _pull_requests_page(
         self, repo: RepoRef, *, cursor: str | None, page_size: int, open_only: bool = False
     ) -> PageResult:
+        """Materialize a page, completing each PR's timeline before normalization.
+
+        Page bounds retain available raw updatedAt values even when other fields are malformed,
+        so normalization skips do not discard watermark progress. Upstream failures propagate;
+        they must not be treated as a successfully completed page with missing history.
+        """
         if not REPO_RE.fullmatch(repo.full_name):
             raise ValueError("Invalid repository")
-        size = min(page_size, self.client.page_size)
+        size = min(page_size, self.page_size)
         while True:
             try:
                 data = await self.client.graphql(
@@ -61,11 +82,11 @@ class GitHubAdapter:
                 )
                 break
             except GitHubTransientError:
-                self.client.successful_pages = 0
+                self.successful_pages = 0
                 if size <= 5:
                     raise
                 size = max(5, size // 2)
-                self.client.page_size = size
+                self.page_size = size
         repository = data.get("repository")
         if not repository:
             raise GitHubNotFoundError("repository_not_found")
@@ -80,6 +101,7 @@ class GitHubAdapter:
             with suppress(KeyError, TypeError, ValueError, AttributeError):
                 updated_at.append(parse_time(remove_nulls(node["updatedAt"])))
             try:
+                # Timelines over 100 items continue by PR node id, which is why queries fetch `id`.
                 timeline = node["timelineItems"]
                 seen: set[str] = set()
                 while timeline["pageInfo"]["hasNextPage"]:
@@ -124,11 +146,16 @@ class GitHubAdapter:
     async def ci_runs(
         self, repo: RepoRef, *, created_from: datetime, created_to: datetime
     ) -> list[CiRun]:
+        """Validate the repository and fetch pull-request CI runs within inclusive time bounds."""
         if not REPO_RE.fullmatch(repo.full_name):
             raise ValueError("Invalid repository")
         return await fetch_runs(self.client, repo, created_from=created_from, created_to=created_to)
 
     async def ownership_rules(self, repo: RepoRef) -> list[OwnershipRule]:
+        """Read the first available CODEOWNERS file plus configured area-owner rules.
+
+        Missing files are allowed; other upstream errors propagate instead of implying no owners.
+        """
         if not REPO_RE.fullmatch(repo.full_name):
             raise ValueError("Invalid repository")
         rules: list[OwnershipRule] = []

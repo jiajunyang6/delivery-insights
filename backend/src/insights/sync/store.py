@@ -1,7 +1,11 @@
-from dataclasses import dataclass
+"""Persist one fetched page of PRs and derive facts for the PRs that actually changed."""
+
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime
+from hashlib import sha256
 from typing import Any
 
+import orjson
 from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from insights.config import Settings
 from insights.db.models import PrEvent, PrFile, PullRequest, Repository
 from insights.domain import PageResult, PullRequestRecord
-from insights.sources.github.normalize import content_hash
 from insights.sync.derive import derive_prs
 
 
@@ -22,18 +25,17 @@ class SaveResult:
     prs_created: int = 0
 
 
-def pr_values(record: PullRequestRecord, repo_id: int, now: datetime) -> dict[str, Any]:
+def pr_values(record: PullRequestRecord, repo_id: int) -> dict[str, Any]:
+    """Project source PR fields, author/labels and content hash into a database insert mapping."""
     fields = {
         name: getattr(record, name)
         for name in (
-            "source_id",
             "number",
             "title",
             "body_excerpt",
             "url",
             "state",
             "is_draft",
-            "author_type",
             "author_association",
             "base_ref",
             "head_ref",
@@ -41,12 +43,9 @@ def pr_values(record: PullRequestRecord, repo_id: int, now: datetime) -> dict[st
             "updated_at",
             "closed_at",
             "merged_at",
-            "merged_by",
             "merge_commit_oid",
             "additions",
             "deletions",
-            "changed_files",
-            "files_truncated",
         )
     }
     return {
@@ -56,7 +55,6 @@ def pr_values(record: PullRequestRecord, repo_id: int, now: datetime) -> dict[st
         "is_bot_author": record.author.is_bot,
         "labels": list(record.labels),
         "content_hash": content_hash(record),
-        "synced_at": now,
     }
 
 
@@ -66,8 +64,13 @@ async def save_page(
     page: PageResult,
     *,
     now: datetime,
-    settings: Settings | None = None,
+    settings: Settings,
 ) -> SaveResult:
+    """Upsert changed PRs with their events and files and derive them, in the caller's transaction.
+
+    Unchanged content hashes are skipped and versions older than the stored `updated_at` are
+    rejected, both here and in the upsert, so a stale page cannot overwrite fresher data.
+    """
     existing = {
         number: (stored_hash, updated_at)
         for number, stored_hash, updated_at in (
@@ -79,7 +82,7 @@ async def save_page(
             )
         ).all()
     }
-    # A backfill page can have been downloaded before a checkpoint's catch-up.
+    # A prefetched backfill page can predate a checkpoint's catch-up and must not regress rows.
     records = [
         p
         for p in page.prs
@@ -93,7 +96,7 @@ async def save_page(
     )
     if not records:
         return SaveResult(0, 0, ())
-    values = [pr_values(pr, repo_id, now) for pr in records]
+    values = [pr_values(pr, repo_id) for pr in records]
     statement = insert(PullRequest).values(values)
     upsert = statement.on_conflict_do_update(
         index_elements=["repo_id", "number"],
@@ -104,6 +107,8 @@ async def save_page(
         },
         where=statement.excluded.updated_at >= PullRequest.updated_at,
     ).returning(PullRequest.number, PullRequest.id)
+    # Older overlapping pages can lose the updated_at guard. Rebuild child rows only for PRs
+    # actually returned by the upsert, or a stale page could replace their newer event history.
     ids: dict[int, int] = dict((await session.execute(upsert)).all())
     records = [pr for pr in records if pr.number in ids]
     if not records:
@@ -139,5 +144,13 @@ async def save_page(
             links_pending=True,
         )
     )
-    violations = await derive_prs(session, pr_ids, settings=settings or Settings(), now=now)
+    violations = await derive_prs(session, pr_ids, settings=settings, now=now)
     return SaveResult(len(records), len(events), pr_ids, violations, created)
+
+
+def content_hash(pr: PullRequestRecord) -> str:
+    """Hash normalized source content with stable event order; identical re-reads skip writes."""
+    normalized = replace(
+        pr, events=tuple(sorted(pr.events, key=lambda e: (e.occurred_at, e.kind, e.dedup_key)))
+    )
+    return sha256(orjson.dumps(asdict(normalized), option=orjson.OPT_SORT_KEYS)).hexdigest()

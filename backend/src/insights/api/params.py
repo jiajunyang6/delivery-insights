@@ -1,31 +1,25 @@
+"""Strict parsing of query and path parameters; failures raise problem+json errors."""
+
 import re
-from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from uuid import UUID
 
 from starlette.datastructures import QueryParams
 
 from insights.analytics.dataset import SnapshotParams
-from insights.api.errors import ProblemError
-from insights.config import NAME_RE, OWNER_RE, REPO_RE, Settings
+from insights.api.errors import ProblemError, invalid_many
+from insights.config import MAX_PERIOD_DAYS, NAME_RE, OWNER_RE, REPO_RE, Settings
+from insights.snapshots.errors import invalid as invalid
+from insights.snapshots.filters import CURSOR_RE
+from insights.snapshots.filters import PrFilters as PrFilters
 
 DATE_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 SNAPSHOT_RE = re.compile(r"^s_[0-9a-f]{16}$")
 LOCATION_RE = re.compile(r"^[^\x00-\x1f\x7f]{1,200}$")
-CURSOR_RE = re.compile(r"^[A-Za-z0-9_-]{1,512}$")
-
-
-def invalid(param: str, message: str = "invalid value") -> ProblemError:
-    return ProblemError(
-        422,
-        "invalid-parameter",
-        "Invalid parameter",
-        "One or more parameters are invalid.",
-        errors=[{"param": param, "message": message}],
-    )
 
 
 def tracked_repos(repos: list[str], settings: Settings) -> tuple[str, ...]:
+    """Return configured spellings of the repos, de-duplicated; 403 if any is not tracked."""
     allowed = {repo.lower(): repo for repo in settings.tracked_repo_list}
     unknown = [repo for repo in repos if repo.lower() not in allowed]
     if unknown or not repos:
@@ -40,6 +34,12 @@ def tracked_repos(repos: list[str], settings: Settings) -> tuple[str, ...]:
 
 
 def parse_params(query: QueryParams, settings: Settings, now: datetime) -> SnapshotParams:
+    """Resolve repo/org and the date range, reporting all invalid fields in one 422.
+
+    Dates default to the 30 days ending on now.date(); the range must end by that date, span at
+    most MAX_PERIOD_DAYS and start within the backfill horizon. An org expands to the tracked
+    repos under that owner.
+    """
     errors = []
     repos, org = query.getlist("repo"), query.get("org")
     if bool(repos) == (org is not None):
@@ -66,7 +66,7 @@ def parse_params(query: QueryParams, settings: Settings, now: datetime) -> Snaps
         start, end = dates["from"], dates["to"]
         if start > end:
             errors.append({"param": "from", "message": "must not be later than 'to'"})
-        if (end - start).days + 1 > 366:
+        if (end - start).days + 1 > MAX_PERIOD_DAYS:
             errors.append({"param": "to", "message": "period must not exceed 366 days"})
         if end > today:
             errors.append({"param": "to", "message": "must not be later than today"})
@@ -75,13 +75,7 @@ def parse_params(query: QueryParams, settings: Settings, now: datetime) -> Snaps
                 {"param": "from", "message": "must be within the configured backfill horizon"}
             )
     if errors:
-        raise ProblemError(
-            422,
-            "invalid-parameter",
-            "Invalid parameter",
-            "One or more parameters are invalid.",
-            errors=errors,
-        )
+        raise invalid_many(errors)
     if org is not None:
         repos = [
             repo for repo in settings.tracked_repo_list if repo.split("/")[0].lower() == org.lower()
@@ -101,6 +95,7 @@ def parse_params(query: QueryParams, settings: Settings, now: datetime) -> Snaps
 
 
 def parse_repo_path(owner: str, name: str, settings: Settings) -> str:
+    """Validate owner/name syntax and return its tracked repository, or raise a problem."""
     if OWNER_RE.fullmatch(owner) is None:
         raise invalid("owner")
     if NAME_RE.fullmatch(name) is None:
@@ -109,12 +104,14 @@ def parse_repo_path(owner: str, name: str, settings: Settings) -> str:
 
 
 def validate_snapshot_id(value: str) -> str:
+    """Return a valid snapshot identifier unchanged, or raise a 422 parameter problem."""
     if SNAPSHOT_RE.fullmatch(value) is None:
         raise invalid("snapshot_id")
     return value
 
 
 def validate_job_id(value: str) -> UUID:
+    """Parse a canonical lowercase, hyphenated UUID, or raise a 422 parameter problem."""
     try:
         parsed = UUID(value)
         if str(parsed) != value:
@@ -124,18 +121,8 @@ def validate_job_id(value: str) -> UUID:
         raise invalid("job_id") from exc
 
 
-@dataclass(frozen=True, slots=True)
-class PrFilters:
-    status: str = "merged"
-    at_risk: bool = False
-    state: str | None = None
-    location: str | None = None
-
-    def canonical_dict(self) -> dict[str, object]:
-        return asdict(self)
-
-
 def parse_filters(query: QueryParams) -> tuple[PrFilters, int, str | None]:
+    """Parse PR list filters; at_risk requires open PRs and state applies only to open PRs."""
     risk = query.get("at_risk", "false")
     if risk not in {"true", "false"}:
         raise invalid("at_risk")

@@ -1,4 +1,9 @@
-from collections.abc import Mapping
+"""Deterministic scoring of the four library hypotheses against evidence items.
+
+Code decides which hypotheses qualify and their confidence band; the LLM only words them.
+"""
+
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,7 +15,58 @@ from insights.analytics.thresholds import (
     REVIEW_CAPACITY_MIN_WAIT_SHARE,
 )
 
-LEVEL_ORDER = {"low": 0, "medium": 1, "high": 2}
+
+@dataclass(frozen=True, slots=True)
+class ConfidenceLevel:
+    minimum: float
+    exclusive: bool
+    downgrade_cap: float
+
+
+# Each downgrade_cap sits inside its own band (0.5 is still low, 0.74 still medium), so a
+# capped or downgraded confidence never lands back in a higher band.
+LEVELS = {
+    "low": ConfidenceLevel(0.35, False, 0.5),
+    "medium": ConfidenceLevel(0.5, True, 0.74),
+    "high": ConfidenceLevel(0.75, False, 1.0),
+}
+LEVEL_ORDER = {name: index for index, name in enumerate(LEVELS)}
+STEPS = ("symptom", "stage", "location", "mechanism")
+CI_RUN_IDS = frozenset({"E44", "E45", "E46"})
+CI_EVIDENCE_IDS = CI_RUN_IDS | {"E20", "E39", "E47"}
+LOCATION_SLOTS = {"pickup_ratio": 0, "waiting_share": 1, "added_wait_share": 2, "owners": 3}
+DEFAULT_ABSTAIN_REASON = "insufficient_signal"
+
+
+def location_id(index: int, slot: str) -> str:
+    """Return the reserved evidence ID for one zero-based location slot."""
+    return f"E{51 + 4 * index + LOCATION_SLOTS[slot]}"
+
+
+def chain_ids(candidate: Mapping[str, Any]) -> list[str]:
+    """Flatten the candidate's ordered evidence steps, removing duplicate IDs."""
+    return list(dict.fromkeys(i for step in STEPS for i in candidate["chain"].get(step, [])))
+
+
+def allowed_ids(candidate: Mapping[str, Any]) -> set[str]:
+    """IDs a hypothesis statement may cite: chain, counter-evidence and ruled-out alternatives.
+
+    Accepts both the pack shape (ruled_out/evidence_ids) and the candidate shape
+    (alternatives_ruled_out/evidence).
+    """
+    ids = set(chain_ids(candidate)) | set(candidate["counter_evidence"])
+    for alternative in candidate.get("ruled_out", candidate.get("alternatives_ruled_out", [])):
+        ids.update(alternative.get("evidence_ids", alternative.get("evidence", [])))
+    return ids
+
+
+def abstention(pack: Mapping[str, Any]) -> tuple[str, str]:
+    """Choose the abstention reason and its cycle-time or merged-count citation."""
+    reason = pack.get("abstain_reason") or DEFAULT_ABSTAIN_REASON
+    identifier = "E1" if any(e["id"] == "E1" for e in pack["evidence"]) else "E3"
+    return reason, identifier
+
+
 SERIES_KEYS = {
     "E1": "cycle_p50_hours",
     "E3": "merged",
@@ -19,61 +75,56 @@ SERIES_KEYS = {
     "E20": "waiting_ci_share",
     "E30": "pr_size_p50_lines",
 }
-TITLES = {
-    "H_review_capacity": "Limited review capacity",
-    "H_ci_bottleneck": "Slow or congested CI",
-    "H_pr_size_growth": "Pull requests getting larger",
-    "H_quality_tradeoff": "Speed gained by lighter review",
-}
 SLOWDOWN_HYPOTHESES = ("H_review_capacity", "H_ci_bottleneck", "H_pr_size_growth")
 # A stage or location item belongs in the displayed chain only when it shows the added time.
 ATTRIBUTION_MIN_SHARE = REVIEW_CAPACITY_MIN_WAIT_SHARE
 
 
 def level(score: float) -> str | None:
-    return (
-        "high" if score >= 0.75 else "medium" if score > 0.5 else "low" if score >= 0.35 else None
-    )
+    """Return the highest qualifying confidence band, or None below all band thresholds."""
+    for name, band in reversed(LEVELS.items()):
+        if score > band.minimum if band.exclusive else score >= band.minimum:
+            return name
+    return None
 
 
-def rel_up(entry: Mapping[str, Any] | None, threshold: float) -> bool:
+def changed(
+    entry: Mapping[str, Any] | None,
+    threshold: float,
+    *,
+    field: str = "change_rel",
+    direction: int = 1,
+) -> bool:
+    """Whether field moved by at least threshold in direction.
+
+    Only an explicit significant=False rejects the change; items without the flag pass.
+    """
     return bool(
         entry
-        and entry.get("change_rel") is not None
-        and entry["change_rel"] >= threshold
-        and entry.get("significant") is not False
-    )
-
-
-def rel_down(entry: Mapping[str, Any] | None, threshold: float) -> bool:
-    return bool(
-        entry
-        and entry.get("change_rel") is not None
-        and entry["change_rel"] <= -threshold
-        and entry.get("significant") is not False
-    )
-
-
-def pp_up(entry: Mapping[str, Any] | None, threshold: float) -> bool:
-    return bool(
-        entry
-        and entry.get("change_pp") is not None
-        and entry["change_pp"] >= threshold
+        and entry.get(field) is not None
+        and entry[field] * direction >= threshold
         and entry.get("significant") is not False
     )
 
 
 def flat_rel(entry: Mapping[str, Any] | None, threshold: float) -> bool:
+    """Test whether the absolute relative change is strictly below the threshold."""
     return bool(
         entry and entry.get("change_rel") is not None and abs(entry["change_rel"]) < threshold
     )
 
 
 def at_least(entry: Mapping[str, Any] | None, threshold: float) -> bool:
+    """Test an available evidence value against an inclusive threshold."""
     return bool(entry and entry.get("value") is not None and entry["value"] >= threshold)
 
 
 def effect_size(entry: Mapping[str, Any], snapshot: Mapping[str, Any]) -> tuple[float, bool]:
+    """Effect in [0, 1] and whether it was measured against weekly variation.
+
+    For items in SERIES_KEYS with at least three non-constant previous-period weeks, 2 sigma
+    counts as full effect; otherwise 10 pp for shares or a 50% relative change does.
+    """
     delta = entry.get("change_abs")
     if delta is None:
         return 0.0, False
@@ -99,291 +150,421 @@ class Signal:
     available: bool = True
 
 
-def actions(identifier: str, location: str | None) -> tuple[str, str]:
-    if identifier == "H_review_capacity":
-        return (
-            f"Add reviewers or code owners for {location} and enable team auto-assignment."
-            if location
-            else "Add reviewers to the busiest areas and enable team auto-assignment.",
-            (
-                "Two weeks after adding reviewers, check whether "
-                f"the first-review wait in {location} has dropped."
-            )
-            if location
-            else (
-                "Two weeks after adding reviewers, check whether the first-review wait has dropped."
-            ),
+class SignalContext:
+    def __init__(self, snapshot: Mapping[str, Any], evidence: Mapping[str, dict[str, Any]]) -> None:
+        """Prepare reusable source availability, localization and counter-evidence predicates."""
+        self.evidence = evidence
+        ci = (
+            snapshot["bottleneck_analysis"].get("ci") is not None
+            and snapshot["time_ledger"]["ci_data_available"]
         )
-    templates = {
-        "H_ci_bottleneck": (
+        drivers = snapshot.get("drivers") is not None
+
+        def available(identifier: str) -> bool:
+            """Test source availability for an evidence family, independently of item presence."""
+            return (
+                ci
+                if identifier in CI_EVIDENCE_IDS
+                else drivers
+                if identifier in {"E48", "E49", "E50"}
+                else True
+            )
+
+        def signal(role: str, ids: tuple[str, ...], condition: bool) -> Signal:
+            """Build a signal that is present only when its condition and all required IDs hold."""
+            eligible = all(available(i) for i in ids)
+            return Signal(
+                role,
+                ids,
+                bool(condition and eligible and all(i in evidence for i in ids)),
+                eligible,
+            )
+
+        e = evidence.get
+        loc_entries = [e(location_id(i, "added_wait_share")) for i in range(5)]
+        localized = max(
+            (entry for entry in loc_entries if entry is not None),
+            key=lambda entry: (entry["value"], -int(entry["id"][1:])),
+            default=None,
+        )
+        # The strongest location still feeds the score, but it is named only when a
+        # meaningful share of the added time is reviewer wait there.
+        shown = localized if at_least(localized, ATTRIBUTION_MIN_SHARE) else None
+        location = shown["location"] if shown else None
+        location_index = (int(shown["id"][1:]) - 53) // 4 if shown else None
+        size_counter = bool(
+            changed(e("E30"), 0.20) and e("E30") and evidence["E30"]["significant"] is True
+        )
+        ci_counter = flat_rel(e("E44"), 0.05) and flat_rel(e("E45"), 0.05)
+        size_flat = bool(
+            flat_rel(e("E30"), 0.05)
+            and e("E31")
+            and evidence["E31"].get("change_pp") is not None
+            and abs(evidence["E31"]["change_pp"]) < 2
+        )
+        revert_flat = bool(
+            e("E10")
+            and evidence["E10"].get("change_pp") is not None
+            and abs(evidence["E10"]["change_pp"]) < 0.5
+        )
+        self.available = available
+        self.ci = ci
+        self.ci_counter = ci_counter
+        self.drivers = drivers
+        self.e = e
+        self.localized = localized
+        self.location = location
+        self.location_index = location_index
+        self.revert_flat = revert_flat
+        self.signal = signal
+        self.size_counter = size_counter
+        self.size_flat = size_flat
+
+
+def build_review_capacity(context: SignalContext) -> dict[str, Any]:
+    """Define review-capacity symptoms, demand/load mechanisms and location support."""
+    return {
+        "localization": context.localized["value"] if context.localized else 0,
+        "location": context.location,
+        "stage": stage_ids(
+            ("E15", changed(context.e("E15"), 0.1)),
+            ("E37", at_least(context.e("E37"), ATTRIBUTION_MIN_SHARE)),
+        ),
+        "location_ids": tuple(
+            location_id(context.location_index, slot)
+            for slot in ("pickup_ratio", "added_wait_share", "owners")
+        )
+        if context.location_index is not None
+        else (),
+        "signals": [
+            context.signal("symptom", ("E1",), changed(context.e("E1"), 0.1)),
+            context.signal("symptom", ("E18",), changed(context.e("E18"), 3, field="change_pp")),
+            context.signal(
+                "mechanism",
+                ("E22",),
+                bool(
+                    context.e("E22")
+                    and context.evidence["E22"]["extra"].get("weeks_total", 0) >= 2
+                    and (
+                        context.evidence["E22"]["value"]
+                        / context.evidence["E22"]["extra"]["weeks_total"]
+                        >= 0.5
+                    )
+                ),
+            ),
+            context.signal("mechanism", ("E26",), at_least(context.e("E26"), 0.5)),
+            context.signal(
+                "mechanism",
+                ("E24",),
+                at_least(context.e("E24"), 0.6) or changed(context.e("E24"), 5, field="change_pp"),
+            ),
+        ],
+        "counter": [("E30",)] if context.size_counter else [],
+    }
+
+
+def build_ci_bottleneck(context: SignalContext) -> dict[str, Any]:
+    """Define CI-related symptoms, queue/runtime/rerun mechanisms and counter-evidence."""
+    return {
+        "localization": (context.e("E39") or {}).get("value", 0),
+        "location": None,
+        "stage": stage_ids(("E39", at_least(context.e("E39"), ATTRIBUTION_MIN_SHARE))),
+        "location_ids": (),
+        "signals": [
+            context.signal("symptom", ("E20",), changed(context.e("E20"), 3, field="change_pp")),
+            context.signal("symptom", ("E1",), changed(context.e("E1"), 0.1)),
+            context.signal("mechanism", ("E44",), changed(context.e("E44"), 0.2)),
+            context.signal("mechanism", ("E45",), changed(context.e("E45"), 0.2)),
+            context.signal(
+                "mechanism",
+                ("E46",),
+                changed(context.e("E46"), 2, field="change_pp") or at_least(context.e("E46"), 0.1),
+            ),
+        ],
+        "counter": [("E44", "E45")] if context.ci_counter else [],
+    }
+
+
+def build_pr_size_growth(context: SignalContext) -> dict[str, Any]:
+    """Define delivery/rework symptoms and size-growth mechanisms with descriptive support."""
+    return {
+        "localization": (context.e("E42") or {}).get("value", 0),
+        "location": None,
+        "stage": stage_ids(("E42", at_least(context.e("E42"), ATTRIBUTION_MIN_SHARE))),
+        "location_ids": (),
+        "signals": [
+            context.signal("symptom", ("E1",), changed(context.e("E1"), 0.1)),
+            context.signal(
+                "symptom",
+                tuple(
+                    (
+                        i
+                        for i, yes in (
+                            ("E8", changed(context.e("E8"), 0.1)),
+                            ("E9", changed(context.e("E9"), 5, field="change_pp")),
+                        )
+                        if yes
+                    )
+                )
+                or ("E8", "E9"),
+                changed(context.e("E8"), 0.1) or changed(context.e("E9"), 5, field="change_pp"),
+            ),
+            context.signal("mechanism", ("E31",), changed(context.e("E31"), 5, field="change_pp")),
+            context.signal("mechanism", ("E30",), changed(context.e("E30"), 0.2)),
+            context.signal("mechanism", ("E48",), at_least(context.e("E48"), 2)),
+        ],
+        "counter": [("E30", "E31")] if context.size_flat else [],
+    }
+
+
+def build_quality_tradeoff(context: SignalContext) -> dict[str, Any]:
+    """Define faster-delivery symptoms and revert/approval mechanisms suggesting a trade-off."""
+    return {
+        "localization": (context.e("E43") or {}).get("value", 0),
+        "location": None,
+        "stage": stage_ids(
+            ("E43", at_least(context.e("E43"), ATTRIBUTION_MIN_SHARE)),
+            ("E15", changed(context.e("E15"), 0.1, direction=-1)),
+        ),
+        "location_ids": (),
+        "signals": [
+            context.signal("symptom", ("E1",), changed(context.e("E1"), 0.1, direction=-1)),
+            context.signal("mechanism", ("E10",), changed(context.e("E10"), 1, field="change_pp")),
+            context.signal("mechanism", ("E32",), changed(context.e("E32"), 5, field="change_pp")),
+            context.signal("mechanism", ("E33",), changed(context.e("E33"), 2, field="change_pp")),
+        ],
+        "counter": [("E10",)] if context.revert_flat else [],
+    }
+
+
+def review_actions(location: str | None) -> tuple[str, str]:
+    """Return reviewer-capacity action and follow-up wording, optionally scoped to a location."""
+    return (
+        f"Add reviewers or code owners for {location} and enable team auto-assignment."
+        if location
+        else "Add reviewers to the busiest areas and enable team auto-assignment.",
+        (
+            "Two weeks after adding reviewers, check whether "
+            f"the first-review wait in {location} has dropped."
+        )
+        if location
+        else ("Two weeks after adding reviewers, check whether the first-review wait has dropped."),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class Hypothesis:
+    title: str
+    subject: str
+    main: str
+    direction: int
+    action: Callable[[str | None], tuple[str, str]]
+    build: Callable[[SignalContext], dict[str, Any]]
+
+
+HYPOTHESES = {
+    "H_review_capacity": Hypothesis(
+        "Limited review capacity",
+        "Limited review capacity",
+        "E15",
+        1,
+        review_actions,
+        build_review_capacity,
+    ),
+    "H_ci_bottleneck": Hypothesis(
+        "Slow or congested CI",
+        "Slow or congested CI",
+        "E20",
+        1,
+        lambda location: (
             "Add CI capacity or speed up the slowest workflows, and fix flaky tests.",
             "After the change, check whether the share of PR time waiting on CI falls.",
         ),
-        "H_pr_size_growth": (
+        build_ci_bottleneck,
+    ),
+    "H_pr_size_growth": Hypothesis(
+        "Pull requests getting larger",
+        "Larger pull requests",
+        "E1",
+        1,
+        lambda location: (
             "Split large changes into smaller PRs and agree on the approach before coding.",
-            (
-                "Over the next month, check whether the share of PRs with 500+ lines "
-                "and the cycle time both fall."
-            ),
+            "Over the next month, check whether the share of PRs with 500+ lines "
+            "and the cycle time both fall.",
         ),
-        "H_quality_tradeoff": (
+        build_pr_size_growth,
+    ),
+    "H_quality_tradeoff": Hypothesis(
+        "Speed gained by lighter review",
+        "Lighter review in exchange for speed",
+        "E1",
+        -1,
+        lambda location: (
             "Keep the faster flow but restore review depth for large or risky changes.",
-            (
-                "Watch the revert rate over the next two periods; "
-                "it should return to its previous level."
-            ),
+            "Watch the revert rate over the next two periods; "
+            "it should return to its previous level.",
         ),
+        build_quality_tradeoff,
+    ),
+}
+
+
+def actions(identifier: str, location: str | None) -> tuple[str, str]:
+    """Return the registered hypothesis's action and verification wording."""
+    return HYPOTHESES[identifier].action(location)
+
+
+def evaluate_candidate(
+    identifier: str,
+    hypothesis: Hypothesis,
+    context: SignalContext,
+    snapshot: Mapping[str, Any],
+    evidence: Mapping[str, dict[str, Any]],
+    ci_complete: bool,
+) -> dict[str, Any]:
+    """Score one hypothesis; return its candidate plus the flags select_candidates uses.
+
+    Eligible requires an adequate main-metric sample, a symptom, a mechanism and at least
+    low confidence. Signals whose data source is unavailable leave the agreement denominator,
+    so missing data neither supports nor counts against a hypothesis. Confidence is a weighted
+    evidence-strength score, not a calibrated probability that this hypothesis is the cause.
+    """
+    definition = hypothesis.build(context)
+    main_id = hypothesis.main
+    main = evidence.get(main_id, {})
+    signals: list[Signal] = list(definition["signals"])
+    symptom = any(s.present for s in signals if s.role == "symptom")
+    mechanisms = [s for s in signals if s.role == "mechanism" and s.available]
+    mechanism = any(s.present for s in mechanisms)
+    sample_ok = (
+        main.get("value") is not None
+        and main.get("previous") is not None
+        and (main.get("n") or 0) >= MIN_SAMPLES_P50
+    )
+    total = sum(s.available for s in signals)
+    present = sum(s.present for s in signals)
+    agreement = present / total if total else 0
+    effect, _ = effect_size(main, snapshot) if main else (0.0, False)
+    direction = hypothesis.direction
+    if main.get("change_abs") is None or main["change_abs"] * direction <= 0:
+        effect = 0
+    series_key = SERIES_KEYS[main_id]
+    values = [w[series_key] for w in snapshot["series"]["current"] if w.get(series_key) is not None]
+    holding = (
+        sum((v - main["previous"]) * direction > 0 for v in values)
+        if main.get("previous") is not None
+        else 0
+    )
+    persistence = holding / len(values) if values else 0
+    sample = min(1, (main.get("n") or 0) / 100)
+    localization = min(1, max(0, float(definition["localization"])))
+    counters = definition["counter"]
+    # Fixed weights summing to 1 keep scores comparable across hypotheses; each counter-evidence
+    # group costs 0.15, enough to move a borderline candidate down a band.
+    raw = max(
+        0,
+        min(
+            1,
+            0.30 * agreement
+            + 0.20 * effect
+            + 0.20 * persistence
+            + 0.15 * sample
+            + 0.15 * localization
+            - 0.15 * len(counters),
+        ),
+    )
+    # Without available, sufficiently covered and complete CI data, a CI hypothesis can still
+    # qualify but is held in the low band rather than claimed at medium or high.
+    cap = (
+        LEVELS["low"].downgrade_cap
+        if identifier == "H_ci_bottleneck"
+        and not (
+            context.ci and snapshot["time_ledger"]["ci_coverage"] >= CI_COVERAGE_MIN and ci_complete
+        )
+        else None
+    )
+    confidence = round(min(raw, cap) if cap is not None else raw, 2)
+    chain = {
+        role: list(
+            dict.fromkeys(i for s in signals if s.role == role and s.present for i in s.evidence)
+        )
+        for role in ("symptom", "mechanism")
     }
-    return templates[identifier]
+    chain.update(
+        stage=[i for i in definition["stage"] if i in evidence],
+        location=[i for i in definition["location_ids"] if i in evidence],
+    )
+    candidate = {
+        "id": identifier,
+        "title": hypothesis.title,
+        "location": definition["location"],
+        "confidence": confidence,
+        "confidence_level": level(confidence),
+        "chain": chain,
+        "persistence": {"weeks_holding": holding, "weeks": len(values)},
+        "counter_evidence": list(dict.fromkeys(i for group in counters for i in group)),
+        "confidence_basis": {
+            "signal_agreement": round(agreement, 2),
+            "signals_present": present,
+            "signals_total": total,
+            "effect_size": round(effect, 2),
+            "persistence": round(persistence, 2),
+            "weeks_holding": f"{holding}/{len(values)}",
+            "sample_adequacy": round(sample, 2),
+            "sample_size": main.get("n"),
+            "localization": round(localization, 2),
+            "counter_evidence": len(counters),
+            "covers_both_parts": symptom and mechanism,
+            "raw_score": round(raw, 2),
+            "cap": cap,
+            "cap_reason": "ci_data_incomplete" if cap is not None else None,
+            "llm_downgrade": None,
+        },
+        "alternatives_ruled_out": [],
+        "alternatives_open": [],
+    }
+    return {
+        "candidate": candidate,
+        "symptom": symptom,
+        "mechanism": mechanism,
+        "mechanisms": mechanisms,
+        "main_available": context.available(main_id),
+        "sample_ok": sample_ok,
+        # A symptom alone shows that something changed and a mechanism alone shows a possible
+        # lever; both are required to propose an explanation for this period's change.
+        "eligible": sample_ok and symptom and mechanism and confidence >= LEVELS["low"].minimum,
+    }
 
 
 def score_hypotheses(
     snapshot: Mapping[str, Any], evidence: Mapping[str, dict[str, Any]], *, ci_complete: bool
 ) -> tuple[list[dict[str, Any]], str | None]:
+    """Return up to three qualifying candidates, or none and an abstain reason.
+
+    Without a previous period the result is no_comparison straight away, because every
+    symptom is a change against that period.
+    """
     if not snapshot["meta"]["comparison_available"]:
         return [], "no_comparison"
-    ci = (
-        snapshot["bottleneck_analysis"].get("ci") is not None
-        and snapshot["time_ledger"]["ci_data_available"]
-    )
-    drivers = snapshot.get("drivers") is not None
-
-    def available(identifier: str) -> bool:
-        return (
-            ci
-            if identifier in {"E20", "E39", "E44", "E45", "E46"}
-            else drivers
-            if identifier in {"E48", "E49", "E50"}
-            else True
+    context = SignalContext(snapshot, evidence)
+    evaluated = {
+        identifier: evaluate_candidate(
+            identifier, hypothesis, context, snapshot, evidence, ci_complete
         )
-
-    def signal(role: str, ids: tuple[str, ...], condition: bool) -> Signal:
-        eligible = all(available(i) for i in ids)
-        return Signal(
-            role, ids, bool(condition and eligible and all(i in evidence for i in ids)), eligible
-        )
-
-    e = evidence.get
-    loc_entries = [e(f"E{53 + 4 * i}") for i in range(5)]
-    localized = max(
-        (entry for entry in loc_entries if entry is not None),
-        key=lambda entry: (entry["value"], -int(entry["id"][1:])),
-        default=None,
-    )
-    # The strongest location still feeds the score, but it is named only when a
-    # meaningful share of the added time is reviewer wait there.
-    shown = localized if at_least(localized, ATTRIBUTION_MIN_SHARE) else None
-    location = shown["location"] if shown else None
-    location_index = (int(shown["id"][1:]) - 53) // 4 if shown else None
-    size_counter = bool(
-        rel_up(e("E30"), 0.20) and e("E30") and evidence["E30"]["significant"] is True
-    )
-    ci_counter = flat_rel(e("E44"), 0.05) and flat_rel(e("E45"), 0.05)
-    size_flat = bool(
-        flat_rel(e("E30"), 0.05)
-        and e("E31")
-        and evidence["E31"].get("change_pp") is not None
-        and abs(evidence["E31"]["change_pp"]) < 2
-    )
-    revert_flat = bool(
-        e("E10")
-        and evidence["E10"].get("change_pp") is not None
-        and abs(evidence["E10"]["change_pp"]) < 0.5
-    )
-    definitions = {
-        "H_review_capacity": {
-            "main": "E15",
-            "direction": 1,
-            "localization": localized["value"] if localized else 0,
-            "location": location,
-            "stage": stage_ids(
-                ("E15", rel_up(e("E15"), 0.10)), ("E37", at_least(e("E37"), ATTRIBUTION_MIN_SHARE))
-            ),
-            "location_ids": tuple(f"E{51 + 4 * location_index + offset}" for offset in (0, 2, 3))
-            if location_index is not None
-            else (),
-            "signals": [
-                signal("symptom", ("E1",), rel_up(e("E1"), 0.10)),
-                signal("symptom", ("E18",), pp_up(e("E18"), 3)),
-                signal(
-                    "mechanism",
-                    ("E22",),
-                    bool(
-                        e("E22")
-                        and evidence["E22"]["extra"].get("weeks_total", 0) >= 2
-                        and evidence["E22"]["value"] / evidence["E22"]["extra"]["weeks_total"]
-                        >= 0.5
-                    ),
-                ),
-                signal("mechanism", ("E26",), at_least(e("E26"), 0.50)),
-                signal("mechanism", ("E24",), at_least(e("E24"), 0.60) or pp_up(e("E24"), 5)),
-            ],
-            "counter": [("E30",)] if size_counter else [],
-        },
-        "H_ci_bottleneck": {
-            "main": "E20",
-            "direction": 1,
-            "localization": (e("E39") or {}).get("value", 0),
-            "location": None,
-            "stage": stage_ids(("E39", at_least(e("E39"), ATTRIBUTION_MIN_SHARE))),
-            "location_ids": (),
-            "signals": [
-                signal("symptom", ("E20",), pp_up(e("E20"), 3)),
-                signal("symptom", ("E1",), rel_up(e("E1"), 0.10)),
-                signal("mechanism", ("E44",), rel_up(e("E44"), 0.20)),
-                signal("mechanism", ("E45",), rel_up(e("E45"), 0.20)),
-                signal("mechanism", ("E46",), pp_up(e("E46"), 2) or at_least(e("E46"), 0.10)),
-            ],
-            "counter": [("E44", "E45")] if ci_counter else [],
-        },
-        "H_pr_size_growth": {
-            "main": "E1",
-            "direction": 1,
-            "localization": (e("E42") or {}).get("value", 0),
-            "location": None,
-            "stage": stage_ids(("E42", at_least(e("E42"), ATTRIBUTION_MIN_SHARE))),
-            "location_ids": (),
-            "signals": [
-                signal("symptom", ("E1",), rel_up(e("E1"), 0.10)),
-                signal(
-                    "symptom",
-                    tuple(
-                        i
-                        for i, yes in (("E8", rel_up(e("E8"), 0.10)), ("E9", pp_up(e("E9"), 5)))
-                        if yes
-                    )
-                    or ("E8", "E9"),
-                    rel_up(e("E8"), 0.10) or pp_up(e("E9"), 5),
-                ),
-                signal("mechanism", ("E31",), pp_up(e("E31"), 5)),
-                signal("mechanism", ("E30",), rel_up(e("E30"), 0.20)),
-                signal("mechanism", ("E48",), at_least(e("E48"), 2)),
-            ],
-            "counter": [("E30", "E31")] if size_flat else [],
-        },
-        "H_quality_tradeoff": {
-            "main": "E1",
-            "direction": -1,
-            "localization": (e("E43") or {}).get("value", 0),
-            "location": None,
-            "stage": stage_ids(
-                ("E43", at_least(e("E43"), ATTRIBUTION_MIN_SHARE)),
-                ("E15", rel_down(e("E15"), 0.10)),
-            ),
-            "location_ids": (),
-            "signals": [
-                signal("symptom", ("E1",), rel_down(e("E1"), 0.10)),
-                signal("mechanism", ("E10",), pp_up(e("E10"), 1)),
-                signal("mechanism", ("E32",), pp_up(e("E32"), 5)),
-                signal("mechanism", ("E33",), pp_up(e("E33"), 2)),
-            ],
-            "counter": [("E10",)] if revert_flat else [],
-        },
+        for identifier, hypothesis in HYPOTHESES.items()
     }
-    evaluated: dict[str, dict[str, Any]] = {}
-    for identifier, definition in definitions.items():
-        main_id = str(definition["main"])
-        main = evidence.get(main_id, {})
-        signals = cast_signals(definition["signals"])
-        symptom = any(s.present for s in signals if s.role == "symptom")
-        mechanisms = [s for s in signals if s.role == "mechanism" and s.available]
-        mechanism = any(s.present for s in mechanisms)
-        sample_ok = (
-            main.get("value") is not None
-            and main.get("previous") is not None
-            and (main.get("n") or 0) >= MIN_SAMPLES_P50
-        )
-        total = sum(s.available for s in signals)
-        present = sum(s.present for s in signals)
-        agreement = present / total if total else 0
-        effect, _ = effect_size(main, snapshot) if main else (0.0, False)
-        direction = int(definition["direction"])
-        if main.get("change_abs") is None or main["change_abs"] * direction <= 0:
-            effect = 0
-        series_key = SERIES_KEYS[main_id]
-        values = [
-            w[series_key] for w in snapshot["series"]["current"] if w.get(series_key) is not None
-        ]
-        holding = (
-            sum((v - main["previous"]) * direction > 0 for v in values)
-            if main.get("previous") is not None
-            else 0
-        )
-        persistence = holding / len(values) if values else 0
-        sample = min(1, (main.get("n") or 0) / 100)
-        localization = min(1, max(0, float(definition["localization"])))
-        counters = definition["counter"]
-        raw = max(
-            0,
-            min(
-                1,
-                0.30 * agreement
-                + 0.20 * effect
-                + 0.20 * persistence
-                + 0.15 * sample
-                + 0.15 * localization
-                - 0.15 * len(counters),
-            ),
-        )
-        cap = (
-            0.5
-            if identifier == "H_ci_bottleneck"
-            and not (
-                ci and snapshot["time_ledger"]["ci_coverage"] >= CI_COVERAGE_MIN and ci_complete
-            )
-            else None
-        )
-        confidence = round(min(raw, cap) if cap is not None else raw, 2)
-        chain = {
-            role: list(
-                dict.fromkeys(
-                    i for s in signals if s.role == role and s.present for i in s.evidence
-                )
-            )
-            for role in ("symptom", "mechanism")
-        }
-        chain.update(
-            stage=[i for i in definition["stage"] if i in evidence],
-            location=[i for i in definition["location_ids"] if i in evidence],
-        )
-        candidate = {
-            "id": identifier,
-            "title": TITLES[identifier],
-            "location": definition["location"],
-            "confidence": confidence,
-            "confidence_level": level(confidence),
-            "chain": chain,
-            "persistence": {"weeks_holding": holding, "weeks": len(values)},
-            "counter_evidence": list(dict.fromkeys(i for group in counters for i in group)),
-            "confidence_basis": {
-                "signal_agreement": round(agreement, 2),
-                "signals_present": present,
-                "signals_total": total,
-                "effect_size": round(effect, 2),
-                "persistence": round(persistence, 2),
-                "weeks_holding": f"{holding}/{len(values)}",
-                "sample_adequacy": round(sample, 2),
-                "sample_size": main.get("n"),
-                "localization": round(localization, 2),
-                "counter_evidence": len(counters),
-                "covers_both_parts": symptom and mechanism,
-                "raw_score": round(raw, 2),
-                "cap": cap,
-                "cap_reason": "ci_data_incomplete" if cap is not None else None,
-                "llm_downgrade": None,
-            },
-            "alternatives_ruled_out": [],
-            "alternatives_open": [],
-        }
-        evaluated[identifier] = {
-            "candidate": candidate,
-            "symptom": symptom,
-            "mechanism": mechanism,
-            "mechanisms": mechanisms,
-            "main_available": available(main_id),
-            "sample_ok": sample_ok,
-            "eligible": sample_ok and symptom and mechanism and confidence >= 0.35,
-        }
+    return select_candidates(evidence, evaluated)
+
+
+def select_candidates(
+    evidence: Mapping[str, dict[str, Any]], evaluated: Mapping[str, dict[str, Any]]
+) -> tuple[list[dict[str, Any]], str | None]:
+    """Pick the top three eligible candidates by confidence and explain the alternatives.
+
+    Each other hypothesis that showed a symptom is either ruled out with cited evidence
+    (counter-evidence, or mechanisms checked and absent) or left open with a reason
+    (no_data, insufficient_sample, not_selected, below_threshold).
+    """
     selected = sorted(
         (item["candidate"] for item in evaluated.values() if item["eligible"]),
         key=lambda c: (-c["confidence"], c["id"]),
@@ -425,7 +606,11 @@ def score_hypotheses(
 def abstain_reason(
     evidence: Mapping[str, dict[str, Any]], evaluated: Mapping[str, Mapping[str, Any]]
 ) -> str:
-    """no_slowdown when cycle time is comparable and no slowdown symptom is present."""
+    """Return no_slowdown when cycle time is comparable and no slowdown symptom is present.
+
+    Otherwise insufficient_signal. H_quality_tradeoff is ignored here: its symptom is a
+    speed-up, which is not a slowdown.
+    """
     cycle = evidence.get("E1")
     comparable = bool(
         cycle
@@ -438,8 +623,5 @@ def abstain_reason(
 
 
 def stage_ids(*items: tuple[str, bool]) -> tuple[str, ...]:
+    """Retain evidence IDs whose paired stage condition is true, preserving input order."""
     return tuple(identifier for identifier, shows_change in items if shows_change)
-
-
-def cast_signals(value: Any) -> list[Signal]:
-    return list(value)

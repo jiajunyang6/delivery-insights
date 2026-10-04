@@ -1,3 +1,5 @@
+"""Per-PR delivery facts computed from one PR's events and timeline; no I/O."""
+
 from collections.abc import Sequence
 from datetime import datetime
 
@@ -9,7 +11,25 @@ from insights.domain import Event, EventKind, OwnershipRule, PullRequestRecord
 
 
 def hours_between(start: datetime | None, end: datetime | None) -> float | None:
+    """Return signed elapsed hours, or None when either endpoint is absent."""
     return (end - start).total_seconds() / 3600 if start is not None and end is not None else None
+
+
+def count_events(
+    events: Sequence[Event],
+    kinds: set[EventKind],
+    *,
+    after: datetime | None,
+    before: datetime | None = None,
+) -> int:
+    """Count matching event kinds strictly after after and, if given, strictly before before."""
+    return sum(
+        e.kind in kinds
+        and after is not None
+        and e.occurred_at > after
+        and (before is None or e.occurred_at < before)
+        for e in events
+    )
 
 
 def compute_facts(
@@ -24,6 +44,13 @@ def compute_facts(
     directory_depth: int = 2,
     ci_covered: bool = False,
 ) -> PrFacts:
+    """Derive one PR's facts; cross-PR link fields keep their defaults until link_prs runs.
+
+    Durations are hours and None when an endpoint is missing. Reviews count human, non-author
+    reviewers only. Coding and pickup are clamped at 0 since commits can be authored after
+    ready_at and reviews can land on drafts. cycle_hours runs from the first commit (or
+    creation) to merge.
+    """
     reviews = sorted(
         (
             event
@@ -41,13 +68,6 @@ def compute_facts(
             approvers.setdefault(event.actor.login.lower(), event.occurred_at)
     approval_times = sorted(approvers.values())
     first_commit = first_commit_at(events)
-    response_times = [
-        e.occurred_at
-        for e in events
-        if e.kind == EventKind.COMMENT and human_event(e, pr.author.login)
-    ]
-    if first_review:
-        response_times.append(first_review)
     locations, location_source = locations_for(
         pr, location_dimension, directory_depth, location_rules
     )
@@ -63,7 +83,6 @@ def compute_facts(
         in {"CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", "FIRST_TIMER", "NONE"},
         first_commit_at=first_commit,
         ready_at=timeline.ready_at,
-        first_response_at=min(response_times, default=None),
         first_review_at=first_review,
         first_approval_at=first_approval,
         approved_at=timeline.approved_at,
@@ -81,21 +100,12 @@ def compute_facts(
             and (first_approval is None or e.occurred_at < first_approval)
             for e in reviews
         ),
-        commits_after_first_review=sum(
-            e.kind == EventKind.COMMIT and first_review is not None and e.occurred_at > first_review
-            for e in events
-        ),
-        force_pushes_after_first_review=sum(
-            e.kind == EventKind.FORCE_PUSH
-            and first_review is not None
-            and e.occurred_at > first_review
-            for e in events
-        ),
-        updates_after_approval=sum(
-            e.kind in {EventKind.COMMIT, EventKind.FORCE_PUSH}
-            and timeline.approved_at is not None
-            and timeline.approved_at < e.occurred_at < (end or now)
-            for e in events
+        commits_after_first_review=count_events(events, {EventKind.COMMIT}, after=first_review),
+        updates_after_approval=count_events(
+            events,
+            {EventKind.COMMIT, EventKind.FORCE_PUSH},
+            after=timeline.approved_at,
+            before=end or now,
         ),
         distinct_approvers=len(approvers),
         second_approval_wait_hours=hours_between(approval_times[0], approval_times[1])
@@ -114,6 +124,4 @@ def compute_facts(
         location_source=location_source,
         state_at_close=timeline.state_at_end,
         ci_covered=ci_covered,
-        ready_weekday=timeline.ready_at.weekday() if timeline.ready_at else None,
-        ready_hour=timeline.ready_at.hour if timeline.ready_at else None,
     )

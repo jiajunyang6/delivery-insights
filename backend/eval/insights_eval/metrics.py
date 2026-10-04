@@ -1,3 +1,5 @@
+"""Revalidate final narratives and compute synthetic evaluation rates and acceptance gates."""
+
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from typing import Any
@@ -8,6 +10,11 @@ from insights.narrative.validator import validate
 def recheck(
     payload: Mapping[str, Any], pack: dict[str, Any], snapshot: Mapping[str, Any]
 ) -> list[str]:
+    """Reconstruct tool-shaped output from the final payload and return validator error codes.
+
+    Use assembled confidence bands, including accepted downgrades, so hedging is checked
+    against the final response. The original pack is copied and remains unchanged.
+    """
     final_pack = deepcopy(pack)
     levels = {h["id"]: h["confidence_level"] for h in payload["hypotheses"]}
     for candidate in final_pack["hypotheses"]:
@@ -30,12 +37,22 @@ def recheck(
 
 
 def metrics(runs: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate evaluation rows; return None for rates with no eligible observations.
+
+    First-attempt validity includes attempted calls, even transport failures without a reply.
+    Consistency rates include only final LLM outputs; fallback rate includes all runs. Top-hit
+    rate excludes no-signal cases, which have a separate abstention rate. Calibration counts
+    every selected hypothesis by expected ID, not location, and is not probability calibration.
+    """
+
     def fraction(flags: Sequence[bool]) -> float | None:
+        """Return the fraction of true flags, or None when the denominator is empty."""
         return sum(flags) / len(flags) if flags else None
 
     llm_runs = [r for r in runs if r["generated_by"] == "llm"]
 
     def consistent(prefixes: tuple[str, ...]) -> float | None:
+        """Fraction of final LLM outputs without a recheck violation in these code families."""
         return fraction(
             [not any(v.startswith(prefixes) for v in r["recheck_violations"]) for r in llm_runs]
         )
@@ -67,6 +84,11 @@ def metrics(runs: Sequence[dict[str, Any]]) -> dict[str, Any]:
 
 
 def gates(values: Mapping[str, Any]) -> dict[str, Any]:
+    """Apply minimum rate thresholds, except fallback_rate which has a maximum.
+
+    An empty high-confidence set passes high_precision as unexercised; all other None rates
+    fail. The runner prints a warning for that exception so it is not reported as evidence.
+    """
     limits = {
         "first_attempt_valid_rate": 0.9,
         "numeric_consistency": 1.0,

@@ -122,7 +122,7 @@ async def test_only_english_default_and_explicit_language_match(api, audience):
     assert default.content == explicit.content
     assert default.headers["etag"] == explicit.headers["etag"]
     payload = default.json()
-    assert payload["lang"] == "en" and payload["meta"]["prompt_version"] == "v7"
+    assert payload["lang"] == "en" and payload["meta"]["prompt_version"] == PROMPT_VERSION
     NarrativeSchema.model_validate(payload)
     contract = (await client.get("/openapi.json")).json()
     parameters = contract["paths"]["/v1/snapshots/{snapshot_id}/narrative"]["get"]["parameters"]
@@ -130,13 +130,13 @@ async def test_only_english_default_and_explicit_language_match(api, audience):
     assert language.get("const") == "en" or language.get("enum") == ["en"]
 
 
-async def test_v7_never_reuses_legacy_language_or_prompt_caches(api):
+async def test_current_prompt_never_reuses_legacy_language_or_prompt_caches(api):
     client, app, clock, ctx = api
     snapshot, _, url = await prepare(api, enabled=True)
     pack, _ = build_evidence_pack(snapshot, "director", False)
     pack_hash = digest(pack)[:16]
     model = ctx["settings"].bedrock_model_id
-    for language, version in (("en", "v3"), ("zh", "v3"), ("en", "v4"), ("en", "v6")):
+    for language, version in (("en", "v3"), ("zh", "v3"), ("en", "v4"), ("en", "v6"), ("en", "v7")):
         key = narrative_key(
             snapshot["snapshot_id"], "director", language, version, model, pack_hash
         )
@@ -161,9 +161,11 @@ async def test_v7_never_reuses_legacy_language_or_prompt_caches(api):
     rejected = await client.get(url.replace("lang=en", "lang=zh"))
     assert rejected.status_code == 422 and not app.state.llm.calls
     fresh = await client.get(url)
-    assert fresh.status_code == 200 and fresh.json()["meta"]["prompt_version"] == "v7"
+    assert fresh.status_code == 200 and fresh.json()["meta"]["prompt_version"] == PROMPT_VERSION
     assert fresh.json()["narrative"] != "legacy" and len(app.state.llm.calls) == 1
-    current_key = narrative_key(snapshot["snapshot_id"], "director", "en", "v7", model, pack_hash)
+    current_key = narrative_key(
+        snapshot["snapshot_id"], "director", "en", PROMPT_VERSION, model, pack_hash
+    )
     await ctx["redis"].delete(current_key)
     restored = await client.get(url)
     assert restored.content == fresh.content and len(app.state.llm.calls) == 1
@@ -240,3 +242,35 @@ async def test_busy_and_deadline_fallbacks_release_only_owned_locks(api, monkeyp
     assert result.status_code == 200 and result.json()["meta"]["fallback_reason"] == "llm_error"
     assert result.json()["meta"]["attempts"] == 1
     assert not await ctx["redis"].exists(key)
+
+
+async def test_repair_uses_remaining_deadline_and_extracts_evidence_once(api, monkeypatch):
+    client, app, _, _ = api
+    _, valid, url = await prepare(api, enabled=True)
+    import insights.narrative.evidence as evidence_module
+    import insights.narrative.service as service
+
+    extracted = []
+    original = evidence_module.extract_evidence
+
+    def extract(snapshot):
+        extracted.append(snapshot["snapshot_id"])
+        return original(snapshot)
+
+    monkeypatch.setattr(evidence_module, "extract_evidence", extract)
+    monkeypatch.setattr(service, "extract_evidence", extract)
+    monkeypatch.setattr(service, "NARRATIVE_DEADLINE_SECONDS", 0.05)
+
+    class RepairTimeoutClient(FakeLLMClient):
+        async def submit(self, **kwargs):
+            if self.calls:
+                await asyncio.sleep(1)
+            return await super().submit(**kwargs)
+
+    app.state.llm = RepairTimeoutClient([{"narrative": "Bad.", "hypotheses": []}, valid])
+    response = await client.get(url)
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["meta"]["attempts"] == 2
+    assert response.json()["meta"]["fallback_reason"] == "llm_error"
+    assert len(extracted) == 1

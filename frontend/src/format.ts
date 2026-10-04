@@ -1,4 +1,4 @@
-import type { State } from "./types";
+import type { Audience, State } from "./types";
 
 export const states: State[] = [
   "waiting_reviewer",
@@ -32,6 +32,7 @@ export function hours(value: number | null | undefined): string {
 export function format(value: number | null | undefined, unit: string): string {
   if (unit === "share" || unit === "change") return percent(value);
   if (unit === "hours") return hours(value);
+  if (unit === "rounds") return number(value, 2);
   return (
     number(value) +
     (value == null
@@ -43,6 +44,10 @@ export function format(value: number | null | undefined, unit: string): string {
           : "")
   );
 }
+/**
+ * Inputs are fractions by default (0.12 → +12%). Pass scale 1 with a " pp" suffix for values
+ * already in percentage points: a relative change in a share is not a point difference.
+ */
 export function signed(
   value: number | null | undefined,
   suffix = "%",
@@ -61,6 +66,10 @@ export function timestamp(value: string): string {
     }) + " UTC"
   );
 }
+/**
+ * Link targets come from API data, so only plain https://github.com URLs become anchors;
+ * other schemes, look-alike hosts, credentials or ports are rendered as text.
+ */
 export function safeGithubUrl(value: string): boolean {
   if (!value.startsWith("https://github.com/")) return false;
   try {
@@ -76,9 +85,32 @@ export function safeGithubUrl(value: string): boolean {
     return false;
   }
 }
+// Inclusive range of UTC calendar days, matching the API's UTC date handling.
 export function dateRange(days: number, to = new Date().toISOString().slice(0, 10)) {
   const from = new Date(Date.parse(to + "T00:00:00Z") - (days - 1) * 86_400_000)
     .toISOString()
     .slice(0, 10);
   return { from, to };
 }
+
+
+export const viewLabels: Record<Audience, string> = {
+  director: "Delivery Overview",
+  manager: "PR & Review Details",
+};
+
+export const viewDescriptions: Record<Audience, string> = {
+  director: "Delivery outcomes and the top three bottlenecks",
+  manager: "All bottlenecks, review queues, areas, and at-risk pull requests",
+};
+
+export function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+export const chartColors = {
+  grid: "#e4e9e7",
+  inflow: "#a3c4bd",
+  outflow: stateColors.waiting_reviewer,
+  queue: "#b17b28",
+};
