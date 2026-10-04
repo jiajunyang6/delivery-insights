@@ -29,6 +29,21 @@ class GitHubAdapter:
     async def pull_requests_page(
         self, repo: RepoRef, *, cursor: str | None, page_size: int, open_only: bool = False
     ) -> PageResult:
+        try:
+            page = await self._pull_requests_page(
+                repo, cursor=cursor, page_size=page_size, open_only=open_only
+            )
+        except Exception:
+            self.client.successful_pages = 0
+            raise
+        self.client.successful_pages = min(2, self.client.successful_pages + 1)
+        if self.client.successful_pages == 2:
+            self.client.page_size = self.client.settings.graphql_page_size
+        return page
+
+    async def _pull_requests_page(
+        self, repo: RepoRef, *, cursor: str | None, page_size: int, open_only: bool = False
+    ) -> PageResult:
         if not REPO_RE.fullmatch(repo.full_name):
             raise ValueError("Invalid repository")
         size = min(page_size, self.client.page_size)
@@ -46,6 +61,7 @@ class GitHubAdapter:
                 )
                 break
             except GitHubTransientError:
+                self.client.successful_pages = 0
                 if size <= 5:
                     raise
                 size = max(5, size // 2)

@@ -25,7 +25,7 @@ from insights.narrative.prompt import PROMPT_VERSION, SYSTEM_PROMPT, TOOL_SPEC, 
 from insights.narrative.template import build_template
 from insights.narrative.validator import STEPS, citations, validate
 from insights.redis import narrative_key, narrative_lock_key
-from insights.snapshot_service import SnapshotService, not_found
+from insights.snapshots.service import SnapshotService, not_found
 
 NARRATIVE_DEADLINE_SECONDS = 150
 LOCK_WAIT_SECONDS = 160

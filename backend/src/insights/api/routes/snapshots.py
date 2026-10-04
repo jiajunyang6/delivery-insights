@@ -9,7 +9,7 @@ from insights.api.routes.insights import response
 from insights.api.schemas import Narrative, Snapshot
 from insights.narrative.llm import LLMClient
 from insights.narrative.service import NarrativeService
-from insights.snapshot_service import SnapshotService
+from insights.snapshots.service import SnapshotService
 
 router = APIRouter(prefix="/v1/snapshots", tags=["Snapshots"])
 

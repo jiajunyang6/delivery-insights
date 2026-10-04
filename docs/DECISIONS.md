@@ -32,6 +32,10 @@ This is the current set; superseded entries remain in Git history.
 | Decision | Reason |
 |---|---|
 | A malformed PR is skipped and logged (repo, number, exception type). NULs are stripped. Timelines that break invariants are kept and counted in job stats. | One bad upstream record must not block a repository. |
+| Sync prefetches at most one page while committing the current page. Cursors and coverage advance only after successful writes. | Overlaps network and database work while retaining resumable checkpoints; abandoned downloads are cancelled. |
+| After two successful PR pages, adaptive pagination restores the configured page size (default 25). Any page failure resets the streak. | A transient GraphQL failure should not leave the entire sync at a reduced page size. |
+| Normal sync links PRs only when newly inserted PRs set the durable `links_pending` flag. Successful linking clears it in the same transaction; explicit rederivation still rebuilds links. | Avoids repeated full-repository scans and preserves pending work across failed jobs. Updates to existing PRs retain their stored links until new PRs or rederivation trigger a scan. |
+| Default snapshot precomputation covers 7, 30 and 60 days. Snapshot orchestration lives in `snapshots/service.py`; `FakeLLMClient` lives in `tests/fakes.py`. | Matches dashboard presets, gives shared API/worker orchestration a package, and keeps test doubles out of production. |
 | GraphQL queries omit `Team.slug` for requested teams. | A public-repository token gets `INSUFFICIENT_SCOPES` for it, and team names do not affect analytics. |
 | Stale PR pagination after a sync clears rows and offers a refresh; pagination requests revalidate the cache. | A sync changes the snapshot identity, so old cursors are rejected. |
 | The worker restarts unless stopped. Logs are JSON across uvicorn, arq and the app, and exceptions log their type only. | Observed arq exit on Redis loss; avoids leaking upstream error text. |

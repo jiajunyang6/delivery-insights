@@ -162,14 +162,35 @@ async def test_adaptive_page_size_and_cursor(client, github_page):
             httpx.Response(200, json={"errors": [{"message": "Something went wrong"}]})
             for _ in range(3)
         ]
-        + [httpx.Response(200, json=github_page), httpx.Response(200, json=github_page)]
+        + [httpx.Response(200, json=github_page) for _ in range(3)]
     )
     adapter = GitHubAdapter(client)
     await adapter.pull_requests_page(RepoRef("a", "b"), cursor="cursor", page_size=25)
     await adapter.pull_requests_page(RepoRef("a", "b"), cursor="next", page_size=25)
+    assert client.page_size == 25
+    await adapter.pull_requests_page(RepoRef("a", "b"), cursor="restored", page_size=25)
     variables = [orjson.loads(c.request.content)["variables"] for c in route.calls]
-    assert [v["pageSize"] for v in variables] == [25, 12, 6, 5, 5]
+    assert [v["pageSize"] for v in variables] == [25, 12, 6, 5, 5, 25]
     assert [v["cursor"] for v in variables[:4]] == ["cursor"] * 4
+
+
+async def test_page_failure_resets_recovery_streak(client, github_page):
+    client.page_size = 5
+    client.router.post(URL).respond(200, json=github_page)
+    adapter = GitHubAdapter(client)
+    await adapter.pull_requests_page(RepoRef("a", "b"), cursor=None, page_size=25)
+    client.router.post(URL).respond(401)
+    with pytest.raises(GitHubAuthError):
+        await adapter.pull_requests_page(RepoRef("a", "b"), cursor="bad", page_size=25)
+    assert client.successful_pages == 0 and client.page_size == 5
+    route = client.router.post(URL).respond(200, json=github_page)
+    calls_before = len(route.calls)
+    for cursor in ("first", "second", "third"):
+        await adapter.pull_requests_page(RepoRef("a", "b"), cursor=cursor, page_size=25)
+    assert [
+        orjson.loads(call.request.content)["variables"]["pageSize"]
+        for call in route.calls[calls_before:]
+    ] == [5, 5, 25]
 
 
 async def test_complete_timeline_before_normalize(client, github_page):

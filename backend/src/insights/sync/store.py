@@ -19,6 +19,7 @@ class SaveResult:
     events: int
     pr_ids: tuple[int, ...]
     invariant_violations: int = 0
+    prs_created: int = 0
 
 
 def pr_values(record: PullRequestRecord, repo_id: int, now: datetime) -> dict[str, Any]:
@@ -78,6 +79,7 @@ async def save_page(
         ).all()
     )
     records = [p for p in page.prs if existing.get(p.number) != content_hash(p)]
+    created = sum(p.number not in existing for p in records)
     await session.execute(
         update(Repository)
         .where(Repository.id == repo_id)
@@ -120,7 +122,10 @@ async def save_page(
     await session.execute(
         update(Repository)
         .where(Repository.id == repo_id)
-        .values(data_version=Repository.data_version + 1)
+        .values(
+            data_version=Repository.data_version + 1,
+            links_pending=True if created else Repository.links_pending,
+        )
     )
     violations = await derive_prs(session, pr_ids, settings=settings or Settings(), now=now)
-    return SaveResult(len(records), len(events), pr_ids, violations)
+    return SaveResult(len(records), len(events), pr_ids, violations, created)

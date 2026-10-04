@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from insights.api.errors import ProblemError
 from insights.config import Settings
-from insights.snapshot_service import SnapshotService
+from insights.snapshots.service import SnapshotService
 
 
 def get_settings(request: Request) -> Settings:

@@ -8,7 +8,7 @@ from insights.api import deps
 from insights.api.caching import Reply
 from insights.api.params import parse_filters, parse_params
 from insights.api.schemas import Pending, PrPage, Snapshot
-from insights.snapshot_service import SnapshotService
+from insights.snapshots.service import SnapshotService
 
 router = APIRouter(prefix="/v1/insights", tags=["Insights"])
 

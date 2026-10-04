@@ -9,7 +9,7 @@ from insights.api.params import validate_job_id
 from insights.api.routes.repos import job_response
 from insights.api.schemas import SyncJobResponse
 from insights.db.models import Repository, SyncJob
-from insights.snapshot_service import not_found
+from insights.snapshots.service import not_found
 
 router = APIRouter(prefix="/v1/sync-jobs", tags=["Sync jobs"])
 

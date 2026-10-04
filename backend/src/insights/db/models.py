@@ -45,6 +45,7 @@ class Repository(Base):
     last_sync_error: Mapped[str | None] = mapped_column(Text)
     data_version: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))
     derived_key: Mapped[str | None] = mapped_column(Text)
+    links_pending: Mapped[bool] = mapped_column(Boolean, server_default=text("FALSE"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )

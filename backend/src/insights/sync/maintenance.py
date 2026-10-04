@@ -10,7 +10,7 @@ from insights.api.errors import ProblemError
 from insights.config import Settings, split_list
 from insights.db.models import Snapshot, SyncJob
 from insights.redis import rows_key, snapshot_key
-from insights.snapshot_service import SnapshotService
+from insights.snapshots.service import SnapshotService
 from insights.sync.jobs import now_for, sessions_for
 
 logger = structlog.get_logger(__name__)

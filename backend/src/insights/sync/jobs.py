@@ -1,6 +1,6 @@
 import asyncio
-from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager, suppress
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
+from contextlib import aclosing, asynccontextmanager, suppress
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from uuid import UUID
@@ -99,15 +99,15 @@ class SyncRun:
             "invariant_violations": 0,
         }
 
-    async def fetch(
-        self, cursor: str | None, *, open_only: bool = False, backfill: bool = False
-    ) -> PageResult:
-        page = await self.adapter.pull_requests_page(
+    async def fetch(self, cursor: str | None, *, open_only: bool = False) -> PageResult:
+        return await self.adapter.pull_requests_page(
             RepoRef(self.repo.owner, self.repo.name),
             cursor=cursor,
             page_size=self.settings.graphql_page_size,
             open_only=open_only,
         )
+
+    async def store(self, page: PageResult, *, backfill: bool = False) -> None:
         async with sessions_for(self.ctx)() as session, session.begin():
             result = await save_page(
                 session, self.repo.id, page, now=now_for(self.ctx), settings=self.settings
@@ -125,41 +125,67 @@ class SyncRun:
         self.stats["graphql_cost"] += page.graphql_cost
         self.stats["skipped_prs"] += page.skipped_prs
         self.stats["invariant_violations"] += result.invariant_violations
-        return page
+
+    async def pages(
+        self,
+        cursor: str | None = None,
+        *,
+        open_only: bool = False,
+        backfill: bool = False,
+        stop: Callable[[PageResult], bool] | None = None,
+        cursor_error: str = "pagination_did_not_advance",
+    ) -> AsyncGenerator[PageResult, None]:
+        """Overlap one page's download with the preceding page's committed write."""
+        seen = {cursor} if cursor else set()
+        pending: asyncio.Task[PageResult] | None = asyncio.create_task(
+            self.fetch(cursor, open_only=open_only)
+        )
+        try:
+            while pending is not None:
+                page = await pending
+                pending = None
+                invalid_cursor = False
+                if page.has_next_page and not (stop and stop(page)):
+                    next_cursor = page.end_cursor
+                    invalid_cursor = not next_cursor or next_cursor in seen
+                    if next_cursor and not invalid_cursor:
+                        seen.add(next_cursor)
+                        pending = asyncio.create_task(self.fetch(next_cursor, open_only=open_only))
+                # Never publish a cursor or consume a prefetched page before this commit succeeds.
+                await self.store(page, backfill=backfill)
+                yield page
+                if invalid_cursor:
+                    raise GitHubError(cursor_error)
+        finally:
+            if pending is not None:
+                pending.cancel()
+                with suppress(asyncio.CancelledError, Exception):
+                    await pending
 
     async def incremental(self, cutoff: datetime) -> None:
-        cursor = None
         first = True
         watermark = None
-        seen: set[str] = set()
-        while True:
-            page = await self.fetch(cursor)
-            if first:
-                watermark, first = page.newest_updated_at, False
-            if not page.has_next_page or (
+
+        def stop(page: PageResult) -> bool:
+            return (
                 page.oldest_updated_at is not None
                 and page.oldest_updated_at < cutoff - timedelta(minutes=10)
-            ):
-                break
-            if not page.end_cursor or page.end_cursor in seen:
-                raise GitHubError("pagination_did_not_advance")
-            seen.add(page.end_cursor)
-            cursor = page.end_cursor
+            )
+
+        async with aclosing(self.pages(stop=stop)) as pages:
+            async for page in pages:
+                if first:
+                    watermark, first = page.newest_updated_at, False
         if watermark is not None:
             self.repo.sync_watermark = watermark
             await set_repo(self.ctx, self.repo.id, sync_watermark=watermark)
 
     async def open_sweep(self) -> None:
-        cursor = None
-        seen: set[str] = set()
-        while True:
-            page = await self.fetch(cursor, open_only=True)
-            if not page.has_next_page:
-                break
-            if not page.end_cursor or page.end_cursor in seen:
-                raise GitHubError("open_cursor_did_not_advance")
-            seen.add(page.end_cursor)
-            cursor = page.end_cursor
+        async with aclosing(
+            self.pages(open_only=True, cursor_error="open_cursor_did_not_advance")
+        ) as pages:
+            async for _ in pages:
+                pass
         self.repo.last_open_sweep_at = now_for(self.ctx)
         await set_repo(self.ctx, self.repo.id, last_open_sweep_at=self.repo.last_open_sweep_at)
 
@@ -168,7 +194,10 @@ class SyncRun:
         await self.incremental(self.previous_checkpoint)
         key = current_key(self.settings)
         async with sessions_for(self.ctx)() as session, session.begin():
-            await link_repo(session, self.repo.id)
+            if await session.scalar(
+                select(Repository.links_pending).where(Repository.id == self.repo.id)
+            ):
+                await link_repo(session, self.repo.id)
             complete = await derivation_complete(session, self.repo.id, key)
             if complete:
                 values["derived_key"] = key
@@ -189,7 +218,6 @@ class SyncRun:
         self.previous_checkpoint = checkpoint_time
 
     async def backfill(self) -> None:
-        cursor = self.repo.backfill_cursor
         phases = [
             days
             for days in self.settings.backfill_phases
@@ -202,34 +230,43 @@ class SyncRun:
         if not phases:
             return
         index = 0
-        seen: set[str] = set()
-        while index < len(phases):
-            target = phases[index]
-            await set_repo(self.ctx, self.repo.id, backfill_target_days=target)
-            await set_job(self.ctx, self.job_id, phase=f"backfill:{target}d")
-            page = await self.fetch(cursor, backfill=True)
-            if self.repo.sync_watermark is None and page.newest_updated_at:
-                self.repo.sync_watermark = page.newest_updated_at
-                await set_repo(self.ctx, self.repo.id, sync_watermark=self.repo.sync_watermark)
-            cursor = page.end_cursor
-            while index < len(phases):
-                threshold = (self.started - timedelta(days=phases[index])).replace(
-                    second=0, microsecond=0
-                )
-                if page.has_next_page and (
-                    page.oldest_updated_at is None or page.oldest_updated_at >= threshold
-                ):
-                    break
-                if self.repo.last_open_sweep_at is None:
-                    await self.open_sweep()
-                self.repo.covered_since = threshold
-                await self.checkpoint(covered_since=threshold, backfill_target_days=phases[index])
-                index += 1
-            if not page.has_next_page:
-                break
-            if not cursor or cursor in seen:
-                raise GitHubError("backfill_cursor_did_not_advance")
-            seen.add(cursor)
+        final_threshold = (self.started - timedelta(days=phases[-1])).replace(
+            second=0, microsecond=0
+        )
+
+        def stop(page: PageResult) -> bool:
+            return page.oldest_updated_at is not None and page.oldest_updated_at < final_threshold
+
+        async with aclosing(
+            self.pages(
+                self.repo.backfill_cursor,
+                backfill=True,
+                stop=stop,
+                cursor_error="backfill_cursor_did_not_advance",
+            )
+        ) as pages:
+            async for page in pages:
+                target = phases[index]
+                await set_repo(self.ctx, self.repo.id, backfill_target_days=target)
+                await set_job(self.ctx, self.job_id, phase=f"backfill:{target}d")
+                if self.repo.sync_watermark is None and page.newest_updated_at:
+                    self.repo.sync_watermark = page.newest_updated_at
+                    await set_repo(self.ctx, self.repo.id, sync_watermark=self.repo.sync_watermark)
+                while index < len(phases):
+                    threshold = (self.started - timedelta(days=phases[index])).replace(
+                        second=0, microsecond=0
+                    )
+                    if page.has_next_page and (
+                        page.oldest_updated_at is None or page.oldest_updated_at >= threshold
+                    ):
+                        break
+                    if self.repo.last_open_sweep_at is None:
+                        await self.open_sweep()
+                    self.repo.covered_since = threshold
+                    await self.checkpoint(
+                        covered_since=threshold, backfill_target_days=phases[index]
+                    )
+                    index += 1
 
     async def execute(self) -> None:
         if self.repo.sync_watermark:
@@ -270,6 +307,7 @@ async def sync_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id:
                 )
                 return "missing_token"
             run.adapter.client.page_size = run.settings.graphql_page_size
+            run.adapter.client.successful_pages = 0
             await run.execute()
         except Exception as exc:
             status = (

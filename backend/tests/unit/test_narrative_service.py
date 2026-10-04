@@ -2,13 +2,14 @@ from copy import deepcopy
 from datetime import UTC, datetime
 
 import pytest
+from tests.fakes import FakeLLMClient
 from tests.narrative_factory import golden, scoring_fixture, validation_fixture
 
 from insights.analytics.snapshot import digest
 from insights.api.schemas import Narrative
 from insights.narrative.evidence import build_evidence_pack
 from insights.narrative.hypotheses import score_hypotheses
-from insights.narrative.llm import FakeLLMClient, LLMReply, LLMUnavailable
+from insights.narrative.llm import LLMReply, LLMUnavailable
 from insights.narrative.service import assemble, generate
 from insights.narrative.template import build_template
 
