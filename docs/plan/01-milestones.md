@@ -1,3 +1,5 @@
+> Historical design input used to generate the first implementation. The code, README, NOTES and docs/REFERENCE.md are authoritative where they differ.
+
 # 01 Milestones (execution sequence)
 
 Execute in order. Each milestone specifies its goal, tasks, required tests, definition of done (DoD), and notes. Run every DoD command and require it to pass. Skip steps marked "credentials required" when the corresponding environment variable is absent, and record them in the final report.

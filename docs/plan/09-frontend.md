@@ -1,3 +1,5 @@
+> Historical design input used to generate the first implementation. The code, README, NOTES and docs/REFERENCE.md are authoritative where they differ.
+
 # 09 Frontend (P1, M11)
 
 ## 1. Scope and principles

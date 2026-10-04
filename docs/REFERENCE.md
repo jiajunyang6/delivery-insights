@@ -1,7 +1,7 @@
 # Technical reference
 
 Detailed behavior moved out of the README. Start with the [README](../README.md) and [NOTES](../NOTES.md).
-Authoritative contracts are in [plan/](plan/00-overview.md); implementation decisions are in [DECISIONS.md](DECISIONS.md).
+Current contracts are in code and this reference; [plan/](plan/00-overview.md) retains historical design input. Implementation decisions are in [DECISIONS.md](DECISIONS.md).
 
 ## The insight and why this metric
 
@@ -61,7 +61,7 @@ It may call Bedrock for an uncached narrative; heavy analytics and boto3 run in 
 
 ## API
 
-OpenAPI is available at `/openapi.json` and `/docs`; the full contract is
+OpenAPI is available at `/openapi.json` and `/docs`; the historical design is
 [06-api.md](plan/06-api.md). Dates and timestamps use UTC.
 `from` and `to` are inclusive dates; comparison uses the preceding equal-length period. `as_of` is capped by the least recent repository sync watermark.
 
@@ -78,7 +78,7 @@ OpenAPI is available at `/openapi.json` and `/docs`; the full contract is
 | GET | `/readyz` | Postgres and Redis readiness |
 
 Repeated `repo=` values aggregate tracked repositories; `org=` selects only tracked
-repositories of that owner. Percentiles pool PRs; `per_repo` preserves separate views.
+repositories of that owner. Percentiles pool PRs; query a single repository for a separate view.
 Unknown parameters are rejected. Invalid input returns `422`; untracked repos return `403`.
 Errors use RFC 9457 `application/problem+json` with `request_id` and sanitized detail.
 
@@ -105,6 +105,28 @@ A `202` is a Pending object, not a snapshot. Respect `Retry-After`; inspect each
 `reason` and `job`. The UI polls for at most five minutes, then asks for a later refresh.
 PR pages accept `status`, `at_risk`, `state`, `location`, `limit` and `cursor`.
 A cursor is tied to snapshot identity and filters; refresh if the data version changes.
+
+## Snapshot contract in analytics 1.5.0
+
+The strict `api/schemas.py` models are the current field contract (`extra="forbid"`).
+Retained metrics, samples, comparisons, significance, findings and their what-if estimates,
+risks, location rows including `owners_count`, headline and links retain their values.
+Only outputs without dashboard, narrative, finding or eval consumers were removed:
+
+| Block | Removed outputs |
+|---|---|
+| Root / bottleneck summary | `per_repo`, `pareto`, the summary `what_if` list (finding-level `what_if` stays) |
+| Merge blockers / drivers | Unused approved-count/second-approval/CI-after-approval metrics; author-WIP, submit timing, review-round buckets/cost/first pickup (re-review wait stays) |
+| Waste / rework | Closed count, class/share diagnostics; revert/reland counters and chain original/reland/exposure/cycle fields (revert URL stays) |
+| Trend / CI | Bottleneck shift, attribution total-hours/reviewer-share diagnostics; rerun rate, runs per PR, workflow/source/coverage diagnostics (ledger CI availability/coverage stays) |
+| Metadata / risk | Exclusion/location-source diagnostics, extra sample counts, risk-by-state, risk PR size/external contributor |
+| Ledger / guardrail / series | Ledger scope/previous count/total, prior revert-rate/change-pp, queue growth, weekly days/reverts, KM step/events outputs |
+
+Identity and caches use analytics 1.5.0. Sampling uses `digest(seed_params)[:16]` with exactly
+the former canonical parameter structure and only `analytics_version` replaced by frozen
+`SAMPLING_SEED_VERSION="1.4.0"`. Existing snapshots and narrative caches remain isolated;
+HTTP conditional requests still return 304 for matching current ETags. Repositories with old
+derived versions enter the existing rederivation path. No schema reset is needed for stages 1–8.
 
 ## Narrative, confidence and evidence chain
 
@@ -190,7 +212,7 @@ Set `CI_COMPLETE=true` only if Actions telemetry covers the CI you intend to mea
 Use `/healthz` for liveness and `/readyz` for dependency readiness. Read `/v1/repos`
 before judging missing data. Snapshots/narratives are retained for seven days and sync-job
 records for thirty days; source PR records are retained until the database is reset.
-Worker housekeeping expires retained data and precomputes 7-, 30- and 90-day reports.
+Worker housekeeping expires retained data and precomputes 7-, 30- and 60-day reports.
 
 ```bash
 curl -s http://localhost:8000/readyz
@@ -242,7 +264,7 @@ There is no authenticated administrative UI or backup orchestration in this demo
 
 Tests focus on accounting boundaries and failure behavior, not only happy-path output.
 They cover 22 specified timeline cases plus 200 random invariant sequences, deterministic
-golden output under shuffled input, sample gates, CI overlap, KM censoring/ties, drivers,
+golden output under shuffled input, sample gates, observed CI waits, KM censoring/ties, drivers,
 resumable ingestion, snapshot identity/expiry, privacy, validators and fallback races.
 Integration tests use actual Postgres 16 and Redis 7 through Testcontainers; GitHub and
 Bedrock calls are mocked or SDK-stubbed. Docker must be running for the full suite.
@@ -258,23 +280,24 @@ make eval
 make smoke
 ```
 
-Latest checks: 2026-10-03, analytics 1.4.0, prompt v7.
+Latest refactor checks: 2026-10-04 UTC, analytics 1.5.0, prompt v7.
 
 | Check | Observed result |
 |---|---|
 | Ruff check/format and strict mypy | Pass |
-| Unit suite | 324 passed |
-| Full suite | 381 passed, including 57 integration tests |
-| Frontend typecheck and build | Pass with Node 24 |
+| Unit suite | 331 passed |
+| Full suite | 402 passed, including 71 integration tests |
+| Frontend tests, typecheck and build | 8 tests passed; typecheck/build pass with Node 24 |
 | Real sync / browser recovery | 50 rows → stale cursor 422 → rows cleared → refresh → 50 matching rows |
-| Golden fixture after cohort caching | Unchanged SHA256; repeat calls reuse tuples; dataset replacements have independent caches |
+| Refactor equivalence | Remaining snapshot values, evidence, scoring, templates, assembly, validator codes and prompt messages match `pre-refactor`; only allowlisted deletions and recomputed identity fields differ |
+| Refactored UI (synthetic fixtures) | Both views; 7/30/60 days; 5 → 12 risk rows; ownership counts; card/citation focus; three abstentions; pending sync; no console errors |
 
 Earlier acceptance measured 3,541 PRs with no invariant violations, three matching PR pages, 533 merged PRs with ledger rounding error 0.0000004833, cold compute 1,376.95 ms and warm HTTP p95 32.32 ms.
 Those analytics 1.2/1.3 measurements and npm ci/audit checks were not repeated here. They are local measurements, not production load evidence.
 The original 90-day performance gate remains excluded; nine upstream deprecation warnings remain.
 
 The harness runs five planted scenarios × two seeds × two English audience variants.
-The offline suite was re-run on prompt v7 with unchanged results; the real Bedrock Sonnet 4.6 column below is from prompt v6 and analytics 1.4.0.
+The offline suite was re-run on analytics 1.5.0 and prompt v7 with unchanged results; the real Bedrock Sonnet 4.6 column below is from prompt v6 and analytics 1.4.0.
 [Evaluation records](EVALUATION.md) retain every current and historical per-case outcome.
 Numeric/citation/hedge denominators include final LLM outputs, excluding fallback.
 
@@ -287,7 +310,7 @@ Numeric/citation/hedge denominators include final LLM outputs, excluding fallbac
 | High-confidence precision | 14/14 (1.00) | 14/14 (1.00) | ≥ 0.80 |
 | Fallback rate | 0/20 (0.00) | 0/20 (0.00) | ≤ 0.10 |
 
-Both current suites pass all gates. Quality-tradeoff seed 101 abstains because its
+The current offline suite and the historical real-Bedrock v6 run pass all gates. Quality-tradeoff seed 101 abstains because its
 previous-period baseline fails the five-event gate; thresholds are unchanged.
 Medium/low precision is undefined. Failed v1/v2 and English v4/v5 trials remain
 recorded. The rebuilt local API also passed the English-only real-manager HTTP smoke.
@@ -301,9 +324,9 @@ benchmark or real-world causal calibration. Missing-key evaluation exits 2.
 | Decision | Choice and cost | Follow-up |
 |---|---|---|
 | Time basis | UTC wall-clock, including nights/weekends | Add team calendars |
-| Multi-repo | Pool PRs; larger repos dominate aggregate percentiles | Compare returned per-repo metrics |
-| Locations | Current labels → CODEOWNERS → directories; historical labels unavailable | Inspect `meta.location_sources` |
-| Scope | Default-branch flow; bots/backports excluded and counted | Separate release-branch view |
+| Multi-repo | Pool PRs; larger repos dominate aggregate percentiles | Query each repository separately |
+| Locations | Current labels → CODEOWNERS → directories; historical labels unavailable | Inspect location rows and current ownership configuration |
+| Scope | Default-branch flow; bots/backports excluded | Separate release-branch view |
 | Freshness | Background sync, default 15 minutes | Webhooks if lower latency is needed |
 | Sources | Whitelisted GitHub repos only | Extend `SourceAdapter` with shared normalized records |
 | Snapshot compute | Concurrent cold requests can duplicate deterministic work | Add single-flight only if measured necessary |
@@ -385,7 +408,9 @@ The GitHub Actions workflow applies backend lint/tests/eval and frontend typeche
 | `backend/migrations/` | Alembic schema history |
 | `backend/tests/` | Unit, integration, fixture and golden checks |
 | `backend/eval/` | Synthetic generator, scenarios and evaluation runner |
-| `frontend/` | React/TypeScript UI, Vite config and nginx image |
+| `frontend/` | React/TypeScript UI, shared abortable requests/formatting/links, Vite config and nginx image |
+| `backend/src/insights/snapshots/` | Shared orchestration, caching, filtering and domain errors |
+| `backend/src/insights/sync/queue.py` | Shared job lifecycle, locks, queue helpers and success lookup |
 | `scripts/` | HTTP smoke entrypoint |
-| `docs/plan/` | Supplied authoritative plan |
+| `docs/plan/` | Historical design input |
 | `docs/` | Decisions, acceptance evidence and evaluation records in Markdown |

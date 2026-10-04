@@ -1,3 +1,5 @@
+> Historical design input used to generate the first implementation. The code, README, NOTES and docs/REFERENCE.md are authoritative where they differ.
+
 # 07 Narrative (Endpoint 2)
 
 Narratives, statements, downgrade reasons, actions and verification advice use English only.

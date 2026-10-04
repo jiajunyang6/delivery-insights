@@ -1,3 +1,5 @@
+> Historical design input used to generate the first implementation. The code, README, NOTES and docs/REFERENCE.md are authoritative where they differ.
+
 # 06 API contract
 
 This external contract has highest precedence (`AGENTS.md` §2). Field names, status codes, headers, and problem types must match it; Pydantic response models live in insights/api/schemas.py.

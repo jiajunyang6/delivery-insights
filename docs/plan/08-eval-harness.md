@@ -1,3 +1,5 @@
+> Historical design input used to generate the first implementation. The code, README, NOTES and docs/REFERENCE.md are authoritative where they differ.
+
 # 08 Eval harness (P1, M10; generator, pipeline, scenarios built in M5)
 
 ## 1. Purpose

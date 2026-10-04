@@ -1,7 +1,9 @@
+> Historical design input used to generate the first implementation. The code, README, NOTES and docs/REFERENCE.md are authoritative where they differ.
+
 # 00 Overview
 
 This is the implementation plan. User-approved scope and tooling changes are recorded in `docs/DECISIONS.md`; the
-current behavior and verification status are described in README and `docs/ACCEPTANCE.md`.
+current behavior and verification status are described in README.
 
 ## 1. Product
 

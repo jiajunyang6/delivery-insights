@@ -50,7 +50,8 @@ Until a period is covered, the API returns `202` with `Retry-After` and the dash
 curl -s "http://localhost:8000/v1/insights/delivery?repo=bevyengine/bevy&from=2026-09-04&to=2026-10-03"
 ```
 
-Dates are inclusive UTC dates. Errors use RFC 9457 `application/problem+json`. Full contract: [06-api.md](docs/plan/06-api.md).
+Dates are inclusive UTC dates. Errors use RFC 9457 `application/problem+json`. Current contract: [REFERENCE.md](docs/REFERENCE.md#api) and the strict models in
+`backend/src/insights/api/schemas.py`. The original design is retained in `docs/plan/`.
 
 ## Configuration
 
@@ -79,6 +80,14 @@ make eval          # same against real Bedrock (reads the key from .env)
 cd frontend && npm ci && npm test && npm run typecheck && npm run build
 ```
 
+Analytics version **1.5.0** trims unused snapshot diagnostics while retaining dashboard,
+narrative and drilldown fields. Snapshot/cache identities use 1.5.0; statistical sampling
+keeps the original 1.4.0 seed parameters. Existing databases rederive on the version change;
+stages 1–8 require no database reset. See [refactor verification](docs/REFACTOR_VERIFICATION.md).
+
+Local checks: **402 backend tests** (331 unit, 71 integration), **8 frontend tests**,
+strict lint/types/build and all eight offline narrative gates pass.
+
 ## Documentation
 
 | Document | Contents |
@@ -87,4 +96,4 @@ cd frontend && npm ci && npm test && npm run typecheck && npm run build
 | [docs/REFERENCE.md](docs/REFERENCE.md) | Metric definitions, confidence scoring, operations, security, test results, limitations |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Implementation decisions and their reasons |
 | [docs/EVALUATION.md](docs/EVALUATION.md) | Narrative evaluation runs, per case |
-| [docs/plan/](docs/plan/00-overview.md) | The design and implementation plan the code was built from |
+| [docs/plan/](docs/plan/00-overview.md) | Historical design input; current code and reference take precedence |

@@ -90,8 +90,25 @@ per-decision log: [docs/DECISIONS.md](docs/DECISIONS.md).
 - **What I did:** product roadmap, tech stack, high-level architecture and product decisions
   (the metric, the trade-offs, the period-scoped dashboard), plus plan and diff reviews.
 - **How the output was checked:**
-  - 381 automated tests, 57 of them on real Postgres 16 and Redis 7.
+  - 402 automated tests, 71 of them on real Postgres 16 and Redis 7.
   - Strict ruff/mypy and the frontend typecheck and build.
   - The 20-case narrative evaluation (stub on prompt v7, real Bedrock on prompt v6).
   - Real GitHub sync and browser checks.
+  - Refactor equivalence across golden, ten planted datasets and an ownership fixture;
+    synthetic browser checks for both views, presets, Load more, cards and abstentions.
   - Not yet done: a person's numeric review of the golden fixture.
+
+## Refactor structure
+
+Analytics/cache identity is 1.5.0, with sampling seeds frozen at 1.4.0. Unused snapshot
+diagnostics were removed; remaining business values, evidence and template text are equivalent
+to `pre-refactor`. `snapshots/` owns cache, filter and domain-error helpers, so service modules
+do not depend on the API layer. `sync/queue.py` owns the shared job lifecycle;
+`sync/derive.py` includes rederivation. PR drilldown rows live in `analytics/snapshot.py`.
+The narrative hypothesis table preserves distinct card titles and template subjects, and
+generation shares one evidence extraction and one total deadline across both attempts.
+The frontend shares `useAbortable`, `GithubLink`, formatting and chart colors.
+
+[Refactor verification](docs/REFACTOR_VERIFICATION.md) separates automatic equivalence checks,
+synthetic browser verification and the later prompt/storage gates. The storage reset remains
+pending; the existing three migrations are retained until its prerequisites and confirmation.

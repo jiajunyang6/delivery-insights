@@ -1,3 +1,5 @@
+> Historical design input used to generate the first implementation. The code, README, NOTES and docs/REFERENCE.md are authoritative where they differ.
+
 # AGENTS.md — Instructions for the implementation agent
 
 Implement **Delivery Insights**, a Python web service that synchronizes GitHub PR collaboration data and helps engineering managers and directors understand where delivery is stuck, why, and what to fix first. It exposes two HTTP endpoints:

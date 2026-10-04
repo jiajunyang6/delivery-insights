@@ -1,3 +1,5 @@
+> Historical design input used to generate the first implementation. The code, README, NOTES and docs/REFERENCE.md are authoritative where they differ.
+
 # 05 Analytics algorithms
 
 This file defines all computations. Except dataset.py, functions are pure: immutable input, new output, no I/O. Durations use hours (float); timestamps use UTC.
