@@ -1,3 +1,4 @@
+import { chartColors } from "../format";
 import {
   Bar,
   CartesianGrid,
@@ -35,7 +36,7 @@ export function ReviewQueueChart({ weeks }: { weeks: Week[] }) {
             <CartesianGrid
               strokeDasharray="3 4"
               vertical={false}
-              stroke="#e4e9e7"
+              stroke={chartColors.grid}
             />
             <XAxis
               dataKey="week_start"
@@ -49,14 +50,14 @@ export function ReviewQueueChart({ weeks }: { weeks: Week[] }) {
             <Bar
               dataKey="inflow"
               name="Inflow"
-              fill="#a3c4bd"
+              fill={chartColors.inflow}
               radius={[3, 3, 0, 0]}
               isAnimationActive={false}
             />
             <Bar
               dataKey="outflow"
               name="First reviews"
-              fill="#208577"
+              fill={chartColors.outflow}
               radius={[3, 3, 0, 0]}
               isAnimationActive={false}
             />
@@ -64,7 +65,7 @@ export function ReviewQueueChart({ weeks }: { weeks: Week[] }) {
               type="monotone"
               dataKey="open_at_week_end"
               name="Open queue"
-              stroke="#b17b28"
+              stroke={chartColors.queue}
               strokeWidth={2}
               dot={{ r: 3 }}
               isAnimationActive={false}

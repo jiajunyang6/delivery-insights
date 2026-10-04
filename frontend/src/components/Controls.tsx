@@ -1,7 +1,6 @@
 import type { Audience, DateLimits, Params, RepoStatus } from "../types";
-import { dateRange } from "../format";
+import { dateRange, viewDescriptions, viewLabels } from "../format";
 import { isPeriodSelected, periodError } from "../period";
-import { viewDescriptions, viewLabels } from "../views";
 
 interface Props {
   params: Params;

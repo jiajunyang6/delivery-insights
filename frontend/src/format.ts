@@ -1,4 +1,4 @@
-import type { State } from "./types";
+import type { Audience, State } from "./types";
 
 export const states: State[] = [
   "waiting_reviewer",
@@ -82,3 +82,25 @@ export function dateRange(days: number, to = new Date().toISOString().slice(0, 1
     .slice(0, 10);
   return { from, to };
 }
+
+
+export const viewLabels: Record<Audience, string> = {
+  director: "Delivery Overview",
+  manager: "PR & Review Details",
+};
+
+export const viewDescriptions: Record<Audience, string> = {
+  director: "Delivery outcomes and the top three bottlenecks",
+  manager: "All bottlenecks, review queues, areas, and at-risk pull requests",
+};
+
+export function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+export const chartColors = {
+  grid: "#e4e9e7",
+  inflow: "#a3c4bd",
+  outflow: stateColors.waiting_reviewer,
+  queue: "#b17b28",
+};

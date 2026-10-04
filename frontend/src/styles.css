@@ -941,7 +941,8 @@ tbody tr:hover {
   }
   .hypothesis-header {
     flex-direction: column;
-    gap: 6px;
+    flex-wrap: wrap;
+    gap: 10px;
   }
   main {
     padding: 20px 15px 35px;
@@ -1026,10 +1027,6 @@ tbody tr:hover {
   }
   .hypothesis {
     padding: 17px;
-  }
-  .hypothesis-header {
-    flex-wrap: wrap;
-    gap: 10px;
   }
   .report-footer {
     flex-wrap: wrap;

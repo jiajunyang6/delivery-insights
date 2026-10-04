@@ -8,7 +8,7 @@ import {
   YAxis,
 } from "recharts";
 import type { Snapshot, State } from "../types";
-import { hours, percent, stateColors, stateLabels, states } from "../format";
+import { chartColors, hours, percent, stateColors, stateLabels, states } from "../format";
 export function TimeLedgerChart({ snapshot: s }: { snapshot: Snapshot }) {
   const data = (
     s.meta.comparison_available ? ["Previous", "Current"] : ["Current"]
@@ -47,7 +47,7 @@ export function TimeLedgerChart({ snapshot: s }: { snapshot: Snapshot }) {
             <CartesianGrid
               strokeDasharray="3 4"
               horizontal={false}
-              stroke="#e4e9e7"
+              stroke={chartColors.grid}
             />
             <XAxis
               type="number"
