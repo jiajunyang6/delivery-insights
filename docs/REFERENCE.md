@@ -288,8 +288,6 @@ make test
 make eval-offline
 # Reads AWS_BEARER_TOKEN_BEDROCK from root .env:
 make eval
-# Requires live GitHub data; waits up to five minutes:
-make smoke
 ```
 
 Latest refactor checks: 2026-10-04 UTC, analytics 1.5.0, prompt v8.
@@ -412,7 +410,7 @@ npm run dev
 ```
 
 Vite proxies `/api` to the local API. Compose serves the built UI through nginx instead.
-Make targets: `up`, `down`, `logs`, `lint`, `fmt`, `test-unit`, `test`, `eval-offline`, `eval`, `smoke`.
+Make targets: `up`, `down`, `logs`, `lint`, `fmt`, `test-unit`, `test`, `eval-offline`, `eval`.
 The GitHub Actions workflow applies backend lint/tests/eval and frontend typecheck/build.
 
 | Directory | Contents |
@@ -424,6 +422,5 @@ The GitHub Actions workflow applies backend lint/tests/eval and frontend typeche
 | `frontend/` | React/TypeScript UI, shared abortable requests/formatting/links, Vite config and nginx image |
 | `backend/src/insights/snapshots/` | Shared orchestration, caching, filtering and domain errors |
 | `backend/src/insights/sync/queue.py` | Shared job lifecycle, locks, queue helpers and success lookup |
-| `scripts/` | HTTP smoke entrypoint |
 | `PLAN.md` | Consolidated historical design input |
 | `docs/` | Decisions, acceptance evidence and evaluation records in Markdown |

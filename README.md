@@ -29,8 +29,14 @@ LLM-generated narratives.
 
 2. **Edit and save `.env` before starting Docker.** Open `.env` in a text editor.
 
-   - Set `GITHUB_TOKEN` to your GitHub token to enable syncing GitHub data.
+   - Set `GITHUB_TOKEN` to your GitHub token to enable syncing public GitHub data.
    - Set `AWS_BEARER_TOKEN_BEDROCK` to your Bedrock API key to enable LLM-generated narratives.
+   - Set `AWS_REGION` to the region used for Bedrock requests (default: `us-west-2`).
+   - Set `BEDROCK_MODEL_ID` to the model or inference profile ID used by the Converse API
+     (default: `us.anthropic.claude-sonnet-4-6`).
+
+   Choose a region and model or inference profile that your AWS account can access and has
+   available quota for; change the defaults if your quota is available elsewhere.
 
    Without a Bedrock key, narratives use deterministic templates and no LLM calls are made.
    Save the file before continuing.
@@ -127,10 +133,10 @@ strict lint/types/build and all eight offline narrative gates pass.
 
 ## Documentation
 
-| Document | Contents |
-|---|---|
-| [NOTES.md](NOTES.md) | Submission notes: run, architecture, next steps, AI use |
-| [docs/REFERENCE.md](docs/REFERENCE.md) | Metric definitions, confidence scoring, operations, security, test results, limitations |
-| [docs/DECISIONS.md](docs/DECISIONS.md) | Implementation decisions and their reasons |
-| [docs/EVALUATION.md](docs/EVALUATION.md) | Narrative evaluation runs, per case |
-| [docs/plan/PLAN.md](docs/PLAN.md) | Consolidated historical design input; current code and reference take precedence |
+| Document | Contents                                                                                                |
+|---|---------------------------------------------------------------------------------------------------------|
+| [NOTES.md](NOTES.md) | Submission notes: run, architecture, next steps, AI use                                                 |
+| [docs/REFERENCE.md](docs/REFERENCE.md) | Metric definitions, confidence scoring, operations, security, test results, limitations                 |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | Implementation decisions and their reasons                                                              |
+| [docs/EVALUATION.md](docs/EVALUATION.md) | Narrative evaluation runs, per case                                                                     |
+| [docs/PLAN.md](docs/PLAN.md) | Consolidated historical design input as implementation plan; current code and reference take precedence |
