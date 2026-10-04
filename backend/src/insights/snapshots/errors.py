@@ -1,7 +1,11 @@
+"""Problem-details errors raised by snapshot orchestration and rendered by the API."""
+
 from typing import Any
 
 
 class ResourceError(Exception):
+    """Error rendered as application/problem+json; type_slug becomes /problems/<slug>."""
+
     def __init__(
         self,
         status: int,

@@ -1,3 +1,8 @@
+"""Sync runs for one repository: staged backfill, incremental windows and open-PR sweeps.
+
+Pages come from the source adapter and are persisted through store.save_page.
+"""
+
 import asyncio
 from collections.abc import AsyncGenerator, Callable
 from contextlib import aclosing, suppress
@@ -30,6 +35,8 @@ logger = structlog.get_logger(__name__)
 
 
 class SyncRun:
+    """One sync job: resumes the backfill cursor, advances the watermark, records coverage."""
+
     def __init__(self, ctx: dict[str, Any], repo: Repository, job_id: str) -> None:
         self.ctx, self.repo, self.job_id = ctx, repo, job_id
         self.adapter = cast(SourceAdapter, ctx["adapter"])
@@ -82,7 +89,11 @@ class SyncRun:
         stop: Callable[[PageResult], bool] | None = None,
         cursor_error: str = "pagination_did_not_advance",
     ) -> AsyncGenerator[PageResult, None]:
-        """Overlap one page's download with the preceding page's committed write."""
+        """Yield committed pages, downloading the next page while the current one is written.
+
+        If more pages remain but the cursor is missing or repeats, raise GitHubError(cursor_error)
+        after the last good page has been stored and yielded.
+        """
         seen = {cursor} if cursor else set()
         pending: asyncio.Task[PageResult] | None = asyncio.create_task(
             self.fetch(cursor, open_only=open_only)
@@ -110,9 +121,11 @@ class SyncRun:
                     await pending
 
     async def incremental(self, cutoff: datetime) -> None:
+        """Re-read PRs updated since `cutoff` and advance the sync watermark."""
         first = True
         watermark = None
 
+        # Read 10 minutes past the cutoff; PRs that did not change are skipped by content hash.
         def stop(page: PageResult) -> bool:
             return (
                 page.oldest_updated_at is not None
@@ -123,11 +136,13 @@ class SyncRun:
             async for page in pages:
                 if first:
                     watermark, first = page.newest_updated_at, False
+        # Pages are newest-first; save the watermark only after the whole window is stored.
         if watermark is not None:
             self.repo.sync_watermark = watermark
             await set_repo(self.ctx, self.repo.id, sync_watermark=watermark)
 
     async def open_sweep(self) -> None:
+        """Re-read every open PR, including ones not updated within the synced window."""
         async with aclosing(
             self.pages(open_only=True, cursor_error="open_cursor_did_not_advance")
         ) as pages:
@@ -137,10 +152,17 @@ class SyncRun:
         await set_repo(self.ctx, self.repo.id, last_open_sweep_at=self.repo.last_open_sweep_at)
 
     async def checkpoint(self, **values: Any) -> None:
+        """Catch up on changes since the previous checkpoint, then publish progress.
+
+        Relinks if pages changed, sets `derived_key` only when every PR is derived with the
+        current key (otherwise queues a rederive), and writes `values` with `last_synced_at`.
+        """
+        # Taken before the catch-up, so last_synced_at never claims changes made during it.
         checkpoint_time = now_for(self.ctx)
         await self.incremental(self.previous_checkpoint)
         key = current_key(self.settings)
         async with sessions_for(self.ctx)() as session, session.begin():
+            # Linking scans every PR in the repository, so it runs per checkpoint, not per page.
             if await session.scalar(
                 select(Repository.links_pending).where(Repository.id == self.repo.id)
             ):
@@ -165,6 +187,11 @@ class SyncRun:
         self.previous_checkpoint = checkpoint_time
 
     async def backfill(self) -> None:
+        """Walk PRs newest-updated first from the saved cursor through each uncovered phase.
+
+        A phase is checkpointed as `covered_since` only once a stored page reaches past its
+        threshold or the listing ends, so coverage never includes a range still downloading.
+        """
         phases = [
             days
             for days in self.settings.backfill_phases
@@ -207,6 +234,8 @@ class SyncRun:
                         page.oldest_updated_at is None or page.oldest_updated_at >= threshold
                     ):
                         break
+                    # The updated-at walk misses open PRs idle since the threshold, so sweep
+                    # them before the first coverage claim.
                     if self.repo.last_open_sweep_at is None:
                         await self.open_sweep()
                     self.repo.covered_since = threshold
@@ -281,6 +310,11 @@ async def enqueue_enrichment(ctx: dict[str, Any], repo: Repository) -> None:
 
 
 async def sync_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
+    """arq entry point for backfill, incremental and manual syncs of one repository.
+
+    Returns the job result, "skipped_locked" or "missing_token". Snapshots are precomputed only
+    when the run changed `data_version`; due CI and ownership enrichment is queued afterwards.
+    """
     async with run_job(ctx, repo_full_name, kind, job_id) as job:
         if job is None:
             return "skipped_locked"

@@ -86,6 +86,7 @@ class Window:
     end: datetime
 
     def contains(self, at: datetime | None) -> bool:
+        # Half-open [start, end): adjacent periods and weeks never both count a boundary event.
         return at is not None and self.start <= at < self.end
 
 
@@ -115,6 +116,7 @@ class Dataset:
 
     @property
     def as_of(self) -> datetime:
+        # Clamp to the least recently synced repo so no repo is read past its synced data.
         return min(self.to_excl, min(r.last_synced_at for r in self.repos))
 
     @property
@@ -158,7 +160,10 @@ class Dataset:
 
 
 def active_in(pr: PrData, window: Window) -> bool:
-    """Select new PRs or recorded human activity, never bot-driven updated_at."""
+    """Period-active rule: created in the window or with recorded human activity in it.
+
+    Bot-driven updates never qualify. The same rule selects the previous-period cohort.
+    """
     if window.contains(pr.created_at):
         return True
     index = bisect_left(pr.human_activity_at, window.start)
@@ -166,6 +171,7 @@ def active_in(pr: PrData, window: Window) -> bool:
 
 
 def merged(dataset: Dataset, window: Window, *, scope: Window | None = None) -> tuple[PrData, ...]:
+    """Flow PRs merged in window, drawn from the active cohort of scope (default: window)."""
     return tuple(p for p in dataset.flow_in(scope or window) if window.contains(p.facts.merged_at))
 
 

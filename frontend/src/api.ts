@@ -36,6 +36,8 @@ export async function fetchJson<T>(
     ?.split(";")[0]
     ?.trim()
     .toLowerCase();
+  // Non-JSON replies (e.g. a proxy's HTML error page) become a readable problem instead of a
+  // JSON parse error.
   if (contentType !== "application/json" && !contentType?.endsWith("+json")) {
     throw new ApiProblem(
       "Service temporarily unavailable",
@@ -77,6 +79,10 @@ function wait(milliseconds: number, signal: AbortSignal) {
     if (signal.aborted) stop();
   });
 }
+/**
+ * Poll while the API answers 202 Pending (data still syncing), honoring Retry-After with a
+ * 5 s floor, and give up after five minutes so the page never polls indefinitely.
+ */
 export async function loadInsights(
   params: Params,
   signal: AbortSignal,

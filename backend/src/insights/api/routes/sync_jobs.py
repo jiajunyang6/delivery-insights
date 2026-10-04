@@ -1,3 +1,5 @@
+"""Sync job status lookup, the target of Location headers from sync requests."""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends

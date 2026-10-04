@@ -1,3 +1,5 @@
+"""Rule-based findings and the headline sentence, derived from an assembled snapshot."""
+
 from typing import Any
 
 from insights.analytics import thresholds as t
@@ -23,6 +25,11 @@ HEADLINE_PHRASES = {
 
 
 def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str, Any]]:
+    """Evaluate finding rules against the unrounded snapshot and rank them.
+
+    Returns [] below MIN_SAMPLES_P50 merged PRs. Evidence refs are JSON pointers into the
+    snapshot. Ranked by impact hours, then severity, then id.
+    """
     if snapshot["efficiency"]["merged_prs"]["value"] < t.MIN_SAMPLES_P50:
         return []
     result: list[dict[str, Any]] = []
@@ -283,6 +290,7 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
 
 
 def headline(snapshot: dict[str, Any]) -> str:
+    """One-sentence summary: cycle time change, then the top finding and its what-if."""
     cycle = snapshot["efficiency"]["cycle_time_p50_hours"]
     value, previous, change = cycle["value"], cycle["previous"], cycle["change_rel"]
     if value is None:

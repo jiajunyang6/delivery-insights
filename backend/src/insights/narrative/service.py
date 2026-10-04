@@ -1,3 +1,7 @@
+"""Narrative orchestration: LLM generation with validation, one repair and template fallback,
+payload assembly, and NarrativeService with Redis cache, Postgres persistence and a Redis lock.
+"""
+
 import asyncio
 from collections.abc import Awaitable, Mapping
 from contextlib import suppress
@@ -27,6 +31,9 @@ from insights.redis import narrative_key, narrative_lock_key
 from insights.snapshots.caching import Reply, cache_ttl, matches_etag
 from insights.snapshots.service import SnapshotService, not_found
 
+# One deadline covers the first call and the repair. Waiters poll a little longer than that,
+# and the lock TTL set in get() (deadline + 30 s) outlives both, so a crashed holder's lock
+# expires. UNLOCK deletes only a lock still holding this request's token.
 NARRATIVE_DEADLINE_SECONDS = 150
 LOCK_WAIT_SECONDS = NARRATIVE_DEADLINE_SECONDS + 10
 UNLOCK = (
@@ -51,6 +58,11 @@ def assemble(
     *,
     evidence: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    """Combine validated LLM or template output with the scored candidates into the payload.
+
+    A downgrade lowers the level and caps confidence inside the new band. The response lists
+    only evidence that is cited or in a hypothesis's allowed set, with example URLs kept.
+    """
     by_id = {c["id"]: c for c in candidates}
     hypotheses: list[dict[str, Any]] = []
     evidence_ids = citations(output["narrative"])
@@ -146,6 +158,12 @@ async def generate(
     prepared: tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]] | None = None,
     fallback_reason: str | None = None,
 ) -> NarrativeResult:
+    """Generate a narrative payload, preferring a validated LLM answer over the template.
+
+    persist is True for a validated LLM answer, or for the template when the LLM is
+    disabled; fallbacks after LLM errors, validation failure or a busy lock are served but
+    not stored, so a later request can try the LLM again.
+    """
     started = perf_counter()
     deadline = monotonic() + NARRATIVE_DEADLINE_SECONDS
     if prepared is None:
@@ -198,6 +216,8 @@ async def generate(
                 )
                 persist = True
                 break
+            # One repair bounds latency and tokens; a second invalid answer falls back to the
+            # deterministic template instead of another attempt.
             if attempt == 2:
                 meta.update(
                     validation="failed",
@@ -277,6 +297,13 @@ class NarrativeService:
             await self.snapshots.cache(pipe.execute())
 
     async def get(self, sid: str, audience: str, conditional: str | None) -> Reply:
+        """Serve a narrative from Redis, then Postgres, then fresh generation.
+
+        With the LLM enabled, one request per snapshot, audience and lang holds the lock;
+        others poll the cache and, after LOCK_WAIT_SECONDS, return an unstored template
+        (llm_busy). On a concurrent insert the stored row wins, so every client gets the
+        same body and ETag. Redis failures fail open; generation proceeds without the lock.
+        """
         lang = "en"
         snapshot = orjson.loads((await self.snapshots.by_id(sid, None)).body)
         settings, redis = self.snapshots.settings, self.snapshots.redis
@@ -287,6 +314,8 @@ class NarrativeService:
         prepared = (pack, candidates, evidence)
         pack_hash = digest(pack)[:16]
         model_key = settings.bedrock_model_id if settings.llm_enabled else "template"
+        # A new prompt version, model or pack content gives a new key, so stale wording is
+        # never served; the same identity keys the Postgres row.
         key = narrative_key(sid, audience, lang, PROMPT_VERSION, model_key, pack_hash)
         if cached := await self.cached(key, conditional):
             return cached
@@ -374,6 +403,7 @@ class NarrativeService:
                     if getattr(exc.orig, "sqlstate", None) == "23503":
                         raise not_found() from None
                     raise
+            # Unstored fallbacks expire within five minutes so the LLM is retried soon.
             await self.put_cache(
                 key, body, tag, result.persist, ttl if result.persist else min(ttl, 300)
             )

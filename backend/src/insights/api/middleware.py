@@ -1,3 +1,5 @@
+"""Outermost ASGI middleware: request ids, rate limiting, default headers, access logs."""
+
 import math
 import re
 from time import perf_counter
@@ -17,6 +19,8 @@ REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 
 class RequestMiddleware:
+    """Tag requests with an id, rate-limit /v1/ per client IP and minute, and log completion."""
+
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
@@ -59,6 +63,7 @@ class RequestMiddleware:
 
         try:
             if limited:
+                # Honor a get_now override so tests that freeze time also control the window.
                 clock = request.app.dependency_overrides.get(get_now, get_now)
                 epoch = clock().timestamp()
                 key = rate_limit_key(
@@ -80,10 +85,12 @@ class RequestMiddleware:
                         )
                         await problem_response(request, error)(scope, receive, wrapped_send)
                         return
+                # Fail open: a Redis outage should not take down reads served from Postgres.
                 except (RedisError, OSError, TimeoutError) as exc:
                     logger.warning("rate_limit_unavailable", error_type=type(exc).__name__)
             await self.app(scope, receive, wrapped_send)
         except Exception as exc:
+            # Once headers are sent a problem body can no longer replace the response.
             if response_started:
                 raise
             response = await handle_problem(request, exc)

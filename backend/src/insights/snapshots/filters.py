@@ -1,3 +1,5 @@
+"""Row filters and cursor syntax for paginated PR rows."""
+
 import re
 from dataclasses import asdict, dataclass
 

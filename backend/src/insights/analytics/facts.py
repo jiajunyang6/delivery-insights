@@ -1,3 +1,5 @@
+"""Per-PR delivery facts computed from one PR's events and timeline; no I/O."""
+
 from collections.abc import Sequence
 from datetime import datetime
 
@@ -40,6 +42,13 @@ def compute_facts(
     directory_depth: int = 2,
     ci_covered: bool = False,
 ) -> PrFacts:
+    """Derive one PR's facts; cross-PR link fields keep their defaults until link_prs runs.
+
+    Durations are hours and None when an endpoint is missing. Reviews count human, non-author
+    reviewers only. Coding and pickup are clamped at 0 since commits can be authored after
+    ready_at and reviews can land on drafts. cycle_hours runs from the first commit (or
+    creation) to merge.
+    """
     reviews = sorted(
         (
             event

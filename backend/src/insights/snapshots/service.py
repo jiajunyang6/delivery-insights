@@ -1,3 +1,5 @@
+"""Snapshot delivery: readiness checks, cache and database lookup, computation and row paging."""
+
 import asyncio
 from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager, suppress
@@ -49,6 +51,7 @@ def not_found() -> ResourceError:
 async def consistent_read(
     sessions: async_sessionmaker[AsyncSession],
 ) -> AsyncIterator[AsyncSession]:
+    """Read-only REPEATABLE READ session, so readiness checks and loads see one DB state."""
     async with sessions() as session:
         await session.connection(execution_options={"isolation_level": "REPEATABLE READ"})
         await session.execute(text("SET TRANSACTION READ ONLY"))
@@ -76,6 +79,13 @@ class SnapshotService:
             return None
 
     async def metadata(self, session: AsyncSession, params: SnapshotParams) -> Dataset | Reply:
+        """Check repo readiness; return a metadata-only Dataset or a 202 pending Reply.
+
+        Pending reasons, checked in order: never_synced, backfill (coverage starts after the
+        period), open_sweep, rederive (derive key changed), stale (no sync since period start).
+        Raises 503 when a repo pending for any reason but rederive has a missing_token,
+        auth_error or not_found sync status.
+        """
         repositories = {
             r.full_name_lower: r
             for r in await session.scalars(
@@ -104,6 +114,7 @@ class SnapshotService:
                 reason = "stale"
             if reason:
                 status = repo.last_sync_status if repo else "never"
+                # Rederive works from stored data, so GitHub access problems do not block it.
                 if reason != "rederive" and status in {"missing_token", "auth_error", "not_found"}:
                     blocked.append({"repo": name, "last_sync_status": status})
                 job = None
@@ -259,6 +270,11 @@ class SnapshotService:
         return stored
 
     async def delivery(self, params: SnapshotParams, conditional: str | None = None) -> Reply:
+        """Return the snapshot for params, computing and persisting it on a cache and DB miss.
+
+        The ID comes from repo metadata alone, so Redis and the snapshots table are checked
+        before PRs are loaded. Returns a 202 Reply while data is pending.
+        """
         started = perf_counter()
         async with consistent_read(self.sessions) as session:
             metadata = await self.metadata(session, params)
@@ -290,6 +306,7 @@ class SnapshotService:
                 etag=tag,
                 created_at=self.now,
             )
+            # A concurrent request may have stored this ID; refreshing created_at extends retention.
             await session.execute(
                 statement.on_conflict_do_update(
                     index_elements=["snapshot_id"],
@@ -310,6 +327,10 @@ class SnapshotService:
     async def rows(
         self, params: SnapshotParams, filters: PrFilters, limit: int, cursor: str | None
     ) -> Reply:
+        """One page of PR rows for the snapshot that delivery would serve for params.
+
+        Rows are cached in Redis per snapshot ID for an hour. Returns a 202 Reply while pending.
+        """
         async with consistent_read(self.sessions) as session:
             metadata = await self.metadata(session, params)
             if isinstance(metadata, Reply):

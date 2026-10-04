@@ -1,3 +1,5 @@
+"""Liveness and readiness probes; readiness pings Postgres and Redis with 2 s timeouts."""
+
 import asyncio
 from typing import Annotated
 

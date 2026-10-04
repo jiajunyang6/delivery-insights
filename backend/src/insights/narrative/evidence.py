@@ -1,3 +1,7 @@
+"""Evidence pack construction: numbered evidence items, observations, top bottlenecks and
+scored hypotheses. The pack is the only snapshot data the LLM receives.
+"""
+
 import re
 from collections.abc import Mapping
 from typing import Any
@@ -44,6 +48,13 @@ def read(snapshot: Mapping[str, Any], pointer: str) -> Any:
 
 
 def extract_evidence(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Resolve catalog, location and top-finding items from the snapshot.
+
+    Items whose pointer is missing or whose value is None are skipped, so IDs can be sparse.
+    E20, E39 and E47 are omitted when the snapshot has no CI data. Up to five locations other
+    than "other" get four slots each (see location_id); the top three findings become E71-E73.
+    Entries keep their pointer and example URLs for the API response; the pack strips both.
+    """
     entries: list[dict[str, Any]] = []
 
     def add(
@@ -214,6 +225,13 @@ def extract_evidence(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
 def observations(
     snapshot: Mapping[str, Any], evidence: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
+    """Rank notable changes and two fixed contradictions into at most eight observations.
+
+    Salience is effect size x per-metric weight (WEIGHTS, default 0.4) x sample factor
+    (n / 100 capped at 1, or 0.5 when n is unknown). Items without a previous value or flagged
+    non-significant are skipped, and changes below 0.15 are dropped. A contradiction scores
+    0.2 above its strongest component, so it ranks ahead of that component's own change.
+    """
     candidates: list[dict[str, Any]] = []
     scores: dict[str, float] = {}
     entries = {e["id"]: e for e in evidence}
@@ -279,6 +297,13 @@ def build_evidence_pack(
     *,
     evidence: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Return the LLM-facing pack and the full hypothesis candidates.
+
+    The pack drops pointers and example URLs, replaces location names outside SAFE_LOCATION
+    with placeholders, and gives hypotheses only their level band, not the numeric confidence.
+    The candidates keep the scoring detail that assemble() needs. Pass evidence to reuse an
+    earlier extract_evidence() result.
+    """
     if evidence is None:
         evidence = extract_evidence(snapshot)
     candidates, abstain = score_hypotheses(
@@ -295,6 +320,8 @@ def build_evidence_pack(
             )
         return locations[name]
 
+    # Register locations in snapshot order so placeholder numbers do not depend on which
+    # evidence item mentions a location first.
     for loc in snapshot["bottleneck_analysis"]["locations"]:
         sanitize(loc["location"])
     safe_evidence = []

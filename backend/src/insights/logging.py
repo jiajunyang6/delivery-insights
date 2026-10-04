@@ -1,3 +1,5 @@
+"""Structured JSON logging shared by the API and worker processes."""
+
 import logging
 import sys
 from importlib.resources import files
@@ -25,6 +27,7 @@ def json_dumps(value: Any, **kwargs: Any) -> str:
 
 
 def sanitize_exception(logger: Any, method: str, event: EventDict) -> EventDict:
+    """Replace exception info with its type name so tracebacks and their data stay out of logs."""
     info = event.pop("exc_info", None)
     event.pop("stack_info", None)
     if info:
@@ -64,6 +67,7 @@ def configure_logging(level: str = "INFO") -> None:
         cache_logger_on_first_use=False,
     )
     dictConfig({**LOGGING_CONFIG, "root": {**LOGGING_CONFIG["root"], "level": level}})
+    # RequestMiddleware emits its own request_completed line with the request id.
     logging.getLogger("uvicorn.access").disabled = True
     for name in ("httpx", "httpcore", "botocore", "urllib3"):
         logging.getLogger(name).setLevel(logging.WARNING)

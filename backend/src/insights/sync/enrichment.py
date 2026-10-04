@@ -1,3 +1,5 @@
+"""Enrichment jobs: GitHub Actions runs and ownership rules, rederiving affected PRs."""
+
 from dataclasses import asdict
 from datetime import datetime, timedelta
 from typing import Any, cast
@@ -29,6 +31,10 @@ logger = structlog.get_logger(__name__)
 async def save_runs(
     session: AsyncSession, repo_id: int, runs: list[CiRun], *, settings: Settings, now: datetime
 ) -> tuple[int, int, int]:
+    """Upsert changed runs and rederive PRs linked to them before or after the change.
+
+    Returns (runs changed, PRs rederived, invariant violations).
+    """
     ids = [r.run_id for r in runs]
     existing = (
         {
@@ -103,6 +109,7 @@ async def save_ownership(
             [{**asdict(r), "owners": list(r.owners), "repo_id": repo_id} for r in new],
         )
     values: dict[str, Any] = {"data_version": Repository.data_version + 1}
+    # Only CODEOWNERS feeds PR locations; area owners are read when snapshots are built.
     if code_changed:
         values["derived_key"] = None
         await session.execute(
@@ -113,6 +120,7 @@ async def save_ownership(
 
 
 async def enrich_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
+    """arq entry point for the "ci_runs" and "ownership" jobs of one repository."""
     settings = cast(Settings, ctx["settings"])
     async with run_job(ctx, repo_full_name, kind, job_id) as job:
         if job is None:
@@ -129,6 +137,7 @@ async def enrich_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_i
         ref = RepoRef(repo.owner, repo.name)
         if kind == "ci_runs" and settings.ci_source == "actions" and repo.covered_since:
             previous = await last_success(ctx, repo.id, "ci_runs")
+            # After the first pass, re-read only the last two days of runs.
             start = now_for(ctx) - timedelta(days=2) if previous else repo.covered_since
             runs = await adapter.ci_runs(ref, created_from=start, created_to=now_for(ctx))
             async with sessions_for(ctx)() as session, session.begin():

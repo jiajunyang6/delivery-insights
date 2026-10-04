@@ -44,6 +44,7 @@ export function AtRiskTable({
         throw new Error(
           "Data is syncing. Refresh the report before loading more.",
         );
+      // Rows from a newer snapshot would not match the report shown, so stop paging.
       if (response.data.snapshot_id !== s.snapshot_id) {
         invalidate();
         return;
@@ -73,6 +74,7 @@ export function AtRiskTable({
     } catch (e) {
       if (!signal.aborted) {
         const problem = message(e);
+        // Cursors are bound to a snapshot; the API rejects them once the data changes.
         if (
           problem.status === 422 &&
           problem.errors.some((p) => p.param === "cursor")

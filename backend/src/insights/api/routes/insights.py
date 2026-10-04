@@ -1,3 +1,5 @@
+"""Delivery snapshot and PR list endpoints; both answer 202 Pending while data syncs."""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -21,6 +23,8 @@ def parameters(
     from_date: Annotated[str | None, Query(alias="from")] = None,
     to: str | None = None,
 ) -> SnapshotParams:
+    # The query arguments above only document the API in OpenAPI; parse_params reads the raw
+    # query so every invalid field is reported together in one 422 problem.
     return parse_params(request.query_params, service.settings, service.now)
 
 
@@ -45,5 +49,6 @@ async def prs(
     limit: str = "50",
     cursor: str | None = None,
 ) -> Response:
+    # As in parameters(): filter arguments are declared for OpenAPI, parsed by parse_filters.
     filters, parsed_limit, parsed_cursor = parse_filters(request.query_params)
     return response(await service.rows(params, filters, parsed_limit, parsed_cursor))

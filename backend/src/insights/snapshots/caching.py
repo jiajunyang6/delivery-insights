@@ -1,3 +1,5 @@
+"""HTTP caching (ETags, retention TTL) and cursor pagination for snapshot replies."""
+
 import base64
 import binascii
 from dataclasses import dataclass
@@ -43,6 +45,7 @@ def snapshot_reply(
         if immutable
         else "private, max-age=60",
     }
+    # Param-addressed replies change as data syncs, so they point at the immutable ID URL.
     if not immutable:
         headers.update({"X-Snapshot-Id": sid, "Content-Location": f"/v1/snapshots/{sid}"})
     matched = matches_etag(conditional, etag)
@@ -50,6 +53,7 @@ def snapshot_reply(
 
 
 def encode_cursor(sid: str, offset: int, filters: PrFilters) -> str:
+    """Opaque URL-safe cursor carrying the offset, snapshot ID and a digest of the filters."""
     return (
         base64.urlsafe_b64encode(
             canonical({"v": 1, "sid": sid, "o": offset, "f": digest(filters.canonical_dict())[:12]})
@@ -79,6 +83,8 @@ def decode_cursor(cursor: str | None, sid: str, filters: PrFilters) -> int:
             raise ValueError
     except (ValueError, binascii.Error, orjson.JSONDecodeError) as exc:
         raise invalid("cursor") from exc
+    # An offset is only meaningful for the row set it came from; a newer snapshot or other
+    # filters would silently skip or repeat rows.
     if obj["sid"] != sid or obj["f"] != digest(filters.canonical_dict())[:12]:
         raise invalid("cursor", "cursor is no longer valid; restart from the first page")
     return int(obj["o"])
@@ -92,6 +98,11 @@ def page_rows(
     limit: int,
     cursor: str | None,
 ) -> dict[str, Any]:
+    """Filter, sort and slice snapshot rows into one page.
+
+    Rows sort by descending score (risk ratio, close time, cycle hours or state age by filter),
+    then repo and number, so pages are stable within a snapshot. Raises 422 for a bad cursor.
+    """
     selected = [
         r
         for r in rows

@@ -1,3 +1,5 @@
+"""Helpers that turn service results and ORM rows into HTTP responses."""
+
 from starlette.responses import Response
 
 from insights.api.schemas import SyncJobResponse

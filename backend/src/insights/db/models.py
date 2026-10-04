@@ -1,3 +1,5 @@
+"""SQLAlchemy schema for synced source data, derived facts, snapshots and the job ledger."""
+
 from datetime import date, datetime
 from typing import Any
 from uuid import UUID
@@ -26,6 +28,14 @@ class Base(DeclarativeBase):
 
 
 class Repository(Base):
+    """A repository and its sync state.
+
+    `covered_since` starts the fully synced range, `sync_watermark` is the newest PR update
+    seen, `backfill_cursor` is where backfill resumes, and `data_version` increments when
+    stored data changes. `links_pending` marks links as stale; `derived_key` is set once every
+    PR is derived with that key.
+    """
+
     __tablename__ = "repositories"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

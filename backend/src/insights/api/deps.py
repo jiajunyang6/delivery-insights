@@ -1,3 +1,5 @@
+"""Dependency providers backed by the clients the app lifespan stores on app.state."""
+
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Annotated, cast
@@ -42,6 +44,7 @@ def get_snapshot_service(
 
 
 async def get_arq(request: Request) -> "ArqRedis":
+    """Shared arq pool, connected on first use if startup could not reach Redis; 503 if down."""
     existing = getattr(request.app.state, "arq", None)
     if existing is not None:
         return cast(ArqRedis, existing)

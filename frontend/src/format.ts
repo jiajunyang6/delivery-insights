@@ -44,6 +44,10 @@ export function format(value: number | null | undefined, unit: string): string {
           : "")
   );
 }
+/**
+ * Inputs are fractions by default (0.12 → +12%). Pass scale 1 with a " pp" suffix for values
+ * already in percentage points: a relative change in a share is not a point difference.
+ */
 export function signed(
   value: number | null | undefined,
   suffix = "%",
@@ -62,6 +66,10 @@ export function timestamp(value: string): string {
     }) + " UTC"
   );
 }
+/**
+ * Link targets come from API data, so only plain https://github.com URLs become anchors;
+ * other schemes, look-alike hosts, credentials or ports are rendered as text.
+ */
 export function safeGithubUrl(value: string): boolean {
   if (!value.startsWith("https://github.com/")) return false;
   try {
@@ -77,6 +85,7 @@ export function safeGithubUrl(value: string): boolean {
     return false;
   }
 }
+// Inclusive range of UTC calendar days, matching the API's UTC date handling.
 export function dateRange(days: number, to = new Date().toISOString().slice(0, 10)) {
   const from = new Date(Date.parse(to + "T00:00:00Z") - (days - 1) * 86_400_000)
     .toISOString()

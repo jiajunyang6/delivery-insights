@@ -1,3 +1,5 @@
+"""Per-PR facts derived during sync, persisted, and read back as analytics input."""
+
 from dataclasses import dataclass
 from datetime import datetime
 

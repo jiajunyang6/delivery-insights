@@ -1,3 +1,5 @@
+"""Snapshot lookup by id and the narrative generated for a snapshot."""
+
 from typing import Annotated, Literal, cast
 
 from fastapi import APIRouter, Depends, Request

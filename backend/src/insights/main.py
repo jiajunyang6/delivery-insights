@@ -1,3 +1,5 @@
+"""FastAPI application factory; request handlers read Postgres and Redis, never GitHub."""
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 
@@ -17,6 +19,7 @@ from insights.redis import connect_arq, create_redis
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
+    """Build the app; settings are injectable for tests and connections open in the lifespan."""
     configuration = settings or get_settings()
 
     @asynccontextmanager
@@ -28,6 +31,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.redis = redis
         app.state.arq = None
         app.state.llm = BedrockClient(configuration) if configuration.llm_enabled else None
+        # The queue is only needed for manual syncs; deps.get_arq reconnects lazily.
         with suppress(RedisError, OSError, TimeoutError):
             app.state.arq = await connect_arq(configuration.redis_url)
         try:
@@ -61,6 +65,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ],
         allow_credentials=False,
     )
+    # Added last so it is outermost: request ids, rate limits and headers cover CORS replies too.
     app.add_middleware(RequestMiddleware)
     return app
 

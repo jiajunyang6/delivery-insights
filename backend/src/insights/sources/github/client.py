@@ -1,3 +1,5 @@
+"""HTTP client for GitHub GraphQL and REST: retries, rate-limit waits and ETag caching."""
+
 from insights.domain import (
     GitHubAuthError,
     GitHubError,
@@ -84,6 +86,11 @@ class GitHubClient:
         return waited + delay
 
     async def _request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+        """Send with up to four attempts, retrying network errors, 403/429 and 502-504.
+
+        Retry-After or the primary-limit reset sets the delay when present. Other 4xx fail at
+        once, and total sleep beyond 15 minutes raises GitHubRateLimited instead of stalling.
+        """
         waited = 0.0
         for attempt in range(4):
             response: httpx.Response | None = None
@@ -125,6 +132,10 @@ class GitHubClient:
         raise GitHubTransientError("retry_exhausted")
 
     async def graphql(self, query: str, variables: dict[str, Any]) -> dict[str, Any]:
+        """POST a query and return its `data`, mapping GraphQL errors to GitHubError types.
+
+        Requests are serialized, so a quota wait here pauses every caller of this client.
+        """
         async with self.lock:
             response = await self._request(
                 "POST",
@@ -159,6 +170,7 @@ class GitHubClient:
                     graphql_cost=rate["cost"],
                     rate_limit_remaining=self.rate_limit_remaining,
                 )
+                # Below 200 points, wait for the reset rather than risk failing mid-sync.
                 if self.rate_limit_remaining < 200:
                     reset = datetime.fromisoformat(rate["resetAt"]).timestamp()
                     await self._wait(reset + 5 - self.clock(), 0, "low_quota")

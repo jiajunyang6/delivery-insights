@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, type DependencyList } from "react";
 
-/** Abort superseded requests and release the current request on unmount. */
+/**
+ * Abort superseded requests and release the current request on unmount, so a slow
+ * response for old inputs cannot overwrite state set for newer ones.
+ */
 export function useAbortable(
   effect?: (signal: AbortSignal) => void,
   dependencies: DependencyList = [],

@@ -1,3 +1,5 @@
+"""Load workflow runs linked to PRs as immutable CiRun records."""
+
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
@@ -43,7 +45,11 @@ async def load_ci_data(
     created_to: datetime | None = None,
     flow_only: bool = False,
 ) -> CiData:
-    """Join explicit PR references and fork-safe commit SHA references in batches."""
+    """Link runs to PRs by explicit PR number or by head SHA matching a stored PR commit.
+
+    The SHA join covers runs that carry no PR numbers, such as runs for fork PRs. `flow_only`
+    keeps human, non-backport PRs that became ready for review.
+    """
     base = select(
         WorkflowRun.id, PullRequest.id.label("pr_id"), PullRequest.number, PullRequest.repo_id
     ).select_from(WorkflowRun)

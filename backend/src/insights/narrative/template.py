@@ -1,3 +1,8 @@
+"""Deterministic template narrative, used whenever no validated LLM answer is available.
+
+It follows the hedge bands and abstention sentences that the validator enforces on the LLM.
+"""
+
 from collections.abc import Mapping
 from typing import Any
 
@@ -45,6 +50,12 @@ def phrase(candidate: Mapping[str, Any]) -> str:
 
 
 def build_template(pack: Mapping[str, Any], snapshot: Mapping[str, Any]) -> dict[str, Any]:
+    """Return output in the submit_narrative shape, built from the pack and guardrail verdict.
+
+    Directors get the key metric, the top cause or abstention, the top finding and a revert
+    warning; managers also get the waiting share and at-risk PRs. Each sentence cites at most
+    three evidence IDs.
+    """
     audience = pack["audience"]
     evidence = {e["id"]: e for e in pack["evidence"]}
     candidates = pack["hypotheses"]

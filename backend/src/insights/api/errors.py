@@ -1,3 +1,5 @@
+"""RFC 9457 problem+json responses and the exception handlers that produce them."""
+
 from typing import Any
 
 import structlog
@@ -22,6 +24,7 @@ logger = structlog.get_logger(__name__)
 
 
 def problem_response(request: Request, error: ProblemError) -> JSONResponse:
+    """Render an error as problem+json, adding the request path and request id."""
     body: dict[str, Any] = {
         "type": f"/problems/{error.type_slug}",
         "title": error.title,
@@ -39,6 +42,7 @@ def problem_response(request: Request, error: ProblemError) -> JSONResponse:
 
 
 async def handle_problem(request: Request, exc: Exception) -> JSONResponse:
+    """Map any exception to a problem response; unexpected ones are logged by type only."""
     if isinstance(exc, ProblemError):
         return problem_response(request, exc)
     if isinstance(exc, RequestValidationError):
@@ -77,6 +81,7 @@ async def handle_problem(request: Request, exc: Exception) -> JSONResponse:
 
 
 def install_handlers(app: FastAPI) -> None:
+    """Register handlers; other exceptions reach RequestMiddleware, which reuses handle_problem."""
     for error_type in (ProblemError, RequestValidationError, HTTPException, SQLAlchemyError):
         app.add_exception_handler(error_type, handle_problem)
 

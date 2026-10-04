@@ -1,3 +1,5 @@
+"""Bottleneck analyses: time ledger, review queue, locations, at-risk PRs and what-if; no I/O."""
+
 from collections import Counter, defaultdict
 from collections.abc import Sequence
 from datetime import datetime, timedelta
@@ -34,6 +36,11 @@ def at_risk(
     exclude_current_drafts: bool = False,
     window: Window | None = None,
 ) -> list[dict[str, Any]]:
+    """Open flow PRs whose current waiting state has outlasted its warning threshold.
+
+    Point-in-time at `at`: only state intervals that ended before it form the baselines.
+    Sorted most overdue first (age / warning threshold).
+    """
     completed: dict[tuple[str, str], list[tuple[datetime, float]]] = defaultdict(list)
     for baseline in dataset.baselines:
         if at - timedelta(days=t.AT_RISK_FALLBACK_DAYS) <= baseline.end_at < at:
@@ -47,6 +54,8 @@ def at_risk(
                 for end, h in completed_values
                 if end >= at - timedelta(days=t.AT_RISK_BASELINE_DAYS)
             ]
+            # Per-repo history reflects each repo's normal pace: prefer the recent window,
+            # widen to the fallback window, and use fixed defaults only when history is thin.
             fallback = [h for _, h in completed_values]
             sample = recent if len(recent) >= t.AT_RISK_MIN_BASELINE else fallback
             source = "90d" if len(recent) >= t.AT_RISK_MIN_BASELINE else "180d"
@@ -61,6 +70,7 @@ def at_risk(
             thresholds[repo.repo, state] = warning, critical, source
     result = []
     for pr in dataset.flow_in(window or dataset.current):
+        # is_draft is the latest synced flag, so callers apply it only when the period ends today.
         if not open_at(pr, at) or (exclude_current_drafts and pr.is_draft):
             continue
         interval = state_at(pr.intervals, at)
@@ -104,6 +114,10 @@ def risk_summary(risks: Sequence[dict[str, Any]]) -> dict[str, Any]:
 
 
 def time_ledger(dataset: Dataset) -> dict[str, Any]:
+    """Post-ready waiting-state hours of flow PRs merged in the current and previous periods.
+
+    Shares are of total waiting hours. Previous-period fields are None without comparison data.
+    """
     current, previous = merged(dataset, dataset.current), merged(dataset, dataset.previous)
     totals = {
         state: sum(hours(p, end=dataset.as_of)[state] for p in current) for state in WAITING_STATES
@@ -173,6 +187,7 @@ def locations(
         names = location_names(pr, dataset)
         for name in names:
             memberships[name].add(pr.pr_id)
+            # Split evenly so a multi-location PR's wait is not counted more than once.
             if pr.pr_id in current:
                 allocated[name] += hours(pr, end=dataset.as_of)["waiting_reviewer"] / len(names)
             if pr.pr_id in previous:
@@ -238,6 +253,12 @@ def locations(
 
 
 def what_if(dataset: Dataset, stage: str, location: str | None = None) -> dict[str, Any] | None:
+    """Illustrative median cycle time if a stage were capped at WHAT_IF_TARGET_HOURS[stage].
+
+    Subtracts each merged PR's excess over the target from its cycle time, assuming nothing else
+    changes; with location, only that location's PRs are capped. Returns None when either median
+    lacks MIN_SAMPLES_P50 samples or the current median is 0.
+    """
     prs = [p for p in merged(dataset, dataset.current) if p.facts.cycle_hours is not None]
     before, after, affected = [], [], 0
     target = t.WHAT_IF_TARGET_HOURS[stage]
@@ -392,6 +413,7 @@ def signal_measures(
 
 def signals(dataset: Dataset, risks: Sequence[dict[str, Any]], params_hash: str) -> dict[str, Any]:
     current = signal_measures(dataset, dataset.current, risks)
+    # Previous-period risks are taken at the previous period's end, mirroring as_of.
     previous = (
         signal_measures(
             dataset, dataset.previous, at_risk(dataset, at=dataset.start, window=dataset.previous)

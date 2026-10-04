@@ -1,9 +1,16 @@
+"""System prompt, submit_narrative tool schema and per-request user message for the LLM call.
+
+The user message carries only the evidence pack and constraints derived from it.
+"""
+
 from typing import Any
 
 from insights.analytics.snapshot import canonical
 from insights.narrative.hypotheses import abstention, allowed_ids
 from insights.narrative.validator import ABSTAIN_SENTENCES
 
+# Bump on any prompt or tool-schema change: it is part of the narrative cache key and of the
+# stored narrative identity, so old wording is never served for a new prompt.
 PROMPT_VERSION = "v9"
 SYSTEM_PROMPT = (
     "Write concise English delivery narratives from the supplied structured evidence "
@@ -93,6 +100,7 @@ SYSTEM_PROMPT = (
     '[E19].","hypotheses":[]}\n'
 )
 
+# Mirrors validator.ToolOutput, which re-checks every reply; keep the two limits in sync.
 SUBMIT_NARRATIVE_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -146,6 +154,12 @@ TOOL_SPEC = {
 
 
 def user_message(pack: dict[str, Any]) -> dict[str, Any]:
+    """Build the user turn: canonical pack JSON, a sentence outline and citation constraints.
+
+    Each candidate gets its allowlist from allowed_ids(); without candidates the exact
+    abstention sentence is supplied instead. The outline's sentence count stays within the
+    validator's per-audience bounds.
+    """
     constraints = []
     for candidate in pack["hypotheses"]:
         allowed = allowed_ids(candidate)

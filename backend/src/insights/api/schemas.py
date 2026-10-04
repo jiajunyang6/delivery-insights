@@ -14,6 +14,8 @@ Unit = Literal[
 
 
 class Contract(BaseModel):
+    """Base for response models: rejects unknown fields and NaN/inf, emits UTC Z timestamps."""
+
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False, populate_by_name=True)
 
     @field_serializer("*", when_used="json")

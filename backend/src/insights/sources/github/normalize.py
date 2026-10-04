@@ -1,3 +1,5 @@
+"""Convert raw GraphQL PR nodes into domain records, including bot detection and event dedup."""
+
 import re
 from datetime import UTC, datetime
 from hashlib import sha1
@@ -68,6 +70,7 @@ def actor(node: dict[str, Any] | None, extra_bots: frozenset[str] = frozenset())
     node = remove_nulls(node or {})
     login = node.get("login")
     lowered = (login or "").lower()
+    # `__typename` is queried only for this check; it is never stored.
     return Actor(
         login,
         node.get("__typename") == "Bot"
@@ -84,6 +87,11 @@ def dedup_key(kind: str, occurred_at: datetime, actor_login: str | None, stable:
 def normalize_events(
     nodes: list[dict[str, Any]], extra_bots: frozenset[str] = frozenset()
 ) -> tuple[Event, ...]:
+    """Map timeline nodes to deduplicated events in deterministic order.
+
+    Pending reviews are dropped. A dismissed review keeps the state recorded by its dismissal
+    event and is dropped without one. Cross-references are kept only from pull requests.
+    """
     nodes = remove_nulls(nodes)
     dismissed = {
         n["review"]["id"]: n

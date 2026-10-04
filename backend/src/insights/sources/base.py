@@ -1,3 +1,5 @@
+"""Source adapter protocol: the upstream-agnostic contract that sync jobs call."""
+
 from datetime import datetime
 from typing import Protocol
 

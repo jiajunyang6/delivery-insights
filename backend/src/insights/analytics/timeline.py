@@ -1,3 +1,5 @@
+"""Per-PR state timeline (coding, waiting states, closed) derived from events; no I/O."""
+
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -101,6 +103,13 @@ def build_timeline(
     ci_intervals: Sequence[tuple[datetime, datetime]],
     now: datetime,
 ) -> TimelineResult:
+    """Split a PR's life into contiguous state intervals; pure and deterministic.
+
+    Before ready_at there is at most one coding interval. From ready_at the state is re-evaluated
+    at every event and CI boundary until merge, close or now; an open PR's last interval has
+    end_at None. review_rounds counts entries into waiting_author caused by review feedback.
+    state_at_end is set only for PRs closed without merging.
+    """
     ready_at = compute_ready_at(pr, events)
     end_at = pr.merged_at or (pr.closed_at if pr.state == "CLOSED" else None)
     horizon = end_at or now
@@ -115,6 +124,7 @@ def build_timeline(
         return TimelineResult(None, intervals, None, 0, None)
     output = [Interval("coding", coding_start, ready_at)] if coding_start < ready_at else []
     ordered = sorted(events, key=lambda e: (e.occurred_at, EVENT_ORDER[e.kind], e.dedup_key))
+    # Only a close that is later reopened pauses the PR; the terminal close ends the timeline.
     paired_closes: set[str] = set()
     next_reopen: datetime | None = None
     for event in reversed(ordered):
@@ -184,6 +194,8 @@ def build_timeline(
             last_update = event.occurred_at
         return feedback
 
+    # Precedence: paused, draft, approved with no outstanding change request, unanswered
+    # feedback, CI running, else waiting on a reviewer.
     def evaluate(at: datetime) -> str:
         if flags["paused"]:
             return "closed"

@@ -1,3 +1,5 @@
+"""Background maintenance: precompute default snapshots and expire retained data."""
+
 from datetime import timedelta
 from typing import Any, cast
 
@@ -17,6 +19,10 @@ logger = structlog.get_logger(__name__)
 
 
 async def precompute_snapshots(ctx: dict[str, Any], repo_full_name: str) -> None:
+    """Warm the snapshot cache for each configured trailing window ending today.
+
+    Windows that cannot be served yet (ResourceError) are logged and skipped.
+    """
     settings = cast(Settings, ctx["settings"])
     now = now_for(ctx)
     service = SnapshotService(sessions_for(ctx), ctx["redis"], settings, now)
@@ -38,6 +44,10 @@ async def precompute_snapshots(ctx: dict[str, Any], repo_full_name: str) -> None
 
 
 async def housekeeping(ctx: dict[str, Any]) -> None:
+    """Delete snapshots older than 7 days and finished job rows older than 30 days.
+
+    Cached snapshot rows and narratives are removed best effort; Redis errors are only logged.
+    """
     now = now_for(ctx)
     async with sessions_for(ctx)() as session, session.begin():
         expired = (

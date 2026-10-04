@@ -1,3 +1,5 @@
+"""Flow eligibility, location assignment and cross-PR revert/reland/close linking; no I/O."""
+
 import re
 from bisect import bisect_left, bisect_right
 from collections import Counter, defaultdict
@@ -29,12 +31,18 @@ LINK_FIELDS = (
 
 
 def is_flow(facts: PrFacts) -> bool:
+    # Flow metrics cover human, ready-for-review PRs; bot and backport PRs are excluded.
     return not facts.is_bot_author and not facts.is_backport and facts.ready_at is not None
 
 
 def locations_for(
     pr: PullRequestRecord, dimension: str, depth: int, rules: Sequence[OwnershipRule]
 ) -> tuple[tuple[str, ...], str]:
+    """Return (locations, source), trying in order: matching labels, CODEOWNERS, directories.
+
+    CODEOWNERS follows GitHub semantics (last matching pattern wins). Directory locations are the
+    DIRECTORY_LOCATIONS_PER_PR most-touched paths at depth; a PR with no files is "unclassified".
+    """
     if dimension.startswith("label:"):
         prefix = dimension[6:].lower()
         labels = tuple(sorted({label for label in pr.labels if label.lower().startswith(prefix)}))
@@ -168,6 +176,7 @@ def link_reverts(
     indexes: LinkIndexes,
     repo_full_name: str,
 ) -> None:
+    # Creation order lets a revert of a revert see its target already marked as a revert.
     for item in sorted(prs, key=lambda p: (p.record.created_at, p.pr_id)):
         pr, facts = item.record, output[item.pr_id]
         title = re.match(r'^Revert\s+"(?P<title>.+)"\s*$', pr.title, re.I)
@@ -311,6 +320,15 @@ def link_prs(
     repo_full_name: str,
     default_branch: str,
 ) -> dict[int, PrFacts]:
+    """Recompute cross-PR link facts for one repo and return new facts keyed by pr_id.
+
+    Link fields are reset first, so the result depends only on the given PRs. Reverts find their
+    original via a "Reverts owner/repo#N" body line, reverted commit SHAs, or the quoted title;
+    reverting a revert records a reland. Unmerged flow closes are classified as superseded (the
+    same author merged a cross-referenced PR, or opened a merged one on the same head branch, by
+    SUPERSEDE_WINDOW_DAYS after the close), no_review, rejected (reviewed, then finally closed by
+    another human) or abandoned.
+    """
     output = {
         p.pr_id: replace(
             p.facts,

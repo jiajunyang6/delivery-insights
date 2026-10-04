@@ -1,3 +1,5 @@
+"""Assemble the snapshot payload and PR rows from a Dataset; deterministic, no I/O."""
+
 import hashlib
 import math
 from datetime import UTC, date, datetime, timedelta
@@ -44,6 +46,11 @@ def freshness(dataset: Dataset) -> list[dict[str, Any]]:
 
 
 def identifiers(dataset: Dataset, params: SnapshotParams) -> tuple[str, str, str]:
+    """Return (snapshot_id, params_hash, versions_hash).
+
+    The ID covers canonical params (with analytics and thresholds versions), per-repo data
+    versions and sync times, and as_of. It needs repo metadata only, not PRs.
+    """
     params_hash = digest(params.canonical_dict())[:16]
     versions_hash = digest(freshness(dataset))[:16]
     snapshot_id = (
@@ -56,6 +63,7 @@ def identifiers(dataset: Dataset, params: SnapshotParams) -> tuple[str, str, str
 
 
 def sampling_hash(params: SnapshotParams) -> str:
+    """Bootstrap seed hash: canonical params with SAMPLING_SEED_VERSION as analytics_version."""
     seed_params = params.canonical_dict()
     seed_params["analytics_version"] = SAMPLING_SEED_VERSION
     return digest(seed_params)[:16]
@@ -104,7 +112,13 @@ def rounded(value: Any, key: str = "", unit: str = "") -> Any:
 
 
 def build_snapshot(dataset: Dataset, *, params: SnapshotParams) -> dict[str, Any]:
+    """Build the JSON-ready snapshot payload; pure and deterministic for a dataset and params.
+
+    Findings and the headline are derived from the assembled snapshot before rounding.
+    """
     snapshot_id, _, _ = identifiers(dataset, params)
+    # Seed from the sampling hash, not the snapshot ID, so analytics-only releases keep the
+    # same bootstrap seeds.
     params_hash = sampling_hash(params)
     efficiency = build_efficiency(dataset, params_hash)
     risks = b.at_risk(dataset, at=dataset.as_of, exclude_current_drafts=dataset.current_day)
@@ -175,6 +189,10 @@ def build_snapshot(dataset: Dataset, *, params: SnapshotParams) -> dict[str, Any
 
 
 def build_pr_rows(dataset: Dataset) -> list[dict[str, Any]]:
+    """Rows for period-active flow PRs merged or closed unmerged in the period, or open at as_of.
+
+    Sorted by repo and number; values are rounded like the snapshot.
+    """
     risks = {
         (p["repo"], p["number"]): p
         for p in at_risk(dataset, at=dataset.as_of, exclude_current_drafts=dataset.current_day)

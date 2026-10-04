@@ -1,3 +1,5 @@
+"""Job ledger, arq enqueueing and per-repository Redis locks shared by every worker job."""
+
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
@@ -57,6 +59,11 @@ async def ensure_repo(session: AsyncSession, repo_full_name: str, now: datetime)
 async def enqueue_sync(
     arq: ArqRedis, session: AsyncSession, repo_full_name: str, kind: str, *, now: datetime
 ) -> tuple[SyncJob, bool]:
+    """Record a ledger row and enqueue the job, deduplicated per repository and route prefix.
+
+    Returns (job, True) when newly queued. Otherwise the new row is dropped and the active (or
+    latest) job sharing the prefix is returned with False.
+    """
     function, prefix = JOB_ROUTES[kind]
     repo = await ensure_repo(session, repo_full_name, now)
     job = SyncJob(id=uuid4(), repo_id=repo.id, kind=kind, status="queued", stats={}, created_at=now)
@@ -124,8 +131,14 @@ async def set_job(ctx: dict[str, Any], job_id: str, **values: Any) -> None:
 
 @asynccontextmanager
 async def repository_lock(ctx: dict[str, Any], repo: str, job_id: str) -> AsyncIterator[bool]:
+    """Hold the repository's Redis lock for the body; yield False (job marked failed) if taken.
+
+    The lock is renewed while held, a lost lock raises once the body exits, and release only
+    deletes the key if this job still owns it.
+    """
     redis = cast(ArqRedis, ctx["redis"])
     key = sync_lock_key(repo)
+    # The TTL frees a crashed worker's lock; the renewal loop keeps it alive for long jobs.
     acquired = await redis.set(key, job_id, nx=True, ex=7200)
     if not acquired:
         await set_job(
@@ -203,6 +216,11 @@ async def run_job(
     kind: str,
     job_id: str,
 ) -> AsyncIterator[JobRun | None]:
+    """Lock the repository and own the ledger lifecycle of one job; yield None if locked.
+
+    A body that does not finish the job is marked succeeded. Exceptions are recorded as failed
+    (and on the repository for sync kinds) and swallowed, unless the job had already finished.
+    """
     async with sessions_for(ctx)() as session:
         repo = await ensure_repo(session, repo_full_name, now_for(ctx))
         await session.commit()

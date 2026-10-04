@@ -1,3 +1,5 @@
+"""GitHub implementation of SourceAdapter. sources/github is the only package that calls GitHub."""
+
 from contextlib import suppress
 from datetime import datetime
 from urllib.parse import quote
@@ -34,6 +36,12 @@ class GitHubAdapter:
     async def pull_requests_page(
         self, repo: RepoRef, *, cursor: str | None, page_size: int, open_only: bool = False
     ) -> PageResult:
+        """Fetch one page of PRs, most recently updated first, with complete timelines.
+
+        Transient errors halve the page size (floor 5) and retry; the configured size returns
+        after two consecutive successful pages. PRs that fail normalization are counted in
+        `skipped_prs` instead of failing the page.
+        """
         try:
             page = await self._pull_requests_page(
                 repo, cursor=cursor, page_size=page_size, open_only=open_only
@@ -85,6 +93,7 @@ class GitHubAdapter:
             with suppress(KeyError, TypeError, ValueError, AttributeError):
                 updated_at.append(parse_time(remove_nulls(node["updatedAt"])))
             try:
+                # Timelines over 100 items continue by PR node id, which is why queries fetch `id`.
                 timeline = node["timelineItems"]
                 seen: set[str] = set()
                 while timeline["pageInfo"]["hasNextPage"]:

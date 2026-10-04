@@ -1,3 +1,5 @@
+"""Fetch GitHub Actions runs triggered by pull requests over REST."""
+
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -30,6 +32,11 @@ def normalize_run(raw: dict[str, Any]) -> CiRun:
 async def fetch_runs(
     client: GitHubClient, repo: RepoRef, *, created_from: datetime, created_to: datetime
 ) -> list[CiRun]:
+    """Return pull_request runs created in [created_from, created_to], deduplicated by id.
+
+    Queries one UTC day at a time. The listing serves at most 1,000 runs per filter, so busier
+    days are split into 6-hour windows; a window still over the cap is truncated and logged.
+    """
     found: dict[int, CiRun] = {}
     path = f"/repos/{repo.full_name}/actions/runs"
 

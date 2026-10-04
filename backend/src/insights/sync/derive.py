@@ -1,4 +1,7 @@
-"""Transactional derivation. Pure computation lives in analytics."""
+"""Transactional derivation of timelines, facts and revert/reland links.
+
+Pure computation lives in analytics; this module loads its inputs and writes the results.
+"""
 
 from collections.abc import Sequence
 from dataclasses import asdict
@@ -52,6 +55,10 @@ async def derivation_complete(session: AsyncSession, repo_id: int, key: str) -> 
 async def derive_prs(
     session: AsyncSession, pr_ids: Sequence[int], *, settings: Settings, now: datetime
 ) -> int:
+    """Rebuild intervals and facts for the given PRs; return how many violate invariants.
+
+    Stored link fields are kept: they depend on other PRs and are owned by link_repo.
+    """
     if not pr_ids:
         return 0
     prs = (await session.scalars(select(PullRequest).where(PullRequest.id.in_(pr_ids)))).all()
@@ -128,6 +135,11 @@ async def derive_prs(
 
 
 async def link_repo(session: AsyncSession, repo_id: int, *, increment_version: bool = True) -> int:
+    """Recompute revert/reland links across the repository and clear `links_pending`.
+
+    Writes only changed link fields and returns their PR count. `data_version` is bumped on
+    change unless the caller bumps it itself.
+    """
     repo = await session.get(Repository, repo_id)
     if repo is None:
         raise ValueError("Repository is missing")
@@ -184,6 +196,11 @@ async def enqueue_rederivation(ctx: dict[str, Any]) -> None:
 
 
 async def rederive_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
+    """arq entry point: rederive PRs whose facts lack the current derive key.
+
+    Commits keyset batches of 500, then relinks and sets `derived_key` only after verifying
+    no PR is still pending.
+    """
     settings = cast(Settings, ctx["settings"])
     key = current_key(settings)
     async with run_job(ctx, repo_full_name, kind, job_id) as job:

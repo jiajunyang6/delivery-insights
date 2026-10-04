@@ -1,3 +1,5 @@
+"""Environment-driven settings and the identifier patterns used to validate input."""
+
 import re
 from functools import lru_cache
 from typing import Literal, Self
@@ -53,6 +55,8 @@ class Settings(BaseSettings):
             REPO_RE.fullmatch(repo) is None for repo in self.tracked_repo_list
         ):
             raise ValueError("TRACKED_REPOS must contain valid owner/name entries")
+        # The worker cron fires at range(0, 60, interval) minutes; a divisor keeps runs evenly
+        # spaced across the hour boundary.
         if 60 % self.sync_interval_minutes:
             raise ValueError("SYNC_INTERVAL_MINUTES must divide 60")
         if self.open_sweep_minutes % self.sync_interval_minutes:
@@ -70,6 +74,7 @@ class Settings(BaseSettings):
 
     @property
     def tracked_repo_list(self) -> list[str]:
+        """Configured repos de-duplicated case-insensitively, keeping the first spelling."""
         seen: dict[str, str] = {}
         for repo in split_list(self.tracked_repos):
             seen.setdefault(repo.lower(), repo)

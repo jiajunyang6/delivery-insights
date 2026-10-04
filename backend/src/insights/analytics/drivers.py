@@ -1,3 +1,5 @@
+"""Descriptive driver comparisons for merged PRs (assignment, re-review, slowest decile)."""
+
 from collections.abc import Sequence
 from itertools import pairwise
 from math import ceil

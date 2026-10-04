@@ -1,3 +1,5 @@
+"""RFC 6901 JSON Pointer lookup used to resolve finding evidence references."""
+
 from typing import Any
 
 

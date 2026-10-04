@@ -1,3 +1,5 @@
+"""Persist one fetched page of PRs and derive facts for the PRs that actually changed."""
+
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from hashlib import sha256
@@ -63,6 +65,11 @@ async def save_page(
     now: datetime,
     settings: Settings,
 ) -> SaveResult:
+    """Upsert changed PRs with their events and files and derive them, in the caller's transaction.
+
+    Unchanged content hashes are skipped and versions older than the stored `updated_at` are
+    rejected, both here and in the upsert, so a stale page cannot overwrite fresher data.
+    """
     existing = {
         number: (stored_hash, updated_at)
         for number, stored_hash, updated_at in (
@@ -74,7 +81,7 @@ async def save_page(
             )
         ).all()
     }
-    # A backfill page can have been downloaded before a checkpoint's catch-up.
+    # A prefetched backfill page can predate a checkpoint's catch-up and must not regress rows.
     records = [
         p
         for p in page.prs

@@ -1,3 +1,5 @@
+"""Parse CODEOWNERS and area-owners files into ownership rules; no I/O."""
+
 import re
 
 from insights.domain import OwnershipRule

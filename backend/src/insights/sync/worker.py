@@ -1,3 +1,5 @@
+"""arq worker entry point: builds the job context and registers jobs and cron schedules."""
+
 from typing import Any, ClassVar
 
 from arq import cron

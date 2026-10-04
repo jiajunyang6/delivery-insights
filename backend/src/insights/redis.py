@@ -1,3 +1,5 @@
+"""Redis and arq connection factories plus the key layout shared by API and worker."""
+
 from hashlib import sha256
 from typing import cast
 
@@ -48,6 +50,7 @@ def github_etag_key(url: str) -> str:
 
 
 async def connect_arq(url: str) -> ArqRedis:
+    """Connect without retries so callers can fail fast and report the queue unavailable."""
     settings = RedisSettings.from_dsn(url)
     settings.conn_retries = 0
     settings.conn_timeout = 2

@@ -1,3 +1,8 @@
+"""Deterministic scoring of the four library hypotheses against evidence items.
+
+Code decides which hypotheses qualify and their confidence band; the LLM only words them.
+"""
+
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -18,6 +23,8 @@ class ConfidenceLevel:
     downgrade_cap: float
 
 
+# Each downgrade_cap sits inside its own band (0.5 is still low, 0.74 still medium), so a
+# capped or downgraded confidence never lands back in a higher band.
 LEVELS = {
     "low": ConfidenceLevel(0.35, False, 0.5),
     "medium": ConfidenceLevel(0.5, True, 0.74),
@@ -40,6 +47,11 @@ def chain_ids(candidate: Mapping[str, Any]) -> list[str]:
 
 
 def allowed_ids(candidate: Mapping[str, Any]) -> set[str]:
+    """IDs a hypothesis statement may cite: chain, counter-evidence and ruled-out alternatives.
+
+    Accepts both the pack shape (ruled_out/evidence_ids) and the candidate shape
+    (alternatives_ruled_out/evidence).
+    """
     ids = set(chain_ids(candidate)) | set(candidate["counter_evidence"])
     for alternative in candidate.get("ruled_out", candidate.get("alternatives_ruled_out", [])):
         ids.update(alternative.get("evidence_ids", alternative.get("evidence", [])))
@@ -79,6 +91,10 @@ def changed(
     field: str = "change_rel",
     direction: int = 1,
 ) -> bool:
+    """Whether field moved by at least threshold in direction.
+
+    Only an explicit significant=False rejects the change; items without the flag pass.
+    """
     return bool(
         entry
         and entry.get(field) is not None
@@ -98,6 +114,11 @@ def at_least(entry: Mapping[str, Any] | None, threshold: float) -> bool:
 
 
 def effect_size(entry: Mapping[str, Any], snapshot: Mapping[str, Any]) -> tuple[float, bool]:
+    """Effect in [0, 1] and whether it was measured against weekly variation.
+
+    For items in SERIES_KEYS with at least three non-constant previous-period weeks, 2 sigma
+    counts as full effect; otherwise 10 pp for shares or a 50% relative change does.
+    """
     delta = entry.get("change_abs")
     if delta is None:
         return 0.0, False
@@ -386,6 +407,12 @@ def evaluate_candidate(
     evidence: Mapping[str, dict[str, Any]],
     ci_complete: bool,
 ) -> dict[str, Any]:
+    """Score one hypothesis; return its candidate plus the flags select_candidates uses.
+
+    Eligible requires an adequate main-metric sample, a symptom, a mechanism and at least
+    low confidence. Signals whose data source is unavailable leave the agreement denominator,
+    so missing data neither supports nor counts against a hypothesis.
+    """
     definition = hypothesis.build(context)
     main_id = hypothesis.main
     main = evidence.get(main_id, {})
@@ -416,6 +443,8 @@ def evaluate_candidate(
     sample = min(1, (main.get("n") or 0) / 100)
     localization = min(1, max(0, float(definition["localization"])))
     counters = definition["counter"]
+    # Fixed weights summing to 1 keep scores comparable across hypotheses; each counter-evidence
+    # group costs 0.15, enough to move a borderline candidate down a band.
     raw = max(
         0,
         min(
@@ -428,6 +457,8 @@ def evaluate_candidate(
             - 0.15 * len(counters),
         ),
     )
+    # Without available, sufficiently covered and complete CI data, a CI hypothesis can still
+    # qualify but is held in the low band rather than claimed at medium or high.
     cap = (
         LEVELS["low"].downgrade_cap
         if identifier == "H_ci_bottleneck"
@@ -483,6 +514,8 @@ def evaluate_candidate(
         "mechanisms": mechanisms,
         "main_available": context.available(main_id),
         "sample_ok": sample_ok,
+        # A symptom alone shows that something changed and a mechanism alone shows a possible
+        # lever; only both together support a cause for this period's change.
         "eligible": sample_ok and symptom and mechanism and confidence >= LEVELS["low"].minimum,
     }
 
@@ -490,6 +523,11 @@ def evaluate_candidate(
 def score_hypotheses(
     snapshot: Mapping[str, Any], evidence: Mapping[str, dict[str, Any]], *, ci_complete: bool
 ) -> tuple[list[dict[str, Any]], str | None]:
+    """Return up to three qualifying candidates, or none and an abstain reason.
+
+    Without a previous period the result is no_comparison straight away, because every
+    symptom is a change against that period.
+    """
     if not snapshot["meta"]["comparison_available"]:
         return [], "no_comparison"
     context = SignalContext(snapshot, evidence)
@@ -505,6 +543,12 @@ def score_hypotheses(
 def select_candidates(
     evidence: Mapping[str, dict[str, Any]], evaluated: Mapping[str, dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], str | None]:
+    """Pick the top three eligible candidates by confidence and explain the alternatives.
+
+    Each other hypothesis that showed a symptom is either ruled out with cited evidence
+    (counter-evidence, or mechanisms checked and absent) or left open with a reason
+    (no_data, insufficient_sample, not_selected, below_threshold).
+    """
     selected = sorted(
         (item["candidate"] for item in evaluated.values() if item["eligible"]),
         key=lambda c: (-c["confidence"], c["id"]),
@@ -546,7 +590,11 @@ def select_candidates(
 def abstain_reason(
     evidence: Mapping[str, dict[str, Any]], evaluated: Mapping[str, Mapping[str, Any]]
 ) -> str:
-    """no_slowdown when cycle time is comparable and no slowdown symptom is present."""
+    """Return no_slowdown when cycle time is comparable and no slowdown symptom is present.
+
+    Otherwise insufficient_signal. H_quality_tradeoff is ignored here: its symptom is a
+    speed-up, which is not a slowdown.
+    """
     cycle = evidence.get("E1")
     comparable = bool(
         cycle

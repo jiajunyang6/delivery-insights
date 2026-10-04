@@ -20,7 +20,11 @@ from insights.domain import OwnershipRule
 async def load_dataset(
     session: AsyncSession, params: SnapshotParams, *, now: datetime, metadata: Dataset | None = None
 ) -> Dataset:
-    """Caller owns a REPEATABLE READ, READ ONLY transaction."""
+    """Load PRs, intervals, reviews, baselines, merge history and CI for one snapshot.
+
+    Caller owns a REPEATABLE READ, READ ONLY transaction so every query sees one view. A given
+    `metadata` skips reloading repository readiness and versions.
+    """
     if metadata is None:
         repositories = (
             await session.scalars(

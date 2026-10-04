@@ -1,3 +1,5 @@
+"""CI run metrics (queue time, runtime, flaky reruns) for runs linked to flow PRs; no I/O."""
+
 from collections.abc import Sequence
 from dataclasses import replace
 from datetime import datetime

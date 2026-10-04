@@ -35,6 +35,7 @@ export function Controls(p: Props) {
           <span className="label">Period · UTC</span>
           <div className="segmented">
             {[7, 30, 60].map((days) => {
+              // Anchor presets to the server's UTC today, not the browser's local date.
               const range = dateRange(days, p.dateLimits?.latest_to);
               const selected = isPeriodSelected(p.params, days);
               const unavailable = p.dateLimits

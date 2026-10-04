@@ -1,3 +1,5 @@
+"""Efficiency metrics for the current vs previous period with bootstrap significance."""
+
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -46,6 +48,11 @@ def compare(
     params_hash: str,
     statistic: Statistic | None = None,
 ) -> dict[str, Any]:
+    """Compare a measure with the previous period's.
+
+    significant is None without a statistic, a previous value, or samples on both sides.
+    change_rel is None when the previous value is missing or 0.
+    """
     old = previous.value if previous else None
     delta = current.value - old if current.value is not None and old is not None else None
     relative = delta / old if delta is not None and old else None
@@ -54,6 +61,7 @@ def compare(
         low, high = bootstrap_diff(
             current.samples, previous.samples, statistic, seed_for(params_hash, name)
         )
+        # The CI rules out sampling noise; the minimum relative change rules out trivial shifts.
         significant = bool((low > 0 or high < 0) and abs(relative) >= t.CHANGE_MIN_RELATIVE)
     return {
         "value": current.value,
@@ -103,6 +111,7 @@ def measures(dataset: Dataset, window: Window) -> dict[str, Measure]:
         numerator = sum(ledger[s] for s in ("waiting_reviewer", "waiting_ci", "waiting_merge"))
         denominator = sum(ledger.values()) + (pr.facts.coding_hours or 0)
         pairs.append((numerator, denominator))
+    # Only PRs ready at least N days before the window ends had the full N days to merge.
     eligible = [
         p
         for p in dataset.flow_in(window)
@@ -135,6 +144,7 @@ def measures(dataset: Dataset, window: Window) -> dict[str, Measure]:
             len(prs),
             tuple(pairs),
         ),
+        # Superseded closes are not waste: their work landed through another merged PR.
         "waste_share": rate(
             [float(p.facts.close_class != "superseded") for p in lost]
             + [float(reverted(p, window.end)) for p in prs]

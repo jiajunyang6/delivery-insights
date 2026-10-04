@@ -1,3 +1,5 @@
+"""Tracked repository status, selectable date limits and manual sync requests."""
+
 from datetime import datetime, timedelta
 from typing import Annotated
 
@@ -98,6 +100,7 @@ async def manual_sync(
 ) -> SyncJobResponse:
     try:
         key = sync_cooldown_key(repo)
+        # SET NX EX claims the cooldown atomically, so concurrent requests enqueue one job.
         accepted = await redis.set(key, "1", nx=True, ex=settings.manual_sync_cooldown_seconds)
         if not accepted:
             ttl = max(1, await redis.ttl(key))

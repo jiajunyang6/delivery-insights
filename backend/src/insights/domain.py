@@ -1,3 +1,5 @@
+"""Source-neutral records shared by the GitHub adapter, sync pipeline and analytics."""
+
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum

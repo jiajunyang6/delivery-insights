@@ -89,6 +89,16 @@ Without Make (Windows), run the equivalent `uv run` commands from the Makefile.
 - Until the first release, schema changes edit the single initial migration and require a
   database rebuild (ask before `down -v`). After release, use forward migrations only.
 
+## Comments
+
+- Every module starts with a one- or two-line docstring: responsibility and boundary.
+- Docstrings go on cross-layer entry points and contracts: one summary line, then only
+  non-obvious details (units, window semantics, when `None` is returned, determinism).
+- Inline comments explain why, not what; do not restate names or types.
+- No change history, ticket numbers, authorship or commented-out code. Lines stay within 100
+  characters. Update comments when behavior changes; long explanations belong in
+  `docs/REFERENCE.md`.
+
 ## Verification
 
 - Every change: `make lint`, `make test`, `make eval-offline`, plus frontend checks when

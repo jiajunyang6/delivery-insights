@@ -1,3 +1,8 @@
+"""LLM client boundary for the narrative: the LLMClient protocol and its Bedrock implementation.
+
+The model only receives the system prompt and messages built in prompt.py.
+"""
+
 import asyncio
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, cast
@@ -36,6 +41,12 @@ class LLMUsage:
 
 
 class LLMClient(Protocol):
+    """Makes one forced submit_narrative tool call per submit().
+
+    tool_input is None when the reply contains no such tool call. Service or transport
+    failures raise LLMUnavailable, which the caller turns into the template fallback.
+    """
+
     model_id: str
 
     async def submit(

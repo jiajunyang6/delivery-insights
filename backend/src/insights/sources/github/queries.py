@@ -1,3 +1,6 @@
+"""GraphQL documents for PR list pages and per-PR timeline continuation pages."""
+
+# Actor `__typename` drives bot detection and timeline node `id`s feed event dedup keys.
 FRAGMENTS = """fragment ActorFields on Actor {
   __typename
   login
@@ -39,6 +42,8 @@ fragment TimelineFields on PullRequestTimelineItems {
 
 """
 
+# PR `id` is not stored but pages timelines past 100 items. Incremental stop rules and the
+# watermark rely on the UPDATED_AT DESC order.
 PULL_REQUESTS_PAGE = (
     FRAGMENTS
     + """query PullRequestsPage($owner: String!, $name: String!, $pageSize: Int!, $cursor: String,

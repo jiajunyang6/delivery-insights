@@ -1,3 +1,9 @@
+"""Validation of LLM tool output against the evidence pack and snapshot.
+
+Checks schema, length, language (CJK characters), citations, numbers, hedge wording, personal
+names and abstention, and returns violations for the repair prompt; output is never modified.
+"""
+
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -134,6 +140,12 @@ class AllowedNumber:
 
 
 def allowed_numbers(entry: Mapping[str, Any]) -> list[AllowedNumber]:
+    """Numbers a sentence citing this item may contain, in each accepted unit.
+
+    Hours may also appear as days, minutes as hours and shares as percent. Previous and change
+    values are accepted even though the prompt asks for current values only, and numbers in
+    the label itself (such as 500 in a PR-size label) are allowed too.
+    """
     result: list[AllowedNumber] = []
     identifier = entry["id"]
 
@@ -205,6 +217,13 @@ def match_numbers(
 def check_numbers(
     sentence: str, pack: Mapping[str, Any], evidence: Mapping[str, dict[str, Any]]
 ) -> list[Violation]:
+    """Check one sentence's numbers and stated change direction against cited evidence.
+
+    Numbers must come from the cited items, the period length, or persistence counts of a
+    hypothesis whose chain is cited; repo names, locations and dates are ignored. When the
+    sentence uses only rising or only falling verbs, the matched (or sole changing) cited item
+    must have moved that way.
+    """
     cited = citations(sentence) & evidence.keys()
     allowed = [number for i in cited for number in allowed_numbers(evidence[i])]
     if cited:
@@ -251,6 +270,12 @@ def validate_hypotheses(
     body: str,
     errors: list[Violation],
 ) -> list[int]:
+    """Check library hypothesis statements, appending violations to errors.
+
+    Returns the final band order (0 low to 2 high, after a valid downgrade) of each statement
+    for a known candidate, for the body's causal-wording ceiling.
+    """
+
     def fail(code: str, message: str) -> None:
         errors.append(Violation(code, message))
 
@@ -305,6 +330,11 @@ def validate(
     *,
     audience: str,
 ) -> list[Violation]:
+    """Return every violation in one tool output, deduplicated; an empty list means valid.
+
+    Schema errors do not stop the semantic checks, so a single repair message can list all
+    problems. A None output (no tool call) yields schema violations only.
+    """
     errors: list[Violation] = []
 
     def fail(code: str, message: str) -> None:
@@ -367,6 +397,9 @@ def validate(
     for i, sentence in enumerate(body_sentences, 1):
         if not citations(sentence):
             fail("V4:sentence_without_citation", f"Body sentence {i} needs evidence.")
+    # Narratives discuss areas and teams, never individuals. Logins never enter the pack, so
+    # any match is a guessed or coincidental name; logins under three characters are skipped
+    # to avoid matching ordinary words.
     logins = {r["reviewer"] for r in snapshot["bottleneck_analysis"]["review_load"]["distribution"]}
     logins.update(p["author"] for p in snapshot["at_risk_prs"] if p["author"])
     for text in texts:
@@ -408,6 +441,8 @@ def validate(
                 "Omit this optional hypothesis if those requirements cannot be met.",
             )
         levels.append(0)
+    # Abstention words exempt a causal sentence only when no hypothesis is output; otherwise
+    # "insufficient" could slip past the wording ceiling of a low-band hypothesis.
     for sentence in body_sentences:
         if CAUSAL.search(sentence) and (levels or not ABSTAIN.search(sentence)):
             hedges = hedge_levels(sentence)
