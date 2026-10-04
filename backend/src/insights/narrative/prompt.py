@@ -11,7 +11,7 @@ from insights.narrative.validator import ABSTAIN_SENTENCES
 
 # Bump on any prompt or tool-schema change: it is part of the narrative cache key and of the
 # stored narrative identity, so old wording is never served for a new prompt.
-PROMPT_VERSION = "v9"
+PROMPT_VERSION = "v10"
 SYSTEM_PROMPT = (
     "Write concise English delivery narratives from the supplied structured evidence "
     "pack.\n"
@@ -46,6 +46,10 @@ SYSTEM_PROMPT = (
     "Avoid abbreviations such as e.g., i.e. and vs. that split sentences.\n"
     "3. Include each high/medium library candidate using its ID; low candidates are "
     "optional.\n"
+    "Each candidate's explains field names the changes it would explain. Name them in its "
+    "statement and in any narrative cause sentence, for example 'may be the main cause of "
+    "the larger share of PR time waiting on reviewers'. Never present a candidate as the "
+    "cause of a change it does not explain, such as a cycle-time improvement.\n"
     "Mention and cite counter-evidence when provided. You may lower a band, never raise"
     " it:\n"
     "include downgrade with the new level and a cited reason, and use that final band "
@@ -84,12 +88,14 @@ SYSTEM_PROMPT = (
     "review\n"
     "demand outpacing first reviews; E53 localizes the added review wait to area-Foo. "
     "Candidate\n"
-    "H_review_capacity is high, with no counter-evidence. Director tool input:\n"
+    "H_review_capacity is high, explains the slower cycle time, with no counter-evidence. "
+    "Director tool input:\n"
     '{"narrative":"Median cycle time was 41.2 h, higher than the previous period [E1]. '
-    "Limited review capacity in area-Foo is likely "
-    "the main cause [E15][E22][E53]. Prioritize reviewer coverage in area-Foo "
+    "Limited review capacity in area-Foo is likely the main cause of the slower cycle "
+    "time [E15][E22][E53]. Prioritize reviewer coverage in area-Foo "
     '[E53].","hypotheses":[{"id":"H_review_capacity","statement":"Limited review '
-    'capacity in area-Foo is likely the main cause [E1][E15][E53]."}]}\n'
+    "capacity in area-Foo is likely the main cause of the slower cycle time "
+    '[E1][E15][E53]."}]}\n'
     "\n"
     "Example B: No candidates, abstain_reason=no_slowdown, E1=30.5 h with no "
     "significant\n"

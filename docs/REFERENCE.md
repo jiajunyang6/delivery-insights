@@ -166,6 +166,10 @@ score = 0.30*S + 0.20*E + 0.20*P + 0.15*N + 0.15*L - 0.15*C
 Example covered by tests: S=4/5, E=1, P=10/13, N=61/100, L=0.63, C=0
 gives 0.7798, rounded to **0.78 (high)**. One counter-evidence group yields **0.63 (medium)**.
 No mechanism signal means no hypothesis, even when symptoms look strong.
+Each candidate in the pack carries `explains`, the changes its present symptoms record, such
+as "the larger share of PR time waiting on reviewers". Cause sentences name that change
+(prompt v10 and the template), so a candidate triggered by reviewer wait is never presented
+as the cause of a cycle-time change it does not cover.
 CI confidence is capped at 0.50 unless CI is available, coverage is at least 0.50,
 and `CI_COMPLETE=true`. The default is false because Actions may be only partial CI.
 

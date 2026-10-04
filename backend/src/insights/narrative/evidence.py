@@ -14,6 +14,7 @@ from insights.narrative.hypotheses import (
     CI_RUN_IDS,
     changed,
     effect_size,
+    explains,
     location_id,
     score_hypotheses,
 )
@@ -387,6 +388,7 @@ def build_evidence_pack(
                 "title": c["title"],
                 "level": c["confidence_level"],
                 "location": sanitize(c["location"]),
+                "explains": explains(c["id"], c["chain"]),
                 "chain": c["chain"],
                 "counter_evidence": c["counter_evidence"],
                 "persistence": c["persistence"],

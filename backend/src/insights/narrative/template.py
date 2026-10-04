@@ -6,7 +6,7 @@ It follows the hedge bands and abstention sentences that the validator enforces 
 from collections.abc import Mapping
 from typing import Any
 
-from insights.narrative.hypotheses import HYPOTHESES, abstention, chain_ids
+from insights.narrative.hypotheses import HYPOTHESES, abstention, chain_ids, explains
 from insights.narrative.validator import ABSTAIN_SENTENCES
 
 FINDINGS = {
@@ -33,7 +33,7 @@ def percent(value: float) -> str:
 
 
 def phrase(candidate: Mapping[str, Any]) -> str:
-    """Render a candidate's location and confidence band using the matching uncertainty wording."""
+    """Render a candidate's location, band wording and the changes it would explain."""
     if candidate["id"] == "H_review_capacity":
         location = candidate["location"]
         subject = (
@@ -42,12 +42,14 @@ def phrase(candidate: Mapping[str, Any]) -> str:
     else:
         subject = HYPOTHESES[candidate["id"]].subject
     level = candidate["level"]
+    effect = explains(candidate["id"], candidate["chain"])
+    cause = f"the main cause of {effect}" if effect else "the main cause"
     return (
-        f"{subject} is likely the main cause"
+        f"{subject} is likely {cause}"
         if level == "high"
-        else f"{subject} may be the main cause"
+        else f"{subject} may be {cause}"
         if level == "medium"
-        else f"There are early signs that {subject[0].lower() + subject[1:]} is the main cause"
+        else f"There are early signs that {subject[0].lower() + subject[1:]} is {cause}"
     )
 
 
