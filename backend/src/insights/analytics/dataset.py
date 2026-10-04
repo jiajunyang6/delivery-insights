@@ -2,7 +2,7 @@
 
 from bisect import bisect_left
 from collections.abc import Iterator
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
@@ -58,7 +58,6 @@ class PrData:
     author: str | None
     is_draft: bool
     created_at: datetime
-    ci_intervals: tuple[tuple[datetime, datetime], ...] = ()
     human_activity_at: tuple[datetime, ...] = ()
 
     def __post_init__(self) -> None:
@@ -100,7 +99,6 @@ class Dataset:
     ci_runs: tuple[tuple[str, CiRun], ...] = ()
     history: tuple[tuple[str, datetime, float], ...] = ()
     current_day: bool = False
-    observation_time: datetime | None = None
     # init=False gives every dataclasses.replace() an empty, independent cache.
     cohort_cache: dict[Window, tuple[tuple[PrData, ...], tuple[Review, ...] | None]] = field(
         default_factory=dict, init=False, compare=False, repr=False
@@ -116,7 +114,7 @@ class Dataset:
 
     @property
     def as_of(self) -> datetime:
-        return min(self.to_excl, self.observation_time or min(r.last_synced_at for r in self.repos))
+        return min(self.to_excl, min(r.last_synced_at for r in self.repos))
 
     @property
     def days(self) -> int:
@@ -156,20 +154,6 @@ class Dataset:
             )
             self.cohort_cache[window] = flow, cached
         return cached
-
-    def for_repo(self, repo: str) -> "Dataset":
-        prs = tuple(p for p in self.prs if p.repo == repo)
-        ids = {p.pr_id for p in prs}
-        return replace(
-            self,
-            repos=tuple(r for r in self.repos if r.repo == repo),
-            observation_time=self.as_of,
-            prs=prs,
-            reviews=tuple(r for r in self.reviews if r.pr_id in ids),
-            baselines=tuple(b for b in self.baselines if b.repo == repo),
-            ci_runs=tuple(r for r in self.ci_runs if r[0] == repo),
-            history=tuple(h for h in self.history if h[0] == repo),
-        )
 
 
 def active_in(pr: PrData, window: Window) -> bool:

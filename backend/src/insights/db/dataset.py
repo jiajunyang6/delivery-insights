@@ -6,7 +6,6 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from insights.analytics.ci import union_intervals
 from insights.analytics.classify import ownership_counts
 from insights.analytics.dataset import Baseline, Dataset, PrData, RepoData, Review, SnapshotParams
 from insights.analytics.timeline import WAITING_STATES, Interval
@@ -117,7 +116,6 @@ async def load_dataset(session: AsyncSession, params: SnapshotParams, *, now: da
             )
         ).all():
             activity[pr_id].append(at)
-    ci = await load_ci_data(session, list(names), pr_ids=ids)
     prs = tuple(
         PrData(
             f.pr_id,
@@ -130,7 +128,6 @@ async def load_dataset(session: AsyncSession, params: SnapshotParams, *, now: da
             author,
             draft,
             created,
-            union_intervals(ci.by_pr.get(f.pr_id, ())),
             tuple(activity[f.pr_id]),
         )
         for f, title, url, author, draft, created in rows

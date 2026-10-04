@@ -1,4 +1,4 @@
-from collections import Counter, defaultdict
+from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from datetime import datetime
@@ -6,7 +6,6 @@ from typing import Any
 
 from insights.analytics.dataset import Dataset, Window
 from insights.analytics.efficiency import Measure, compare, quantile, rate
-from insights.analytics.stats import percentile
 from insights.domain import CiRun, EventKind, PullRequestRecord
 
 
@@ -51,12 +50,6 @@ def union_intervals(runs: Sequence[CiRun]) -> tuple[tuple[datetime, datetime], .
     return tuple(result)
 
 
-def overlap_hours(
-    intervals: Sequence[tuple[datetime, datetime]], start: datetime, end: datetime
-) -> float:
-    return sum(max(0, (min(b, end) - max(a, start)).total_seconds()) for a, b in intervals) / 3600
-
-
 def measures(dataset: Dataset, window: Window) -> tuple[dict[str, Measure], list[CiRun]]:
     eligible = {(p.repo, p.number) for p in dataset.flow_in(window)}
     runs = [
@@ -77,22 +70,19 @@ def measures(dataset: Dataset, window: Window) -> tuple[dict[str, Measure], list
         and r.run_started_at is not None
         and r.updated_at >= r.run_started_at
     ]
-    counts = Counter((repo, number) for repo, r in runs for number in r.pr_numbers)
     return {
         "queue_p50_minutes": quantile(queue),
         "run_p50_minutes": quantile(duration),
-        "rerun_rate": rate([float(r.run_attempt > 1) for _, r in runs]),
         "flaky_rerun_rate": rate(
             [float(r.run_attempt > 1 and r.conclusion == "success") for _, r in runs]
         ),
-        "runs_per_pr_p50": quantile(list(counts.values())),
     }, [r for _, r in runs]
 
 
-def build_ci(dataset: Dataset, params_hash: str, coverage: float) -> dict[str, Any]:
-    current, runs = measures(dataset, dataset.current)
+def build_ci(dataset: Dataset, params_hash: str) -> dict[str, Any]:
+    current, _ = measures(dataset, dataset.current)
     previous, _ = measures(dataset, dataset.previous)
-    result: dict[str, Any] = {"source": "actions", "coverage": coverage}
+    result: dict[str, Any] = {}
     for name, measurement in current.items():
         unit = (
             "minutes" if name.endswith("minutes") else "share" if name.endswith("rate") else "count"
@@ -105,29 +95,4 @@ def build_ci(dataset: Dataset, params_hash: str, coverage: float) -> dict[str, A
             params_hash=params_hash,
             statistic="mean" if unit == "share" else "median",
         )
-    groups: dict[str, list[CiRun]] = defaultdict(list)
-    for run in runs:
-        groups[run.workflow_name].append(run)
-    workflows = []
-    for name, group in groups.items():
-        durations = [
-            (r.updated_at - r.run_started_at).total_seconds() / 60
-            for r in group
-            if r.status == "completed"
-            and r.run_started_at is not None
-            and r.updated_at >= r.run_started_at
-        ]
-        workflows.append(
-            (
-                sum(durations),
-                {
-                    "workflow_name": name,
-                    "runs": len(group),
-                    "run_p50_minutes": percentile(durations, 50, 1),
-                    "rerun_rate": sum(r.run_attempt > 1 for r in group) / len(group),
-                },
-            )
-        )
-    workflows.sort(key=lambda item: (-item[0], item[1]["workflow_name"]))
-    result["top_workflows"] = [value for _, value in workflows[:5]]
     return result

@@ -120,7 +120,6 @@ class HeadIndex:
 def link_prs(
     prs: Sequence[LinkInput], *, repo_full_name: str, default_branch: str
 ) -> dict[int, PrFacts]:
-    wip = author_wip(prs)
     by_number = {item.record.number: item for item in prs}
     by_id = {item.pr_id: item for item in prs}
     output = {
@@ -135,7 +134,6 @@ def link_prs(
             superseded_by_pr_id=None,
             close_class=None,
             late_rejection=False,
-            author_open_prs_at_ready=wip.get(p.pr_id),
         )
         for p in prs
     }
@@ -310,24 +308,3 @@ def ownership_counts(rules: Sequence[OwnershipRule]) -> tuple[tuple[str, int], .
         elif rule.source == "codeowners":
             code["codeowners:" + rule.pattern] = len(set(rule.owners))
     return tuple(sorted({**code, **{key: len(owners) for key, owners in areas.items()}}.items()))
-
-
-def author_wip(prs: Sequence[LinkInput]) -> dict[int, int]:
-    """Count simultaneous flow PRs using sorted start/end indexes, excluding self."""
-    groups: dict[str, list[LinkInput]] = defaultdict(list)
-    for item in prs:
-        author = item.record.author.login
-        if author and is_flow(item.facts):
-            groups[author.lower()].append(item)
-    result = {}
-    for group in groups.values():
-        starts = sorted(p.facts.ready_at for p in group if p.facts.ready_at is not None)
-        ends = sorted(p.facts.end_at for p in group if p.facts.end_at is not None)
-        for p in group:
-            at = p.facts.ready_at
-            if at is not None:
-                self_active = p.facts.end_at is None or at < p.facts.end_at
-                result[p.pr_id] = (
-                    bisect_right(starts, at) - bisect_right(ends, at) - int(self_active)
-                )
-    return result

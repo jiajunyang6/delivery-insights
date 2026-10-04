@@ -12,14 +12,22 @@ from insights.analytics.stats import kaplan_meier
 
 def test_km_five_hand_calculated_samples_tied_event_before_censor():
     km = kaplan_meier([(24, True), (24, False), (72, True), (168, False), (336, True)])
-    assert km["n"] == 5 and km["events"] == 3
-    assert km["s_at_hours"] == pytest.approx({"24": 0.8, "72": 8 / 15, "168": 8 / 15, "336": 0})
+    assert km["n"] == 5
     assert km["median_hours"] == 336
     assert kaplan_meier([(1, False), (2, False)])["median_hours"] is None
-    assert kaplan_meier([(1, False)])["s_at_hours"]["336"] == 1
 
 
-def test_survival_ready_cohort_observation_boundary_and_early_closed_censor():
+def test_survival_ready_cohort_observation_boundary_and_early_closed_censor(monkeypatch):
+    import insights.analytics.efficiency as efficiency
+
+    observed = []
+    original = efficiency.kaplan_meier
+
+    def capture(samples):
+        observed[:] = samples
+        return original(samples)
+
+    monkeypatch.setattr(efficiency, "kaplan_meier", capture)
     prs = []
     for i in range(20):
         p = pr(i)
@@ -32,12 +40,13 @@ def test_survival_ready_cohort_observation_boundary_and_early_closed_censor():
         prs.append(replace(p, facts=f))
     d = dataset(prs)
     km = survival_cohort(d, d.current)
-    assert km["n"] == 20 and km["events"] == 10 and km["median_hours"] == 1
-    assert km["s_at_hours"]["24"] == pytest.approx(1 / 3)
+    assert km["n"] == 20 and km["median_hours"] == 1
     # A merge at the observation boundary is censored.
     boundary = replace(prs[0], facts=replace(prs[0].facts, merged_at=d.as_of))
     changed = replace(d, prs=(boundary, *prs[1:]))
-    assert survival_cohort(changed, changed.current)["events"] == 9
+    assert survival_cohort(changed, changed.current)["median_hours"] == 1
+    assert sum(event for _, event in observed) == 9
+    assert observed[0][1] is False
     assert survival_cohort(dataset(prs[:19]), d.current) is None
 
 

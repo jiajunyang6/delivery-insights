@@ -15,7 +15,6 @@ export interface Metric {
   value: number | null;
   previous: number | null;
   change_rel: number | null;
-  change_abs: number | null;
   significant: boolean | null;
   status: "ok" | "insufficient_sample";
   unit: string;
@@ -25,7 +24,6 @@ export interface Metric {
 export interface RepoStatus {
   repo: string;
   last_sync_status: string;
-  last_synced_at: string | null;
 }
 export interface PendingRepo {
   repo: string;
@@ -108,7 +106,6 @@ export interface Snapshot {
   snapshot_id: string;
   headline: string;
   as_of: string;
-  repos: string[];
   period: { from: string; to: string; days: number; complete: boolean };
   efficiency: {
     cycle_time_p50_hours: Metric;
@@ -139,10 +136,6 @@ export interface Snapshot {
     locations: Location[];
     review_queue: {
       weeks: Week[];
-      weeks_total: number;
-      weeks_inflow_exceeds_outflow: number;
-      open_growth_rel: number | null;
-      net_inflow_share: number | null;
     };
   };
   at_risk_prs: RiskPr[];
@@ -163,7 +156,6 @@ export interface Evidence {
   value: number;
   previous: number | null;
   unit: string;
-  change_abs: number | null;
   change_rel: number | null;
   change_pp: number | null;
   ref: string;
@@ -189,7 +181,6 @@ export interface Hypothesis {
 }
 export type AbstainReason = "no_comparison" | "no_slowdown" | "insufficient_signal";
 export interface Narrative {
-  snapshot_id: string;
   narrative: string;
   abstained: boolean;
   abstain_reason: AbstainReason | null;

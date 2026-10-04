@@ -23,7 +23,7 @@ def test_mature_cohort_includes_boundary_and_not_partial_followup():
     m = measures(d, d.current)["merged_within_n_days"]
     assert m.value == 1 and m.n == 30
     assert m.extra["n_days"] == 3
-    d = replace(d, observation_time=at(71))
+    d = replace(d, repos=(replace(d.repos[0], last_synced_at=at(71)),))
     assert measures(d, d.current)["merged_within_n_days"].n == 0
 
 
@@ -38,7 +38,9 @@ def test_excluded_priority_and_zero_coding_waiting_share():
         pr(102), facts=replace(pr(102).facts, ready_at=None, merged_at=None, closed_at=at(64))
     )
     payload = build_snapshot(dataset([bot, backport, draft]), params=params(d))
-    assert payload["meta"]["excluded"] == {"bot_prs": 1, "backport_prs": 1, "never_ready_drafts": 1}
+    assert payload["efficiency"]["merged_prs"]["value"] == 0
+    assert payload["meta"]["sample"]["merged_prs"] == 0
+    assert payload["time_ledger"]["total_pr_hours"] == 0
 
 
 def test_other_union_counts_inflow_outflow_and_risks_once():

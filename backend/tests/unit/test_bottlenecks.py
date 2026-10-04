@@ -9,10 +9,8 @@ from insights.analytics.bottlenecks import (
     at_risk,
     attribution,
     locations,
-    pareto,
     review_queue,
     time_ledger,
-    trend,
     what_if,
 )
 from insights.analytics.dataset import Baseline, RepoData
@@ -29,7 +27,6 @@ def test_ledger_weighted_locations_and_other_union():
     assert len(locs) == 1 and locs[0]["location"] == "other"
     assert locs[0]["merged_prs"] == 5
     assert locs[0]["waiting_reviewer_pr_hours"] == 100
-    assert sum(p["pr_hours"] for p in pareto(ledger, locs)) == 150
 
 
 def test_what_if_and_null_zero_cases():
@@ -107,9 +104,7 @@ def test_week_clipping_and_shift_boundary():
     assert len(queue["weeks"]) == 1 and queue["weeks"][0]["days"] == 1
     assert queue["net_inflow_share"] is None
     ledger = time_ledger(d)
-    assert trend(d, ledger, [])["bottleneck_shift"] is None
     ledger["states"]["waiting_ci"]["change_pp"] = 5
-    assert trend(d, ledger, [])["bottleneck_shift"].startswith("waiting_ci share +5.0pp")
 
 
 def half_unreviewed_dataset():

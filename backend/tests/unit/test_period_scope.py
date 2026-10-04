@@ -53,7 +53,6 @@ def test_human_activity_union_flows_through_all_dashboard_outputs():
     assert {p.number for p in d.flow} == {2, 5, 8}
     snapshot = build_snapshot(d, params=SnapshotParams(("a/b",), d.period_from, d.period_to))
     assert snapshot["meta"]["sample"]["open_prs_at_as_of"] == 3
-    assert snapshot["meta"]["sample"]["human_reviews"] == 1
     assert snapshot["bottleneck_analysis"]["review_load"]["reviews"] == 1
     assert snapshot["bottleneck_analysis"]["review_queue"]["weeks"][0]["open_at_week_end"] == 2
     assert snapshot["at_risk_summary"]["total"] == 1
@@ -96,7 +95,7 @@ def test_previous_risk_uses_previous_activity_and_partial_day_uses_watermark():
 
     d = dataset([waiting(1, 30), waiting(2, 55), waiting(3, 65)])
     assert {r["number"] for r in at_risk(d, at=d.start, window=d.previous)} == {1}
-    d = replace(d, observation_time=at(60))
+    d = replace(d, repos=(replace(dataset([]).repos[0], last_synced_at=at(60)),))
     assert {r["number"] for r in at_risk(d, at=d.as_of)} == {2}
 
 
@@ -115,7 +114,7 @@ def test_inactive_bot_merged_pr_and_ci_are_excluded_with_consistent_totals():
     assert s["time_ledger"]["total_pr_hours"] == 30
     assert sum(w["merged"] for w in s["series"]["current"]) == 1
     assert s["bottleneck_analysis"]["ci"]["queue_p50_minutes"]["n"] == 1
-    assert s["bottleneck_analysis"]["ci"]["runs_per_pr_p50"]["n"] == 1
+    assert s["bottleneck_analysis"]["ci"]["flaky_rerun_rate"]["n"] == 1
     rows = build_pr_rows(d)
     assert [r["number"] for r in rows] == [1]
     assert sum(sum(r["ledger_hours"].values()) for r in rows) == 30
@@ -125,7 +124,10 @@ def test_weekly_series_keeps_the_full_selected_period_cohort():
     # Human activity in week one, automated merge in week two: still in this report.
     p = replace(pr(1, merged_at=at(24 * 9)), created_at=at(-200), human_activity_at=(at(24),))
     d = dataset(
-        [p], period_from=date(2026, 1, 1), period_to=date(2026, 1, 14), observation_time=at(24 * 14)
+        [p],
+        period_from=date(2026, 1, 1),
+        period_to=date(2026, 1, 14),
+        repos=(replace(dataset([]).repos[0], last_synced_at=at(24 * 14)),),
     )
     assert sum(w["merged"] for w in series(d, d.current)) == 1
 
@@ -149,7 +151,11 @@ def test_repo_and_replaced_datasets_have_independent_caches():
     )
     d.flow_in(d.current)
     d.reviews_in(d.current)
-    scoped = d.for_repo("a/b")
+    scoped = replace(
+        d,
+        prs=tuple(p for p in d.prs if p.repo == "a/b"),
+        reviews=tuple(r for r in d.reviews if r.pr_id == 1),
+    )
     empty = replace(d, prs=())
     assert not scoped.cohort_cache and not empty.cohort_cache
     assert scoped.cohort_cache is not d.cohort_cache

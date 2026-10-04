@@ -59,9 +59,7 @@ class Predictability(Contract):
 
 class KM(Contract):
     n: int
-    events: int
     median_hours: float | None
-    s_at_hours: dict[Literal["24", "72", "168", "336"], float]
 
 
 class Survival(Contract):
@@ -96,11 +94,8 @@ class StateLedger(Contract):
 
 
 class TimeLedger(Contract):
-    scope: Literal["merged_prs"]
     merged_prs: int
-    previous_merged_prs: int | None
     total_pr_hours: float
-    previous_total_pr_hours: float | None
     states: dict[State, StateLedger]
     ci_coverage: float
     ci_data_available: bool
@@ -159,7 +154,6 @@ class ReviewQueue(Contract):
     weeks: list[QueueWeek]
     weeks_total: int
     weeks_inflow_exceeds_outflow: int
-    open_growth_rel: float | None
     net_inflow_share: float | None
 
 
@@ -178,18 +172,8 @@ class Location(Contract):
 
 
 class MergeBlockers(Contract):
-    approved_merged_prs: int
     second_approval_share: float | None
-    second_approval_wait_p50_hours: float | None
     post_approval_update_share: float | None
-    ci_after_approval_p50_hours: float | None
-
-
-class Pareto(Contract):
-    cause: State
-    location: str | None
-    pr_hours: float
-    share: float
 
 
 class Reviewer(Contract):
@@ -204,30 +188,16 @@ class ReviewLoad(Contract):
     distribution: list[Reviewer]
 
 
-class Workflow(Contract):
-    workflow_name: str
-    runs: int
-    run_p50_minutes: float | None
-    rerun_rate: float
-
-
 class CI(Contract):
-    source: Literal["actions"]
-    coverage: float
     queue_p50_minutes: Metric
     run_p50_minutes: Metric
-    rerun_rate: Metric
     flaky_rerun_rate: Metric
-    runs_per_pr_p50: Metric
-    top_workflows: list[Workflow]
 
 
 class BottleneckAnalysis(Contract):
     review_queue: ReviewQueue
     locations: list[Location]
     merge_blockers: MergeBlockers
-    pareto: list[Pareto]
-    what_if: list[WhatIf]
     review_load: ReviewLoad
     ci: CI | None
 
@@ -243,41 +213,8 @@ class Assignment(Contract):
     ratio: float | None
 
 
-class RoundBucket(Contract):
-    rounds: Literal["0", "1", "2", "3+"]
-    n: int
-    cycle_p50_hours: float | None
-
-
 class ReviewRoundCost(Contract):
-    buckets: list[RoundBucket]
-    hours_per_extra_round: float | None
     re_review_wait_p50_hours: float | None
-    first_pickup_p50_hours: float | None
-
-
-class WipBucket(Contract):
-    wip: Literal["0", "1-2", "3+"]
-    n: int
-    waiting_author_p50_hours: float | None
-
-
-class AuthorWip(Contract):
-    buckets: list[WipBucket]
-    spearman: float | None
-
-
-class WeekdayPickup(PickupGroup):
-    weekday: int = Field(ge=0, le=6)
-
-
-class HourPickup(PickupGroup):
-    hours: Literal["00-05", "06-11", "12-17", "18-23"]
-
-
-class SubmitTiming(Contract):
-    by_weekday: list[WeekdayPickup]
-    by_hour_block: list[HourPickup]
 
 
 class SlowFeature(Contract):
@@ -301,8 +238,6 @@ class SlowestDecile(Contract):
 class Drivers(Contract):
     assignment: Assignment
     review_round_cost: ReviewRoundCost
-    author_wip: AuthorWip
-    submit_timing: SubmitTiming
     slowest_decile: SlowestDecile | None
 
 
@@ -319,22 +254,16 @@ class AtRiskPr(Contract):
     severity: Literal["critical", "warning"]
     baseline_source: Literal["90d", "180d", "default"]
     locations: list[str]
-    external_contributor: bool
-    size_lines: int
 
 
 class AtRiskSummary(Contract):
     total: int
     critical: int
-    by_state: dict[State, int]
 
 
 class Waste(Contract):
-    closed_unmerged: int
-    by_class: dict[Literal["superseded", "rejected", "abandoned", "no_review"], int]
     lost_while_waiting: int
     late_rejections: int
-    wasted_review_share: float | None
     wasted_pr_hours: float
 
 
@@ -344,25 +273,16 @@ class PrLink(Contract):
 
 
 class RevertChain(Contract):
-    original: PrLink
     revert: PrLink
-    reland: PrLink | None
-    exposure_hours: float
-    revert_pr_cycle_hours: float
 
 
 class Rework(Contract):
-    reverts: int
-    revert_prs: int
-    relanded: int
     revert_chains: list[RevertChain]
 
 
 class Guardrail(Contract):
     cycle_time_p50_change_rel: float | None
     revert_rate: float | None
-    previous_revert_rate: float | None
-    revert_rate_change_pp: float | None
     verdict: Literal["ok", "watch", "tradeoff_suspected"]
 
 
@@ -380,7 +300,6 @@ class StateAttribution(Change):
 class LocationAttribution(Contract):
     location: str
     change: float
-    share_of_reviewer_increase: float
     share_of_increase: float
 
 
@@ -391,8 +310,6 @@ class LargePrAttribution(Change):
 class Attribution(Contract):
     basis: Literal["mean_hours_per_merged_pr"]
     cycle_mean_hours: Change
-    total_increase_hours: float
-    total_decrease_hours: float
     states: dict[
         Literal["coding", "waiting_reviewer", "waiting_author", "waiting_ci", "waiting_merge"],
         StateAttribution,
@@ -402,7 +319,6 @@ class Attribution(Contract):
 
 
 class Trend(Contract):
-    bottleneck_shift: str | None
     attribution: Attribution | None
 
 
@@ -416,27 +332,17 @@ class Signals(Contract):
 
 class Week(Contract):
     week_start: date
-    days: float
     merged: int
     cycle_p50_hours: float | None
     pickup_p50_hours: float | None
     pr_size_p50_lines: float | None
     waiting_reviewer_share: float | None
     waiting_ci_share: float | None
-    reverts: int
 
 
 class Series(Contract):
     current: list[Week]
     previous: list[Week]
-
-
-class PerRepo(Contract):
-    repo: str
-    merged_prs: int
-    cycle_time_p50_hours: float | None
-    pickup_p50_hours: float | None
-    waiting_share: float | None
 
 
 class Links(Contract):
@@ -454,16 +360,7 @@ class DataFreshness(Contract):
 
 class Sample(Contract):
     merged_prs: int
-    closed_unmerged_prs: int
-    ready_prs: int
     open_prs_at_as_of: int
-    human_reviews: int
-
-
-class Excluded(Contract):
-    bot_prs: int
-    backport_prs: int
-    never_ready_drafts: int
 
 
 class Meta(Contract):
@@ -476,8 +373,6 @@ class Meta(Contract):
     ci_source: Literal["none", "actions"]
     data_freshness: list[DataFreshness]
     sample: Sample
-    excluded: Excluded
-    location_sources: dict[Literal["label", "codeowners", "directory", "unclassified"], int]
 
 
 class Snapshot(Contract):
@@ -499,7 +394,6 @@ class Snapshot(Contract):
     trend: Trend
     signals: Signals
     series: Series
-    per_repo: list[PerRepo] | None
     links: Links
     meta: Meta
 
