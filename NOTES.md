@@ -4,16 +4,40 @@
 
 **Prerequisites:** Docker with Compose v2 (Docker Desktop on Windows/macOS). For live data, a
 GitHub fine-grained personal access token: Settings → Developer settings → Fine-grained tokens,
-**Repository access: Public repositories**, no extra permissions. A Bedrock API key is optional.
+**Repository access: Public repositories**, no extra permissions. A Bedrock API key is required
+for LLM-generated narratives.
 
-```bash
-cp .env.example .env            # PowerShell: Copy-Item .env.example .env
-# Edit .env:
-#   GITHUB_TOKEN=github_pat_...          required for syncing GitHub data
-#   AWS_BEARER_TOKEN_BEDROCK=...         optional; empty = deterministic template narrative
-docker compose up --build -d
-docker compose ps -a              # migrate exits 0; api, worker, web, postgres, redis are running
-```
+1. **Create the configuration file.** If `.env` does not exist, copy `.env.example`:
+
+    Bash:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    PowerShell:
+
+    ```powershell
+    Copy-Item .env.example .env
+    ```
+
+2. **Edit and save `.env` before starting Docker.** Open `.env` in a text editor.
+
+   - Set `GITHUB_TOKEN` to your GitHub token to enable syncing GitHub data.
+   - Set `AWS_BEARER_TOKEN_BEDROCK` to your Bedrock API key to enable LLM-generated narratives.
+
+   Without a Bedrock key, narratives use deterministic templates and no LLM calls are made.
+   Save the file before continuing.
+
+3. **Start the services and check their status.** Run these commands after saving `.env`:
+
+    ```bash
+    docker compose up --build -d
+    docker compose ps -a
+    ```
+
+    Expected status: `migrate` has exited with code `0`; `api`, `worker`, `web`,
+    `postgres` and `redis` are running.
 
 - Dashboard: <http://localhost:5173>. API docs: <http://localhost:8000/docs>. Both bind to localhost only.
 - The worker starts syncing `bevyengine/bevy` immediately: 7 days first, then 30, then

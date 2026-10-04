@@ -10,13 +10,36 @@ Sonnet 4.6 on Amazon Bedrock. Each claim in the narrative links to the number be
 ## Quickstart
 
 Prerequisites: Docker with Compose v2, and a GitHub fine-grained token with
-**Public repositories** access and no extra permissions. A Bedrock API key is optional.
+**Public repositories** access and no extra permissions. A Bedrock API key is required for
+LLM-generated narratives.
 
-```bash
-[ -f .env ] || cp .env.example .env     # PowerShell: if (!(Test-Path .env)) { Copy-Item .env.example .env }
-# Edit .env: set GITHUB_TOKEN (required for live data) and optionally AWS_BEARER_TOKEN_BEDROCK.
-docker compose up --build -d
-```
+1. **Create the configuration file.** Copy `.env.example` if `.env` does not already exist:
+
+    Bash:
+
+    ```bash
+    [ -f .env ] || cp .env.example .env
+    ```
+
+    PowerShell:
+
+    ```powershell
+    if (!(Test-Path .env)) { Copy-Item .env.example .env }
+    ```
+
+2. **Edit and save `.env` before starting Docker.** Open `.env` in a text editor.
+
+   - Set `GITHUB_TOKEN` to your GitHub token to enable syncing GitHub data.
+   - Set `AWS_BEARER_TOKEN_BEDROCK` to your Bedrock API key to enable LLM-generated narratives.
+
+   Without a Bedrock key, narratives use deterministic templates and no LLM calls are made.
+   Save the file before continuing.
+
+3. **Start the services.** Run this command after saving `.env`:
+
+    ```bash
+    docker compose up --build -d
+    ```
 
 Open the dashboard at <http://localhost:5173> and the API docs at <http://localhost:8000/docs>.
 The worker backfills `bevyengine/bevy` in 7-day, 30-day and then `BACKFILL_DAYS` (120) stages.
@@ -61,7 +84,7 @@ Settings come from `.env`; never commit it. Without `.env`, code defaults apply 
 | Variable | `.env.example` | Purpose |
 |---|---|---|
 | `GITHUB_TOKEN` | empty | Required for sync; without it `/v1/repos` reports `missing_token` |
-| `AWS_BEARER_TOKEN_BEDROCK` | empty | Optional; empty means a deterministic template narrative |
+| `AWS_BEARER_TOKEN_BEDROCK` | empty | Required for LLM-generated narratives; without it, only deterministic templates are available |
 | `AWS_REGION`, `BEDROCK_MODEL_ID` | `us-west-2`, `us.anthropic.claude-sonnet-4-6` | Bedrock Converse target |
 | `TRACKED_REPOS` | `bevyengine/bevy` | Comma-separated allowlist, e.g. `bevyengine/bevy,prometheus/prometheus` |
 | `BACKFILL_DAYS` | `120` | History to collect (30–365); the 60-day view needs at least 120 for a full comparison |

@@ -192,7 +192,7 @@ Copy `.env.example`; never commit `.env`. Full environment defaults are in `back
 | Variable | Default | Purpose |
 |---|---|---|
 | `GITHUB_TOKEN` | empty | GitHub collection; missing token is reported explicitly |
-| `AWS_BEARER_TOKEN_BEDROCK` | empty | Optional Bedrock API key; empty enables templates |
+| `AWS_BEARER_TOKEN_BEDROCK` | empty | Required for LLM-generated narratives; without it, only deterministic templates are available |
 | `AWS_REGION` | `us-west-2` | Bedrock client region |
 | `BEDROCK_MODEL_ID` | `us.anthropic.claude-sonnet-4-6` | Converse model/inference profile |
 | `TRACKED_REPOS` | `bevyengine/bevy` | Comma-separated repository allowlist |
