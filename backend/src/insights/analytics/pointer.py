@@ -1,0 +1,9 @@
+from typing import Any
+
+
+def resolve_pointer(payload: Any, pointer: str) -> Any:
+    current = payload
+    for part in pointer.lstrip("/").split("/") if pointer else []:
+        key = part.replace("~1", "/").replace("~0", "~")
+        current = current[int(key)] if isinstance(current, list) else current[key]
+    return current

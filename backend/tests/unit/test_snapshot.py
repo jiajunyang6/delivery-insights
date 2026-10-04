@@ -9,7 +9,7 @@ from tests.factories import at
 
 from insights.analytics import ANALYTICS_VERSION, derive_key
 from insights.analytics.dataset import SnapshotParams
-from insights.analytics.findings import resolve_pointer
+from insights.analytics.pointer import resolve_pointer
 from insights.analytics.snapshot import build_snapshot, canonical, etag, identifiers, rounded
 from insights.api.schemas import Snapshot
 from insights_eval.generator import ScenarioSpec, generate

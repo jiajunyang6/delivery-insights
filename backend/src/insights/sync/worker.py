@@ -8,10 +8,10 @@ from insights.db.engine import create_database
 from insights.logging import configure_logging
 from insights.sources.github.adapter import GitHubAdapter
 from insights.sources.github.client import GitHubClient
-from insights.sync.enrichment import sync_ci_runs, sync_ownership
+from insights.sync.derive import rederive_repo
+from insights.sync.enrichment import enrich_repo
 from insights.sync.jobs import incremental_sync_all, reconcile_tracked_repos, sync_repo
 from insights.sync.maintenance import housekeeping, precompute_snapshots
-from insights.sync.rederive import rederive_repo
 
 
 async def startup(ctx: dict[str, Any]) -> None:
@@ -40,8 +40,7 @@ class WorkerSettings:
         rederive_repo,
         precompute_snapshots,
         housekeeping,
-        sync_ci_runs,
-        sync_ownership,
+        enrich_repo,
     ]
     cron_jobs: ClassVar[list[Any]] = [
         cron(incremental_sync_all, minute=set(range(0, 60, Settings().sync_interval_minutes))),

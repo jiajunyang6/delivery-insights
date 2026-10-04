@@ -167,7 +167,7 @@ async def test_adaptive_page_size_and_cursor(client, github_page):
     adapter = GitHubAdapter(client)
     await adapter.pull_requests_page(RepoRef("a", "b"), cursor="cursor", page_size=25)
     await adapter.pull_requests_page(RepoRef("a", "b"), cursor="next", page_size=25)
-    assert client.page_size == 25
+    assert adapter.page_size == 25
     await adapter.pull_requests_page(RepoRef("a", "b"), cursor="restored", page_size=25)
     variables = [orjson.loads(c.request.content)["variables"] for c in route.calls]
     assert [v["pageSize"] for v in variables] == [25, 12, 6, 5, 5, 25]
@@ -175,14 +175,14 @@ async def test_adaptive_page_size_and_cursor(client, github_page):
 
 
 async def test_page_failure_resets_recovery_streak(client, github_page):
-    client.page_size = 5
-    client.router.post(URL).respond(200, json=github_page)
     adapter = GitHubAdapter(client)
+    adapter.page_size = 5
+    client.router.post(URL).respond(200, json=github_page)
     await adapter.pull_requests_page(RepoRef("a", "b"), cursor=None, page_size=25)
     client.router.post(URL).respond(401)
     with pytest.raises(GitHubAuthError):
         await adapter.pull_requests_page(RepoRef("a", "b"), cursor="bad", page_size=25)
-    assert client.successful_pages == 0 and client.page_size == 5
+    assert adapter.successful_pages == 0 and adapter.page_size == 5
     route = client.router.post(URL).respond(200, json=github_page)
     calls_before = len(route.calls)
     for cursor in ("first", "second", "third"):

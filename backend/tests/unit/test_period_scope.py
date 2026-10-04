@@ -8,8 +8,7 @@ from tests.unit.test_ci import run
 
 from insights.analytics.bottlenecks import at_risk, series
 from insights.analytics.dataset import RepoData, SnapshotParams, Window, active_in
-from insights.analytics.rows import build_pr_rows
-from insights.analytics.snapshot import build_snapshot
+from insights.analytics.snapshot import build_pr_rows, build_snapshot
 from insights.analytics.timeline import Interval
 from insights.narrative.evidence import extract_evidence
 from insights_eval.generator import SyntheticRepo

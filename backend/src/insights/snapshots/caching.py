@@ -7,7 +7,8 @@ from typing import Any
 import orjson
 
 from insights.analytics.snapshot import canonical, digest
-from insights.api.params import CURSOR_RE, PrFilters, invalid
+from insights.snapshots.errors import invalid
+from insights.snapshots.filters import CURSOR_RE, PrFilters
 
 SNAPSHOT_RETENTION = timedelta(days=7)
 

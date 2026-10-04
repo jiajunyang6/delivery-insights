@@ -6,12 +6,12 @@ from redis.exceptions import RedisError
 from sqlalchemy import delete
 
 from insights.analytics.dataset import SnapshotParams
-from insights.api.errors import ProblemError
 from insights.config import Settings, split_list
 from insights.db.models import Snapshot, SyncJob
 from insights.redis import rows_key, snapshot_key
+from insights.snapshots.errors import ResourceError
 from insights.snapshots.service import SnapshotService
-from insights.sync.jobs import now_for, sessions_for
+from insights.sync.queue import now_for, sessions_for
 
 logger = structlog.get_logger(__name__)
 
@@ -33,7 +33,7 @@ async def precompute_snapshots(ctx: dict[str, Any], repo_full_name: str) -> None
         )
         try:
             await service.delivery(params)
-        except ProblemError as exc:
+        except ResourceError as exc:
             logger.info("precompute_skipped", repo=repo_full_name, status=exc.status)
 
 

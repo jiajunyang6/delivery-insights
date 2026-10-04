@@ -2,14 +2,15 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Annotated, cast
 
-from arq.connections import ArqRedis, RedisSettings, create_pool
+from arq.connections import ArqRedis
 from fastapi import Depends, Request
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from insights.api.errors import ProblemError
+from insights.api.errors import unavailable
 from insights.config import Settings
+from insights.redis import connect_arq
 from insights.snapshots.service import SnapshotService
 
 
@@ -45,16 +46,8 @@ async def get_arq(request: Request) -> "ArqRedis":
     if existing is not None:
         return cast(ArqRedis, existing)
     try:
-        redis_settings = RedisSettings.from_dsn(get_settings(request).redis_url)
-        redis_settings.conn_retries = 0
-        redis_settings.conn_timeout = 2
-        pool = await create_pool(redis_settings)
+        pool = await connect_arq(get_settings(request).redis_url)
     except (RedisError, OSError, TimeoutError) as exc:
-        raise ProblemError(
-            503,
-            "dependency-unavailable",
-            "Dependency unavailable",
-            "The sync queue is unavailable.",
-        ) from exc
+        raise unavailable("The sync queue is unavailable.") from exc
     request.app.state.arq = pool
     return pool

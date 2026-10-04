@@ -1,7 +1,9 @@
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime
+from hashlib import sha256
 from typing import Any
 
+import orjson
 from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from insights.config import Settings
 from insights.db.models import PrEvent, PrFile, PullRequest, Repository
 from insights.domain import PageResult, PullRequestRecord
-from insights.sources.github.normalize import content_hash
 from insights.sync.derive import derive_prs
 
 
@@ -141,3 +142,10 @@ async def save_page(
     )
     violations = await derive_prs(session, pr_ids, settings=settings, now=now)
     return SaveResult(len(records), len(events), pr_ids, violations, created)
+
+
+def content_hash(pr: PullRequestRecord) -> str:
+    normalized = replace(
+        pr, events=tuple(sorted(pr.events, key=lambda e: (e.occurred_at, e.kind, e.dedup_key)))
+    )
+    return sha256(orjson.dumps(asdict(normalized), option=orjson.OPT_SORT_KEYS)).hexdigest()

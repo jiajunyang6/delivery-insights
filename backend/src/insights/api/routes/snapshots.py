@@ -5,7 +5,7 @@ from starlette.responses import Response
 
 from insights.api.deps import get_snapshot_service
 from insights.api.params import invalid, validate_snapshot_id
-from insights.api.routes.insights import response
+from insights.api.responses import response
 from insights.api.schemas import Narrative, Snapshot
 from insights.narrative.llm import LLMClient
 from insights.narrative.service import NarrativeService

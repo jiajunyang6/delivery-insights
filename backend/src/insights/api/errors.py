@@ -7,29 +7,18 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 
+from insights.snapshots.errors import ResourceError as ProblemError
+
+__all__ = [
+    "ProblemError",
+    "handle_problem",
+    "install_handlers",
+    "invalid_many",
+    "problem_response",
+    "unavailable",
+]
+
 logger = structlog.get_logger(__name__)
-
-
-class ProblemError(Exception):
-    def __init__(
-        self,
-        status: int,
-        type_slug: str,
-        title: str,
-        detail: str,
-        *,
-        errors: list[dict[str, str]] | None = None,
-        headers: dict[str, str] | None = None,
-        extensions: dict[str, Any] | None = None,
-    ) -> None:
-        super().__init__(title)
-        self.status = status
-        self.type_slug = type_slug
-        self.title = title
-        self.detail = detail
-        self.errors = errors
-        self.headers = headers or {}
-        self.extensions = extensions or {}
 
 
 def problem_response(request: Request, error: ProblemError) -> JSONResponse:
@@ -76,9 +65,7 @@ async def handle_problem(request: Request, exc: Exception) -> JSONResponse:
         logger.error("database_unavailable", error_type=type(exc).__name__)
         return problem_response(
             request,
-            ProblemError(
-                503, "dependency-unavailable", "Dependency unavailable", "Postgres is unavailable."
-            ),
+            unavailable("Postgres is unavailable."),
         )
     logger.error("unhandled_error", error_type=type(exc).__name__)
     return problem_response(
@@ -92,3 +79,17 @@ async def handle_problem(request: Request, exc: Exception) -> JSONResponse:
 def install_handlers(app: FastAPI) -> None:
     for error_type in (ProblemError, RequestValidationError, HTTPException, SQLAlchemyError):
         app.add_exception_handler(error_type, handle_problem)
+
+
+def unavailable(detail: str) -> ProblemError:
+    return ProblemError(503, "dependency-unavailable", "Dependency unavailable", detail)
+
+
+def invalid_many(errors: list[dict[str, str]]) -> ProblemError:
+    return ProblemError(
+        422,
+        "invalid-parameter",
+        "Invalid parameter",
+        "One or more parameters are invalid.",
+        errors=errors,
+    )

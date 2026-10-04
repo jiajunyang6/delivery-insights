@@ -358,4 +358,4 @@ async def test_reduced_backfill_target_preserves_coverage_without_resuming_histo
     assert repo.covered_since == covered_since
     assert repo.backfill_cursor == "unfinished-180-day-cursor"
     assert repo.backfill_target_days == 30 and repo.last_sync_status == "ok"
-    assert jobs[0].status == "succeeded"
+    assert next(j for j in jobs if j.id == job.id).status == "succeeded"

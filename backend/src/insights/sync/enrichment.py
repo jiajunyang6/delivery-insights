@@ -10,13 +10,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from insights.config import Settings
 from insights.db.ci import load_ci_data, run_from_row
 from insights.db.models import OwnershipRule as StoredRule
-from insights.db.models import PrFact, Repository, SyncJob, WorkflowRun
+from insights.db.models import PrFact, Repository, WorkflowRun
 from insights.domain import CiRun, OwnershipRule, RepoRef
 from insights.sources.base import SourceAdapter
-from insights.sources.github.client import GitHubError
 from insights.sync.derive import derive_prs
-from insights.sync.jobs import now_for, repository_lock, sessions_for, set_job
-from insights.sync.queue import enqueue_sync, ensure_repo
+from insights.sync.queue import (
+    enqueue_precompute,
+    enqueue_sync,
+    last_success,
+    now_for,
+    run_job,
+    sessions_for,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -110,86 +115,54 @@ async def save_ownership(
     return code_changed, area_changed
 
 
-async def execute(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
+async def enrich_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
     settings = cast(Settings, ctx["settings"])
-    async with sessions_for(ctx)() as session:
-        repo = await ensure_repo(session, repo_full_name, now_for(ctx))
-        await session.commit()
-    async with repository_lock(ctx, repo_full_name, job_id) as acquired:
-        if not acquired:
+    async with run_job(ctx, repo_full_name, kind, job_id) as job:
+        if job is None:
             return "skipped_locked"
-        await set_job(ctx, job_id, status="running", phase=kind, started_at=now_for(ctx))
+        repo = job.repo
         log = logger.bind(job=job_id, repo=repo_full_name, phase=kind)
         if not settings.github_token:
-            await set_job(
-                ctx, job_id, status="failed", error="missing_token", finished_at=now_for(ctx)
-            )
+            await job.finish("failed", "missing_token")
             log.warning("enrichment_missing_token")
             return "missing_token"
         stats: dict[str, Any] = {}
         changed = False
-        try:
-            adapter = cast(SourceAdapter, ctx["adapter"])
-            ref = RepoRef(repo.owner, repo.name)
-            if kind == "ci_runs" and settings.ci_source == "actions" and repo.covered_since:
-                async with sessions_for(ctx)() as session:
-                    previous = await session.scalar(
-                        select(SyncJob.finished_at)
-                        .where(
-                            SyncJob.repo_id == repo.id,
-                            SyncJob.kind == "ci_runs",
-                            SyncJob.status == "succeeded",
-                        )
-                        .order_by(SyncJob.finished_at.desc())
-                        .limit(1)
-                    )
-                start = now_for(ctx) - timedelta(days=2) if previous else repo.covered_since
-                runs = await adapter.ci_runs(ref, created_from=start, created_to=now_for(ctx))
-                async with sessions_for(ctx)() as session, session.begin():
-                    updates, affected, violations = await save_runs(
-                        session, repo.id, runs, settings=settings, now=now_for(ctx)
-                    )
-                stats = {
-                    "runs_fetched": len(runs),
-                    "runs_changed": updates,
-                    "prs_rederived": affected,
-                    "invariant_violations": violations,
-                }
-                changed = updates > 0
-            elif kind == "ownership":
-                rules = await adapter.ownership_rules(ref)
-                async with sessions_for(ctx)() as session, session.begin():
-                    code, area = await save_ownership(session, repo.id, rules, now=now_for(ctx))
-                changed = code or area
-                stats = {
-                    "rules": len(rules),
-                    "codeowners_changed": code,
-                    "area_owners_changed": area,
-                }
-                if code:
-                    async with sessions_for(ctx)() as session:
-                        await enqueue_sync(
-                            ctx["redis"], session, repo_full_name, "rederive", now=now_for(ctx)
-                        )
-            if changed:
-                await ctx["redis"].enqueue_job(
-                    "precompute_snapshots",
-                    repo_full_name,
-                    _job_id=f"precompute:{repo_full_name.lower()}",
+        adapter = cast(SourceAdapter, ctx["adapter"])
+        ref = RepoRef(repo.owner, repo.name)
+        if kind == "ci_runs" and settings.ci_source == "actions" and repo.covered_since:
+            previous = await last_success(ctx, repo.id, "ci_runs")
+            start = now_for(ctx) - timedelta(days=2) if previous else repo.covered_since
+            runs = await adapter.ci_runs(ref, created_from=start, created_to=now_for(ctx))
+            async with sessions_for(ctx)() as session, session.begin():
+                updates, affected, violations = await save_runs(
+                    session, repo.id, runs, settings=settings, now=now_for(ctx)
                 )
-        except Exception as exc:
-            error = str(exc) if isinstance(exc, GitHubError) else type(exc).__name__
-            await set_job(ctx, job_id, status="failed", error=error[:500], finished_at=now_for(ctx))
-            log.error("enrichment_failed", error=error[:500])
-            return "failed"
-        await set_job(ctx, job_id, status="succeeded", stats=stats, finished_at=now_for(ctx))
+            stats = {
+                "runs_fetched": len(runs),
+                "runs_changed": updates,
+                "prs_rederived": affected,
+                "invariant_violations": violations,
+            }
+            changed = updates > 0
+        elif kind == "ownership":
+            rules = await adapter.ownership_rules(ref)
+            async with sessions_for(ctx)() as session, session.begin():
+                code, area = await save_ownership(session, repo.id, rules, now=now_for(ctx))
+            changed = code or area
+            stats = {
+                "rules": len(rules),
+                "codeowners_changed": code,
+                "area_owners_changed": area,
+            }
+            if code:
+                async with sessions_for(ctx)() as session:
+                    await enqueue_sync(
+                        ctx["redis"], session, repo_full_name, "rederive", now=now_for(ctx)
+                    )
+        if changed:
+            await enqueue_precompute(ctx, repo)
+        job.stats = stats
+        await job.finish()
         log.info("enrichment_completed", **stats)
-        return "succeeded"
-
-
-async def sync_ci_runs(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
-    return await execute(ctx, repo_full_name, kind, job_id)
-
-
-async def sync_ownership(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
-    return await execute(ctx, repo_full_name, kind, job_id)
+    return job.result

@@ -4,7 +4,8 @@ import pytest
 
 from insights.domain import EventKind
 from insights.sources.github.actions import normalize_run
-from insights.sources.github.normalize import actor, content_hash, normalize_pr, remove_nulls
+from insights.sources.github.normalize import actor, normalize_pr, remove_nulls
+from insights.sync.store import content_hash
 
 
 @pytest.mark.parametrize(

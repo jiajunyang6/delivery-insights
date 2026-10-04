@@ -16,7 +16,6 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 
 from insights.analytics.snapshot import canonical, digest, etag, iso
-from insights.api.caching import Reply, cache_ttl, matches_etag
 from insights.db.models import Narrative, Snapshot
 from insights.narrative.evidence import build_evidence_pack, extract_evidence
 from insights.narrative.hypotheses import actions
@@ -25,6 +24,7 @@ from insights.narrative.prompt import PROMPT_VERSION, SYSTEM_PROMPT, TOOL_SPEC, 
 from insights.narrative.template import build_template
 from insights.narrative.validator import STEPS, citations, validate
 from insights.redis import narrative_key, narrative_lock_key
+from insights.snapshots.caching import Reply, cache_ttl, matches_etag
 from insights.snapshots.service import SnapshotService, not_found
 
 NARRATIVE_DEADLINE_SECONDS = 150

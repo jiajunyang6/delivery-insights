@@ -15,10 +15,9 @@ from insights.db.ci import load_ci_data
 from insights.db.dataset import load_dataset
 from insights.db.models import PrFact, PrInterval, Repository, SyncJob
 from insights.domain import OwnershipRule
-from insights.sync.derive import current_key, link_repo
-from insights.sync.enrichment import save_ownership, save_runs, sync_ci_runs, sync_ownership
+from insights.sync.derive import current_key, link_repo, rederive_repo
+from insights.sync.enrichment import enrich_repo, save_ownership, save_runs
 from insights.sync.jobs import enqueue_enrichment
-from insights.sync.rederive import rederive_repo
 from insights.sync.store import save_page
 from insights_eval.generator import SyntheticRepo
 from insights_eval.pipeline import dataset_from_repo
@@ -100,7 +99,7 @@ async def test_ownership_invalidates_codeonly_rederives_and_area_changes_snapsho
     ]
     context["adapter"].ownership_rules = AsyncMock(return_value=rules)
     job, _ = await queued(context, "ownership")
-    assert await sync_ownership(context, "a/b", "ownership", str(job.id)) == "succeeded"
+    assert await enrich_repo(context, "a/b", "ownership", str(job.id)) == "succeeded"
     async with context["session_factory"]() as session:
         assert await session.scalar(select(Repository.derived_key)) is None
         assert await session.scalar(select(PrFact.derive_key)) is None
@@ -130,12 +129,12 @@ async def test_first_ci_sync_backfills_then_uses_two_days_and_scheduler_cooldown
         await session.execute(update(Repository).values(covered_since=at(-5000)))
     context["adapter"].ci_runs = AsyncMock(return_value=[])
     job, _ = await queued(context, "ci_runs")
-    assert await sync_ci_runs(context, "a/b", "ci_runs", str(job.id)) == "succeeded"
+    assert await enrich_repo(context, "a/b", "ci_runs", str(job.id)) == "succeeded"
     assert context["adapter"].ci_runs.call_args.kwargs["created_from"] == at(-5000)
     # A distinct later job sees the prior success; replaying the same ledger ID is not a new run.
     await context["redis"].flushdb()
     job2, _ = await queued(context, "ci_runs")
-    assert await sync_ci_runs(context, "a/b", "ci_runs", str(job2.id)) == "succeeded"
+    assert await enrich_repo(context, "a/b", "ci_runs", str(job2.id)) == "succeeded"
     assert context["adapter"].ci_runs.call_args.kwargs["created_from"] == NOW - timedelta(days=2)
     async with context["session_factory"]() as session:
         repo = await session.get(Repository, repo_id)

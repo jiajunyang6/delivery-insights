@@ -3,15 +3,8 @@ from typing import Any
 from insights.analytics import thresholds as t
 from insights.analytics.bottlenecks import what_if
 from insights.analytics.dataset import Dataset, hours, merged
+from insights.analytics.pointer import resolve_pointer
 from insights.analytics.stats import ratio
-
-
-def resolve_pointer(payload: Any, pointer: str) -> Any:
-    current = payload
-    for part in pointer.lstrip("/").split("/") if pointer else []:
-        key = part.replace("~1", "/").replace("~0", "~")
-        current = current[int(key)] if isinstance(current, list) else current[key]
-    return current
 
 
 def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str, Any]]:

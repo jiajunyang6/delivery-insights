@@ -1,6 +1,7 @@
 from hashlib import sha256
 from typing import cast
 
+from arq.connections import ArqRedis, RedisSettings, create_pool
 from redis.asyncio import Redis
 
 from insights.config import Settings
@@ -44,3 +45,10 @@ def rate_limit_key(client_ip: str, epoch_minute: int) -> str:
 
 def github_etag_key(url: str) -> str:
     return f"di:gh:etag:{sha256(url.encode()).hexdigest()}"
+
+
+async def connect_arq(url: str) -> ArqRedis:
+    settings = RedisSettings.from_dsn(url)
+    settings.conn_retries = 0
+    settings.conn_timeout = 2
+    return await create_pool(settings)

@@ -2,7 +2,7 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
-from insights.analytics.findings import resolve_pointer
+from insights.analytics.pointer import resolve_pointer
 from insights.narrative.catalog import CATALOG
 from insights.narrative.hypotheses import effect_size, pp_up, rel_down, rel_up, score_hypotheses
 

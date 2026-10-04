@@ -1,42 +1,11 @@
-from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
 from insights.analytics.dataset import Dataset, Window
 from insights.analytics.efficiency import Measure, compare, quantile, rate
-from insights.domain import CiRun, EventKind, PullRequestRecord
-
-
-def map_runs(
-    records: Mapping[int, PullRequestRecord], runs: Sequence[CiRun]
-) -> dict[int, tuple[CiRun, ...]]:
-    numbers = {p.number: identifier for identifier, p in records.items()}
-    sha: dict[str, set[int]] = defaultdict(set)
-    for identifier, record in records.items():
-        for event in record.events:
-            if event.kind == EventKind.COMMIT:
-                sha[event.payload["oid"]].add(identifier)
-    mapped: dict[int, list[CiRun]] = defaultdict(list)
-    for run in sorted(runs, key=lambda r: (r.created_at, r.run_id)):
-        ids = set(sha.get(run.head_sha, ()))
-        ids.update(numbers[n] for n in run.pr_numbers if n in numbers)
-        for identifier in sorted(ids):
-            mapped[identifier].append(run)
-    return {identifier: tuple(values) for identifier, values in mapped.items()}
-
-
-def mapped_flow_runs(
-    mapped: Mapping[int, Sequence[CiRun]], flow_numbers: Mapping[int, int]
-) -> tuple[CiRun, ...]:
-    runs: dict[int, CiRun] = {}
-    numbers: dict[int, set[int]] = defaultdict(set)
-    for identifier, num in flow_numbers.items():
-        for run in mapped.get(identifier, ()):
-            runs[run.run_id] = run
-            numbers[run.run_id].add(num)
-    return tuple(replace(runs[i], pr_numbers=tuple(sorted(numbers[i]))) for i in sorted(runs))
+from insights.domain import CiRun
 
 
 def union_intervals(runs: Sequence[CiRun]) -> tuple[tuple[datetime, datetime], ...]:

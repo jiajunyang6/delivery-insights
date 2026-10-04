@@ -1,28 +1,19 @@
 import re
-from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from uuid import UUID
 
 from starlette.datastructures import QueryParams
 
 from insights.analytics.dataset import SnapshotParams
-from insights.api.errors import ProblemError
-from insights.config import NAME_RE, OWNER_RE, REPO_RE, Settings
+from insights.api.errors import ProblemError, invalid_many
+from insights.config import MAX_PERIOD_DAYS, NAME_RE, OWNER_RE, REPO_RE, Settings
+from insights.snapshots.errors import invalid as invalid
+from insights.snapshots.filters import CURSOR_RE
+from insights.snapshots.filters import PrFilters as PrFilters
 
 DATE_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 SNAPSHOT_RE = re.compile(r"^s_[0-9a-f]{16}$")
 LOCATION_RE = re.compile(r"^[^\x00-\x1f\x7f]{1,200}$")
-CURSOR_RE = re.compile(r"^[A-Za-z0-9_-]{1,512}$")
-
-
-def invalid(param: str, message: str = "invalid value") -> ProblemError:
-    return ProblemError(
-        422,
-        "invalid-parameter",
-        "Invalid parameter",
-        "One or more parameters are invalid.",
-        errors=[{"param": param, "message": message}],
-    )
 
 
 def tracked_repos(repos: list[str], settings: Settings) -> tuple[str, ...]:
@@ -66,7 +57,7 @@ def parse_params(query: QueryParams, settings: Settings, now: datetime) -> Snaps
         start, end = dates["from"], dates["to"]
         if start > end:
             errors.append({"param": "from", "message": "must not be later than 'to'"})
-        if (end - start).days + 1 > 366:
+        if (end - start).days + 1 > MAX_PERIOD_DAYS:
             errors.append({"param": "to", "message": "period must not exceed 366 days"})
         if end > today:
             errors.append({"param": "to", "message": "must not be later than today"})
@@ -75,13 +66,7 @@ def parse_params(query: QueryParams, settings: Settings, now: datetime) -> Snaps
                 {"param": "from", "message": "must be within the configured backfill horizon"}
             )
     if errors:
-        raise ProblemError(
-            422,
-            "invalid-parameter",
-            "Invalid parameter",
-            "One or more parameters are invalid.",
-            errors=errors,
-        )
+        raise invalid_many(errors)
     if org is not None:
         repos = [
             repo for repo in settings.tracked_repo_list if repo.split("/")[0].lower() == org.lower()
@@ -122,17 +107,6 @@ def validate_job_id(value: str) -> UUID:
         return parsed
     except ValueError as exc:
         raise invalid("job_id") from exc
-
-
-@dataclass(frozen=True, slots=True)
-class PrFilters:
-    status: str = "merged"
-    at_risk: bool = False
-    state: str | None = None
-    location: str | None = None
-
-    def canonical_dict(self) -> dict[str, object]:
-        return asdict(self)
 
 
 def parse_filters(query: QueryParams) -> tuple[PrFilters, int, str | None]:

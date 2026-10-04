@@ -1,6 +1,7 @@
 import logging
 import sys
 from importlib.resources import files
+from logging.config import dictConfig
 from types import TracebackType
 from typing import Any
 
@@ -62,13 +63,7 @@ def configure_logging(level: str = "INFO") -> None:
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=False,
     )
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(json_formatter())
-    logging.basicConfig(level=level, handlers=[handler], force=True)
-    for name in ("arq", "uvicorn", "uvicorn.error"):
-        logger = logging.getLogger(name)
-        logger.handlers.clear()
-        logger.propagate = True
+    dictConfig({**LOGGING_CONFIG, "root": {**LOGGING_CONFIG["root"], "level": level}})
     logging.getLogger("uvicorn.access").disabled = True
     for name in ("httpx", "httpcore", "botocore", "urllib3"):
         logging.getLogger(name).setLevel(logging.WARNING)

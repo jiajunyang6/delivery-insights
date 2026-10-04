@@ -5,6 +5,8 @@ from insights.domain import CiRun, OwnershipRule, PageResult, RepoRef
 
 
 class SourceAdapter(Protocol):
+    def reset(self) -> None: ...
+
     async def pull_requests_page(
         self, repo: RepoRef, *, cursor: str | None, page_size: int, open_only: bool = False
     ) -> PageResult: ...

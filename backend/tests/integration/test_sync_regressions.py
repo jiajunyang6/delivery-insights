@@ -275,8 +275,8 @@ async def test_prefetch_cannot_overwrite_checkpoint_catchup(context, prefetch):
 
 
 async def test_second_failure_restarts_success_streak(context, github_page):
-    client = context["adapter"].client
-    client.page_size = 12
+    adapter = context["adapter"]
+    adapter.page_size = 12
     route = (
         context["router"]
         .post("https://api.github.com/graphql")
@@ -292,11 +292,11 @@ async def test_second_failure_restarts_success_streak(context, github_page):
     )
     adapter = context["adapter"]
     await adapter.pull_requests_page(RepoRef("a", "b"), cursor="a", page_size=25)
-    assert client.successful_pages == 1 and client.page_size == 12
+    assert adapter.successful_pages == 1 and adapter.page_size == 12
     await adapter.pull_requests_page(RepoRef("a", "b"), cursor="b", page_size=25)
-    assert client.successful_pages == 1 and client.page_size == 6
+    assert adapter.successful_pages == 1 and adapter.page_size == 6
     await adapter.pull_requests_page(RepoRef("a", "b"), cursor="c", page_size=25)
-    assert client.successful_pages == 2 and client.page_size == 25
+    assert adapter.successful_pages == 2 and adapter.page_size == 25
     await adapter.pull_requests_page(RepoRef("a", "b"), cursor="d", page_size=25)
     variables = [orjson.loads(call.request.content)["variables"] for call in route.calls]
     assert [v["pageSize"] for v in variables] == [12, 12, 6, 6, 25]

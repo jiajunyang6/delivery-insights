@@ -5,21 +5,12 @@ from starlette.responses import Response
 
 from insights.analytics.dataset import SnapshotParams
 from insights.api import deps
-from insights.api.caching import Reply
 from insights.api.params import parse_filters, parse_params
+from insights.api.responses import response
 from insights.api.schemas import Pending, PrPage, Snapshot
 from insights.snapshots.service import SnapshotService
 
 router = APIRouter(prefix="/v1/insights", tags=["Insights"])
-
-
-def response(reply: Reply) -> Response:
-    return Response(
-        reply.body,
-        status_code=reply.status,
-        headers=reply.headers,
-        media_type=None if reply.status == 304 else "application/json",
-    )
 
 
 def parameters(

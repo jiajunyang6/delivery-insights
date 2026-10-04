@@ -8,8 +8,6 @@ from tests.factories import at, event, record
 
 from insights.analytics.ci import (
     build_ci,
-    map_runs,
-    mapped_flow_runs,
     union_intervals,
 )
 from insights.analytics.dataset import SnapshotParams
@@ -20,7 +18,7 @@ from insights.domain import CiRun, RepoRef
 from insights.sources.github.actions import fetch_runs
 from insights.sources.github.client import GitHubClient
 from insights_eval.generator import generate
-from insights_eval.pipeline import build_snapshot_from_repo
+from insights_eval.pipeline import build_snapshot_from_repo, map_runs, mapped_flow_runs
 from insights_eval.scenarios import SCENARIOS
 
 

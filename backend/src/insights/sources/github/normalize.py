@@ -1,10 +1,8 @@
 import re
-from dataclasses import asdict, replace
 from datetime import UTC, datetime
-from hashlib import sha1, sha256
+from hashlib import sha1
 from typing import Any
 
-import orjson
 import structlog
 
 from insights.domain import Actor, Event, EventKind, PullRequestRecord
@@ -200,10 +198,3 @@ def normalize_pr(
         files_truncated=bool((node.get("files") or {}).get("pageInfo", {}).get("hasNextPage")),
         events=normalize_events(node["timelineItems"]["nodes"], extra_bots),
     )
-
-
-def content_hash(pr: PullRequestRecord) -> str:
-    normalized = replace(
-        pr, events=tuple(sorted(pr.events, key=lambda e: (e.occurred_at, e.kind, e.dedup_key)))
-    )
-    return sha256(orjson.dumps(asdict(normalized), option=orjson.OPT_SORT_KEYS)).hexdigest()

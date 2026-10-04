@@ -1,7 +1,6 @@
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
-from arq.connections import RedisSettings, create_pool
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from redis.exceptions import RedisError
@@ -14,7 +13,7 @@ from insights.config import Settings, get_settings, split_list
 from insights.db.engine import create_database
 from insights.logging import configure_logging
 from insights.narrative.llm import BedrockClient
-from insights.redis import create_redis
+from insights.redis import connect_arq, create_redis
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -29,13 +28,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.redis = redis
         app.state.arq = None
         app.state.llm = BedrockClient(configuration) if configuration.llm_enabled else None
-        try:
-            redis_settings = RedisSettings.from_dsn(configuration.redis_url)
-            redis_settings.conn_retries = 0
-            redis_settings.conn_timeout = 2
-            app.state.arq = await create_pool(redis_settings)
-        except (RedisError, OSError, TimeoutError):
-            pass
+        with suppress(RedisError, OSError, TimeoutError):
+            app.state.arq = await connect_arq(configuration.redis_url)
         try:
             yield
         finally:

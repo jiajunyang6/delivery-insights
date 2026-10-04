@@ -44,6 +44,7 @@ class RepoData:
     last_synced_at: datetime
     last_sync_status: str = "ok"
     owners: tuple[tuple[str, int], ...] = ()
+    repo_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,7 +1,8 @@
 """I/O boundary: materialize one consistent database view for pure analytics."""
 
 from collections import defaultdict
-from datetime import UTC, datetime, timedelta
+from dataclasses import replace
+from datetime import datetime, timedelta
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,42 +17,59 @@ from insights.db.records import facts_from_row
 from insights.domain import OwnershipRule
 
 
-async def load_dataset(session: AsyncSession, params: SnapshotParams, *, now: datetime) -> Dataset:
+async def load_dataset(
+    session: AsyncSession, params: SnapshotParams, *, now: datetime, metadata: Dataset | None = None
+) -> Dataset:
     """Caller owns a REPEATABLE READ, READ ONLY transaction."""
-    repositories = (
-        await session.scalars(
-            select(Repository)
-            .where(Repository.full_name_lower.in_([r.lower() for r in params.repos]))
-            .order_by(Repository.full_name)
+    if metadata is None:
+        repositories = (
+            await session.scalars(
+                select(Repository)
+                .where(Repository.full_name_lower.in_([r.lower() for r in params.repos]))
+                .order_by(Repository.full_name)
+            )
+        ).all()
+        display = {name.lower(): name for name in params.repos}
+        repo_data = []
+        for repo in repositories:
+            if repo.covered_since is None or repo.last_synced_at is None:
+                raise ValueError("Repository is not ready for analytics")
+            repo_data.append(
+                RepoData(
+                    display[repo.full_name_lower],
+                    repo.data_version,
+                    repo.covered_since,
+                    repo.last_synced_at,
+                    repo.last_sync_status,
+                    repo_id=repo.id,
+                )
+            )
+        if len(repo_data) != len(params.repos):
+            raise ValueError("Repository is missing")
+        metadata = Dataset(
+            tuple(repo_data),
+            (),
+            (),
+            (),
+            params.period_from,
+            params.period_to,
+            current_day=params.period_to == now.date(),
         )
-    ).all()
-    display = {name.lower(): name for name in params.repos}
-    names = {r.id: display[r.full_name_lower] for r in repositories}
+    names = {r.repo_id: r.repo for r in metadata.repos if r.repo_id is not None}
+    if len(names) != len(metadata.repos):
+        raise ValueError("Repository metadata is missing database ids")
     rules: dict[int, list[OwnershipRule]] = defaultdict(list)
     for rule in await session.scalars(select(StoredRule).where(StoredRule.repo_id.in_(names))):
         rules[rule.repo_id].append(
             OwnershipRule(rule.source, rule.pattern, tuple(rule.owners), rule.line_no)
         )
-    repo_data = []
-    for repo in repositories:
-        if repo.covered_since is None or repo.last_synced_at is None:
-            raise ValueError("Repository is not ready for analytics")
-        repo_data.append(
-            RepoData(
-                names[repo.id],
-                repo.data_version,
-                repo.covered_since,
-                repo.last_synced_at,
-                repo.last_sync_status,
-                ownership_counts(rules[repo.id]),
-            )
-        )
-    if len(repo_data) != len(params.repos):
-        raise ValueError("Repository is missing")
-    start = datetime.combine(params.period_from, datetime.min.time(), UTC)
-    end = datetime.combine(params.period_to + timedelta(days=1), datetime.min.time(), UTC)
-    previous_start = start - timedelta(days=(params.period_to - params.period_from).days + 1)
-    as_of = min(end, *(r.last_synced_at for r in repo_data))
+    repo_data = [
+        replace(r, owners=ownership_counts(rules[r.repo_id]))
+        for r in metadata.repos
+        if r.repo_id is not None
+    ]
+    start, end = metadata.start, metadata.to_excl
+    previous_start, as_of = metadata.previous.start, metadata.as_of
     rows = (
         await session.execute(
             select(

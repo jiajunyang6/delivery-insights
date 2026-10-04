@@ -7,10 +7,10 @@ import pytest
 from starlette.datastructures import QueryParams
 from tests.factories import at
 
-from insights.api.caching import decode_cursor, encode_cursor, matches_etag
 from insights.api.errors import ProblemError
 from insights.api.params import PrFilters, parse_filters, parse_params, validate_job_id
 from insights.config import Settings
+from insights.snapshots.caching import decode_cursor, encode_cursor, matches_etag
 
 
 @pytest.mark.parametrize(

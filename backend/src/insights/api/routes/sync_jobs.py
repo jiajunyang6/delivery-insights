@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from insights.api.deps import get_session
 from insights.api.params import validate_job_id
-from insights.api.routes.repos import job_response
+from insights.api.responses import job_response
 from insights.api.schemas import SyncJobResponse
 from insights.db.models import Repository, SyncJob
 from insights.snapshots.service import not_found

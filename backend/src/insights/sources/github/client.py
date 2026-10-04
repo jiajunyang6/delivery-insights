@@ -1,3 +1,22 @@
+from insights.domain import (
+    GitHubAuthError,
+    GitHubError,
+    GitHubNotFoundError,
+    GitHubQueryError,
+    GitHubRateLimited,
+    GitHubTransientError,
+)
+
+__all__ = [
+    "GitHubAuthError",
+    "GitHubClient",
+    "GitHubError",
+    "GitHubNotFoundError",
+    "GitHubQueryError",
+    "GitHubRateLimited",
+    "GitHubTransientError",
+    "RestResponse",
+]
 import asyncio
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
@@ -15,30 +34,6 @@ from insights.config import Settings
 from insights.redis import github_etag_key
 
 logger = structlog.get_logger(__name__)
-
-
-class GitHubError(Exception):
-    """Sanitized upstream error; never includes headers or response bodies."""
-
-
-class GitHubAuthError(GitHubError):
-    pass
-
-
-class GitHubNotFoundError(GitHubError):
-    pass
-
-
-class GitHubRateLimited(GitHubError):  # noqa: N818
-    pass
-
-
-class GitHubQueryError(GitHubError):
-    pass
-
-
-class GitHubTransientError(GitHubError):
-    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,8 +56,6 @@ class GitHubClient:
         self.clock = clock
         self.lock = asyncio.Lock()
         self.rate_limit_remaining: int | None = None
-        self.page_size = settings.graphql_page_size
-        self.successful_pages = 0
         headers = {
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",

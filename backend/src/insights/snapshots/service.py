@@ -15,21 +15,34 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from insights.analytics import ANALYTICS_VERSION, derive_key
 from insights.analytics.dataset import Dataset, RepoData, SnapshotParams
-from insights.analytics.rows import build_pr_rows
-from insights.analytics.snapshot import build_snapshot, canonical, etag, identifiers, rounded
-from insights.api.caching import Reply, alive, cache_ttl, matches_etag, page_rows, snapshot_reply
-from insights.api.errors import ProblemError
-from insights.api.params import PrFilters
+from insights.analytics.snapshot import (
+    build_pr_rows,
+    build_snapshot,
+    canonical,
+    etag,
+    identifiers,
+    rounded,
+)
 from insights.config import Settings
 from insights.db.dataset import load_dataset
 from insights.db.models import Repository, Snapshot, SyncJob
 from insights.redis import rows_key, snapshot_key
+from insights.snapshots.caching import (
+    Reply,
+    alive,
+    cache_ttl,
+    matches_etag,
+    page_rows,
+    snapshot_reply,
+)
+from insights.snapshots.errors import ResourceError
+from insights.snapshots.filters import PrFilters
 
 logger = structlog.get_logger(__name__)
 
 
-def not_found() -> ProblemError:
-    return ProblemError(404, "not-found", "Not found", "The requested resource was not found.")
+def not_found() -> ResourceError:
+    return ResourceError(404, "not-found", "Not found", "The requested resource was not found.")
 
 
 @asynccontextmanager
@@ -140,10 +153,11 @@ class SnapshotService:
                         repo.covered_since,
                         repo.last_synced_at,
                         repo.last_sync_status,
+                        repo_id=repo.id,
                     )
                 )
         if blocked:
-            raise ProblemError(
+            raise ResourceError(
                 503,
                 "data-unavailable",
                 "Data unavailable",
@@ -258,7 +272,7 @@ class SnapshotService:
             if stored is not None:
                 return stored
             load_started = perf_counter()
-            dataset = await load_dataset(session, params, now=self.now)
+            dataset = await load_dataset(session, params, now=self.now, metadata=metadata)
             load_ms = (perf_counter() - load_started) * 1000
             compute_started = perf_counter()
             payload = await asyncio.to_thread(build_snapshot, dataset, params=params)
@@ -308,7 +322,7 @@ class SnapshotService:
                 with suppress(orjson.JSONDecodeError):
                     rows = orjson.loads(cached)
             if rows is None:
-                dataset = await load_dataset(session, params, now=self.now)
+                dataset = await load_dataset(session, params, now=self.now, metadata=metadata)
                 rows = await asyncio.to_thread(build_pr_rows, dataset)
                 await self.cache(self.redis.set(rows_key(sid), canonical(rows), ex=3600))
         page = page_rows(

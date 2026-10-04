@@ -25,6 +25,11 @@ logger = structlog.get_logger(__name__)
 class GitHubAdapter:
     def __init__(self, client: GitHubClient) -> None:
         self.client = client
+        self.reset()
+
+    def reset(self) -> None:
+        self.page_size = self.client.settings.graphql_page_size
+        self.successful_pages = 0
 
     async def pull_requests_page(
         self, repo: RepoRef, *, cursor: str | None, page_size: int, open_only: bool = False
@@ -34,11 +39,11 @@ class GitHubAdapter:
                 repo, cursor=cursor, page_size=page_size, open_only=open_only
             )
         except Exception:
-            self.client.successful_pages = 0
+            self.successful_pages = 0
             raise
-        self.client.successful_pages = min(2, self.client.successful_pages + 1)
-        if self.client.successful_pages == 2:
-            self.client.page_size = self.client.settings.graphql_page_size
+        self.successful_pages = min(2, self.successful_pages + 1)
+        if self.successful_pages == 2:
+            self.page_size = self.client.settings.graphql_page_size
         return page
 
     async def _pull_requests_page(
@@ -46,7 +51,7 @@ class GitHubAdapter:
     ) -> PageResult:
         if not REPO_RE.fullmatch(repo.full_name):
             raise ValueError("Invalid repository")
-        size = min(page_size, self.client.page_size)
+        size = min(page_size, self.page_size)
         while True:
             try:
                 data = await self.client.graphql(
@@ -61,11 +66,11 @@ class GitHubAdapter:
                 )
                 break
             except GitHubTransientError:
-                self.client.successful_pages = 0
+                self.successful_pages = 0
                 if size <= 5:
                     raise
                 size = max(5, size // 2)
-                self.client.page_size = size
+                self.page_size = size
         repository = data.get("repository")
         if not repository:
             raise GitHubNotFoundError("repository_not_found")

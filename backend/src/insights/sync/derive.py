@@ -22,6 +22,13 @@ from insights.db.models import OwnershipRule as StoredRule
 from insights.db.models import PrFact, PrInterval, PullRequest, Repository
 from insights.db.records import facts_from_row, load_records
 from insights.domain import OwnershipRule
+from insights.sync.queue import (
+    enqueue_precompute,
+    enqueue_sync,
+    now_for,
+    run_job,
+    sessions_for,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -159,3 +166,77 @@ async def link_repo(session: AsyncSession, repo_id: int, *, increment_version: b
         update(Repository).where(Repository.id == repo_id).values(links_pending=False)
     )
     return len(changed)
+
+
+async def enqueue_rederivation(ctx: dict[str, Any]) -> None:
+    key = current_key(cast(Settings, ctx["settings"]))
+    async with sessions_for(ctx)() as session:
+        repos = (
+            await session.scalars(
+                select(Repository).where(
+                    Repository.tracked,
+                    Repository.covered_since.is_not(None),
+                    Repository.derived_key.is_distinct_from(key),
+                )
+            )
+        ).all()
+        for repo in repos:
+            await enqueue_sync(ctx["redis"], session, repo.full_name, "rederive", now=now_for(ctx))
+
+
+async def rederive_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
+    settings = cast(Settings, ctx["settings"])
+    key = current_key(settings)
+    async with run_job(ctx, repo_full_name, kind, job_id) as job:
+        if job is None:
+            return "skipped_locked"
+        processed = violations = 0
+        job.stats = {"prs_derived": 0, "invariant_violations": 0}
+        async with sessions_for(ctx)() as session:
+            repo = (
+                await session.scalars(
+                    select(Repository).where(Repository.full_name_lower == repo_full_name.lower())
+                )
+            ).one()
+            complete = repo.derived_key == key and await derivation_complete(session, repo.id, key)
+        if not complete:
+            # Invalidate readiness even when a corrupted row had a current repository key.
+            async with sessions_for(ctx)() as session, session.begin():
+                await session.execute(
+                    update(Repository)
+                    .where(Repository.id == repo.id)
+                    .values(derived_key=None if repo.derived_key == key else repo.derived_key)
+                )
+            after = 0
+            while True:
+                async with sessions_for(ctx)() as session, session.begin():
+                    ids = (
+                        await session.scalars(
+                            pending_prs(repo.id, key)
+                            .where(PullRequest.id > after)
+                            .order_by(PullRequest.id)
+                            .limit(500)
+                        )
+                    ).all()
+                    if not ids:
+                        break
+                    violations += await derive_prs(
+                        session, ids, settings=settings, now=now_for(ctx)
+                    )
+                    after = ids[-1]
+                    processed += len(ids)
+                    job.stats.update(prs_derived=processed, invariant_violations=violations)
+            async with sessions_for(ctx)() as session, session.begin():
+                await link_repo(session, repo.id, increment_version=False)
+                if not await derivation_complete(session, repo.id, key):
+                    raise RuntimeError("Repository derivation is incomplete")
+                await session.execute(
+                    update(Repository)
+                    .where(Repository.id == repo.id)
+                    .values(derived_key=key, data_version=Repository.data_version + 1)
+                )
+        job.stats.update(prs_derived=processed, invariant_violations=violations)
+        await job.finish()
+        if not complete:
+            await enqueue_precompute(ctx, repo)
+    return job.result

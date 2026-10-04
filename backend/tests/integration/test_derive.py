@@ -6,12 +6,11 @@ from tests.factories import at, event, record
 from tests.integration.test_sync import NOW, queued
 
 from insights.analytics.timeline import Interval, TimelineResult, check_invariants, pr_input
-from insights.db.models import PrFact, PrInterval, PullRequest, Repository, SyncJob
+from insights.db.models import PrEvent, PrFact, PrFile, PrInterval, PullRequest, Repository, SyncJob
 from insights.domain import PageResult, RepositoryInfo
-from insights.sync.derive import current_key, derivation_complete, derive_prs
+from insights.sync.derive import current_key, derivation_complete, derive_prs, rederive_repo
 from insights.sync.jobs import incremental_sync_all, reconcile_tracked_repos
 from insights.sync.queue import ensure_repo
-from insights.sync.rederive import rederive_repo
 from insights.sync.store import save_page
 
 pytestmark = pytest.mark.integration
@@ -62,6 +61,8 @@ async def test_transactional_derivation_and_preserved_links(context):
         again = await save_page(session, repo_id, page, now=NOW, settings=context["settings"])
         assert not again.prs_changed
         assert await session.scalar(select(func.count()).select_from(PrInterval)) == 3
+        assert await session.scalar(select(func.count()).select_from(PrFile)) == 1
+        assert await session.scalar(select(func.count()).select_from(PrEvent)) == 2
 
 
 async def test_rederive_change_and_noop_without_github(context):
@@ -91,7 +92,7 @@ async def test_rederive_change_and_noop_without_github(context):
 
 
 async def test_partial_failure_keyset_resume_and_cron_without_token(context, monkeypatch):
-    import insights.sync.rederive as module
+    import insights.sync.derive as module
 
     repo_id, _, _ = await seed(context, 501)
     context["settings"].github_token = None

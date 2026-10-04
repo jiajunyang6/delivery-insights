@@ -116,3 +116,27 @@ class OwnershipRule:
     pattern: str
     owners: tuple[str, ...]
     line_no: int
+
+
+class GitHubError(Exception):
+    """Sanitized upstream error; never includes headers or response bodies."""
+
+
+class GitHubAuthError(GitHubError):
+    pass
+
+
+class GitHubNotFoundError(GitHubError):
+    pass
+
+
+class GitHubRateLimited(GitHubError):  # noqa: N818
+    pass
+
+
+class GitHubQueryError(GitHubError):
+    pass
+
+
+class GitHubTransientError(GitHubError):
+    pass

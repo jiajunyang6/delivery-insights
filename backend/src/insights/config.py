@@ -5,6 +5,8 @@ from typing import Literal, Self
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+MAX_PERIOD_DAYS = 366
+
 REPO_RE = re.compile(
     r"^(?P<owner>[A-Za-z0-9][A-Za-z0-9-]{0,38})/(?P<name>(?!\.{1,2}$)[A-Za-z0-9._-]{1,100})$"
 )
@@ -60,7 +62,7 @@ class Settings(BaseSettings):
         ):
             raise ValueError("LOCATION_DIMENSION must be label:<prefix>, codeowners or directory")
         if any(
-            not value.isdigit() or not 1 <= int(value) <= 366
+            not value.isdigit() or not 1 <= int(value) <= MAX_PERIOD_DAYS
             for value in split_list(self.precompute_days)
         ):
             raise ValueError("PRECOMPUTE_DAYS must contain day counts between 1 and 366")
