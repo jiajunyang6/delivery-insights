@@ -1,6 +1,6 @@
 import type { Audience, DateLimits, Params, RepoStatus } from "../types";
 import { dateRange } from "../format";
-import { periodError } from "../period";
+import { isPeriodSelected, periodError } from "../period";
 import { viewDescriptions, viewLabels } from "../views";
 
 interface Props {
@@ -37,6 +37,7 @@ export function Controls(p: Props) {
           <div className="segmented">
             {[7, 30, 60].map((days) => {
               const range = dateRange(days, p.dateLimits?.latest_to);
+              const selected = isPeriodSelected(p.params, days);
               const unavailable = p.dateLimits
                 ? periodError(range, p.dateLimits)
                 : "Loading supported dates…";
@@ -46,12 +47,8 @@ export function Controls(p: Props) {
                   key={days}
                   disabled={unavailable !== null}
                   title={unavailable ?? undefined}
-                  aria-pressed={range.from === p.params.from && range.to === p.params.to}
-                  className={
-                    range.from === p.params.from && range.to === p.params.to
-                      ? "selected"
-                      : ""
-                  }
+                  aria-pressed={selected}
+                  className={selected ? "selected" : ""}
                   onClick={() => p.setParams({ ...p.params, ...range })}
                 >
                   Last {days} days
