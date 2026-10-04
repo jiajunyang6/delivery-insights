@@ -17,10 +17,9 @@ export function TimeLedgerChart({ snapshot: s }: { snapshot: Snapshot }) {
     ...Object.fromEntries(
       states.map((state) => [
         state,
-        100 *
-          (period === "Current"
-            ? s.time_ledger.states[state].share
-            : (s.time_ledger.states[state].previous_share ?? 0)),
+        period === "Current"
+          ? s.time_ledger.states[state].share
+          : (s.time_ledger.states[state].previous_share ?? 0),
       ]),
     ),
   }));
@@ -41,6 +40,7 @@ export function TimeLedgerChart({ snapshot: s }: { snapshot: Snapshot }) {
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             layout="vertical"
+            stackOffset="expand"
             data={data}
             margin={{ top: 8, right: 14, bottom: 0, left: 0 }}
           >
@@ -51,8 +51,10 @@ export function TimeLedgerChart({ snapshot: s }: { snapshot: Snapshot }) {
             />
             <XAxis
               type="number"
-              domain={[0, 100]}
-              tickFormatter={(v) => v + "%"}
+              domain={[0, 1]}
+              ticks={[0, 0.25, 0.5, 0.75, 1]}
+              allowDataOverflow
+              tickFormatter={percent}
               axisLine={false}
               tickLine={false}
             />
@@ -72,7 +74,7 @@ export function TimeLedgerChart({ snapshot: s }: { snapshot: Snapshot }) {
                     ? s.time_ledger.states[state].pr_hours
                     : s.time_ledger.states[state].previous_pr_hours;
                 return [
-                  percent(Number(v) / 100) +
+                  percent(Number(v)) +
                     " · " +
                     hours(duration) +
                     " PR-hours",

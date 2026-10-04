@@ -4,6 +4,7 @@ from datetime import timedelta
 import pytest
 from pydantic import SecretStr
 from sqlalchemy import delete, func, select
+from tests.fakes import FakeLLMClient
 from tests.integration.test_api import DELIVERY
 from tests.integration.test_api import api as api
 
@@ -11,7 +12,6 @@ from insights.analytics.snapshot import digest
 from insights.api.schemas import Narrative as NarrativeSchema
 from insights.db.models import Narrative, Snapshot
 from insights.narrative.evidence import build_evidence_pack
-from insights.narrative.llm import FakeLLMClient
 from insights.narrative.prompt import PROMPT_VERSION
 from insights.narrative.template import build_template
 from insights.redis import narrative_key, narrative_lock_key

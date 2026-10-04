@@ -9,4 +9,3 @@ frontend/dist/
 backend/reports/
 *.egg-info/
 .idea/
-.gitattributes

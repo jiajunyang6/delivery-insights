@@ -7,6 +7,14 @@ function validDate(value: string): boolean {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
+export function isPeriodSelected(
+  params: Pick<Params, "from" | "to">,
+  days: number,
+): boolean {
+  if (!validDate(params.from) || !validDate(params.to)) return false;
+  return (Date.parse(params.to) - Date.parse(params.from)) / DAY + 1 === days;
+}
+
 export function periodError(
   params: Pick<Params, "from" | "to">,
   limits: DateLimits | null,

@@ -64,6 +64,7 @@ class GitHubClient:
         self.lock = asyncio.Lock()
         self.rate_limit_remaining: int | None = None
         self.page_size = settings.graphql_page_size
+        self.successful_pages = 0
         headers = {
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",

@@ -9,7 +9,7 @@ from sqlalchemy import func, select, update
 from insights.db.models import PrEvent, PrFact, PrFile, PrInterval, PullRequest, Repository, SyncJob
 from insights.redis import sync_lock_key
 from insights.sync.derive import current_key, derivation_complete
-from insights.sync.jobs import incremental_sync_all, reconcile_tracked_repos, sync_repo
+from insights.sync.jobs import SyncRun, incremental_sync_all, reconcile_tracked_repos, sync_repo
 from insights.sync.queue import enqueue_sync
 
 pytestmark = pytest.mark.integration
@@ -108,6 +108,78 @@ async def test_changed_content_replaces_events_and_files(context, github_page):
         assert await session.scalar(select(func.count()).select_from(PullRequest)) == 1
         assert await session.scalar(select(func.count()).select_from(PrEvent)) == 0
         assert (await session.scalars(select(PrFile.path))).all() == ["src/B/new.cs"]
+
+
+async def test_linking_runs_only_for_changed_prs_and_pending_work_survives_failure(
+    context, github_page, monkeypatch
+):
+    from unittest.mock import AsyncMock
+
+    import insights.sync.jobs as jobs
+
+    original = jobs.link_repo
+    linking = AsyncMock(wraps=original)
+    monkeypatch.setattr(jobs, "link_repo", linking)
+    route = context["router"].post("https://api.github.com/graphql")
+    route.respond(200, json=github_page)
+    job, _ = await queued(context)
+    assert await sync_repo(context, "a/b", "backfill", str(job.id)) == "succeeded"
+    assert linking.await_count == 1
+    repo, _ = await load_state(context)
+    assert not repo.links_pending
+
+    # No-op pages skip the scan; changed titles may alter revert/reland matching.
+    assert await sync_repo(context, "a/b", "incremental", str(job.id)) == "succeeded"
+    assert linking.await_count == 1
+    github_page["data"]["repository"]["pullRequests"]["nodes"][0]["title"] = "Changed title"
+    route.respond(200, json=github_page)
+    assert await sync_repo(context, "a/b", "incremental", str(job.id)) == "succeeded"
+    assert linking.await_count == 2
+    repo, _ = await load_state(context)
+    previous_watermark = repo.sync_watermark
+
+    # A new PR is committed, but the prefetched next page fails before checkpointing.
+    route.mock(
+        side_effect=[
+            httpx.Response(200, json=response_page(github_page, 2, 0, "next", True)),
+            httpx.Response(401),
+        ]
+    )
+    assert await sync_repo(context, "a/b", "incremental", str(job.id)) == "failed"
+    repo, _ = await load_state(context)
+    assert repo.links_pending and linking.await_count == 2
+    assert repo.sync_watermark == previous_watermark
+    route.respond(200, json=response_page(github_page, 2, 0))
+    assert await sync_repo(context, "a/b", "incremental", str(job.id)) == "succeeded"
+    repo, _ = await load_state(context)
+    assert not repo.links_pending and linking.await_count == 3
+
+
+async def test_failed_page_write_does_not_advance_backfill_cursor(
+    context, github_page, monkeypatch
+):
+    import insights.sync.jobs as jobs
+
+    job, _ = await queued(context)
+    repo, _ = await load_state(context)
+    run = SyncRun(context, repo, str(job.id))
+    context["router"].post("https://api.github.com/graphql").respond(
+        200, json=response_page(github_page, 1, 0, "next", True)
+    )
+    original = jobs.save_page
+
+    async def fail_after_insert(*args, **kwargs):
+        await original(*args, **kwargs)
+        raise RuntimeError("rollback")
+
+    monkeypatch.setattr(jobs, "save_page", fail_after_insert)
+    with pytest.raises(RuntimeError, match="rollback"):
+        await run.backfill()
+    repo, _ = await load_state(context)
+    assert repo.backfill_cursor is None and not repo.links_pending
+    assert repo.covered_since is None and run.stats["pages"] == 0
+    async with context["session_factory"]() as session:
+        assert await session.scalar(select(func.count()).select_from(PullRequest)) == 0
 
 
 async def test_null_body_is_saved_and_watermark_advances(context, github_page):

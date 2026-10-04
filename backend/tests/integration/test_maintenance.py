@@ -7,9 +7,9 @@ from tests.integration.test_derive import seed
 from tests.integration.test_sync import NOW
 
 from insights.analytics.dataset import SnapshotParams
-from insights.db.models import Snapshot, SyncJob
+from insights.db.models import Repository, Snapshot, SyncJob
 from insights.redis import rows_key, snapshot_key
-from insights.snapshot_service import SnapshotService
+from insights.snapshots.service import SnapshotService
 from insights.sync.derive import current_key
 from insights.sync.maintenance import housekeeping, precompute_snapshots
 from insights.sync.queue import enqueue_sync
@@ -61,3 +61,25 @@ async def test_precompute_skips_unready_without_job_rows(context):
     async with context["session_factory"]() as session:
         assert (await session.scalars(select(Snapshot))).all() == []
         assert (await session.scalars(select(SyncJob))).all() == []
+
+
+async def test_precompute_covers_dashboard_presets(context):
+    await seed(context)
+    async with context["session_factory"]() as session, session.begin():
+        await session.execute(
+            update(Repository).values(
+                covered_since=at(-1000),
+                last_synced_at=NOW,
+                last_open_sweep_at=NOW,
+                derived_key=current_key(context["settings"]),
+            )
+        )
+    await precompute_snapshots(context, "a/b")
+    async with context["session_factory"]() as session:
+        snapshots = (await session.scalars(select(Snapshot))).all()
+        assert sorted((row.period_to - row.period_from).days + 1 for row in snapshots) == [
+            7,
+            30,
+            60,
+        ]
+        assert all(row.period_to == NOW.date() for row in snapshots)

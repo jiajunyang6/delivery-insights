@@ -64,6 +64,7 @@ Settings come from `.env`; never commit it. Without `.env`, code defaults apply 
 | `AWS_REGION`, `BEDROCK_MODEL_ID` | `us-west-2`, `us.anthropic.claude-sonnet-4-6` | Bedrock Converse target |
 | `TRACKED_REPOS` | `bevyengine/bevy` | Comma-separated allowlist, e.g. `bevyengine/bevy,prometheus/prometheus` |
 | `BACKFILL_DAYS` | `120` | History to collect (30–365); the 60-day view needs at least 120 for a full comparison |
+| `PRECOMPUTE_DAYS` | `7,30,60` | Snapshot windows warmed after a successful sync changes repository data |
 | `LOCATION_DIMENSION` | `label:area-` | Area grouping: labels, then CODEOWNERS, then directories |
 | `CI_SOURCE`, `CI_COMPLETE` | `actions`, `false` | GitHub Actions CI waiting; `false` caps CI-hypothesis confidence |
 

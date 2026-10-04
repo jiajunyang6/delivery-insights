@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { dateRange } from "../src/format.ts";
-import { periodError } from "../src/period.ts";
+import { isPeriodSelected, periodError } from "../src/period.ts";
 
 const limits = {
   earliest_from: "2026-09-03",
@@ -44,4 +44,36 @@ test("invalid calendar dates, reversed dates, and overlong periods cannot submit
   assert.match(periodError({ from: "2025-01-01", to: limits.latest_to }, {
     ...limits, earliest_from: "2025-01-01",
   })!, /at most 366 days/);
+});
+
+test("restored 30-day URL range stays selected after the latest UTC date advances", () => {
+  const query = new URLSearchParams("from=2026-09-04&to=2026-10-03");
+  const restored = { from: query.get("from")!, to: query.get("to")! };
+  assert.notDeepEqual(restored, dateRange(30, "2026-10-04"));
+  assert.equal(isPeriodSelected(restored, 30), true);
+  assert.equal(isPeriodSelected(restored, 7), false);
+  assert.equal(isPeriodSelected(restored, 60), false);
+});
+
+test("each preset matches inclusive UTC dates across month and leap-year boundaries", () => {
+  for (const to of ["2026-10-04", "2024-03-01", "2026-01-01"]) {
+    for (const days of [7, 30, 60]) {
+      const range = dateRange(days, to);
+      for (const candidate of [7, 30, 60])
+        assert.equal(isPeriodSelected(range, candidate), candidate === days);
+    }
+  }
+});
+
+test("custom lengths and invalid dates do not select a preset", () => {
+  for (const range of [
+    { from: "2026-09-05", to: "2026-10-03" },
+    { from: "2026-10-03", to: "2026-09-04" },
+    { from: "2026-02-30", to: "2026-03-29" },
+    { from: "", to: "2026-10-03" },
+    { from: "2026-09-04", to: "" },
+  ]) {
+    for (const days of [7, 30, 60])
+      assert.equal(isPeriodSelected(range, days), false);
+  }
 });

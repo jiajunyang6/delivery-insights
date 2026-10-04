@@ -155,4 +155,7 @@ async def link_repo(session: AsyncSession, repo_id: int, *, increment_version: b
                 .where(Repository.id == repo_id)
                 .values(data_version=Repository.data_version + 1)
             )
+    await session.execute(
+        update(Repository).where(Repository.id == repo_id).values(links_pending=False)
+    )
     return len(changed)
