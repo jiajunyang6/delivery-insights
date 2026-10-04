@@ -7,7 +7,7 @@
 - `backend/src/insights/snapshots/`: shared snapshot orchestration, caching, filters and domain errors; services must not import `api.*`.
 - `backend/src/insights/sync/queue.py`: job lifecycle/locking; `sync/derive.py`: derivation and rederivation. PR rows live in `analytics/snapshot.py`; pointer resolution stays independent.
 - `frontend/src/`: React/TypeScript dashboard, components, shared `format.ts`, `hooks/useAbortable.ts`, and CSS assets.
-- `docs/plan/`: requirements; `docs/DECISIONS.md`: architectural decisions; `docs/EVALUATION.md`: evaluation records.
+- `docs/plan/PLAN.md`: consolidated historical requirements; `docs/DECISIONS.md`: architectural decisions; `docs/EVALUATION.md`: evaluation records.
 - `scripts/smoke.sh`: HTTP smoke checks; `.github/workflows/ci.yml`: CI gates.
 
 ## Build, Test, and Development Commands

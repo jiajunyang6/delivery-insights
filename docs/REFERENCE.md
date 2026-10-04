@@ -1,7 +1,7 @@
 # Technical reference
 
 Detailed behavior moved out of the README. Start with the [README](../README.md) and [NOTES](../NOTES.md).
-Current contracts are in code and this reference; [plan/](plan/00-overview.md) retains historical design input. Implementation decisions are in [DECISIONS.md](DECISIONS.md).
+Current contracts are in code and this reference; [the consolidated plan](plan/PLAN.md) retains historical design input. Implementation decisions are in [DECISIONS.md](DECISIONS.md).
 
 ## The insight and why this metric
 
@@ -62,7 +62,7 @@ It may call Bedrock for an uncached narrative; heavy analytics and boto3 run in 
 ## API
 
 OpenAPI is available at `/openapi.json` and `/docs`; the historical design is
-[06-api.md](plan/06-api.md). Dates and timestamps use UTC.
+[API contract chapter](plan/PLAN.md#plan-06). Dates and timestamps use UTC.
 `from` and `to` are inclusive dates; comparison uses the preceding equal-length period. `as_of` is capped by the least recent repository sync watermark.
 
 | Method | Path | Purpose |
@@ -420,5 +420,5 @@ The GitHub Actions workflow applies backend lint/tests/eval and frontend typeche
 | `backend/src/insights/snapshots/` | Shared orchestration, caching, filtering and domain errors |
 | `backend/src/insights/sync/queue.py` | Shared job lifecycle, locks, queue helpers and success lookup |
 | `scripts/` | HTTP smoke entrypoint |
-| `docs/plan/` | Historical design input |
+| `docs/plan/PLAN.md` | Consolidated historical design input |
 | `docs/` | Decisions, acceptance evidence and evaluation records in Markdown |

@@ -1,6 +1,6 @@
 # Decisions
 
-Implementation decisions that deviate from, or fill gaps in, [the plan](plan/00-overview.md).
+Implementation decisions that deviate from, or fill gaps in, [the plan](plan/PLAN.md).
 This is the current set; superseded entries remain in Git history.
 
 ## Product scope

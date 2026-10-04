@@ -79,7 +79,7 @@ per-decision log: [docs/DECISIONS.md](docs/DECISIONS.md).
 ## 4. How AI was used
 
 - **Claude (Anthropic):** brainstorming, the design document, and the implementation plan in
-  `docs/plan/`, written as instructions for a coding agent. Later it reviewed the implementation
+  `docs/plan/PLAN.md`, written as instructions for a coding agent. Later it reviewed the implementation
   diffs and found issues such as a causal-wording validator loophole, sync stalls on malformed
   PRs and stale pagination after sync. It also implemented the narrative abstention and
   hypothesis-card improvements.
