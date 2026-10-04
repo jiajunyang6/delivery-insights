@@ -1,12 +1,14 @@
 import asyncio
 from datetime import timedelta
 
+import orjson
 import pytest
 from pydantic import SecretStr
 from sqlalchemy import delete, func, select
 from tests.fakes import FakeLLMClient
 from tests.integration.test_api import DELIVERY
 from tests.integration.test_api import api as api
+from tests.integration.test_sync import NOW
 
 from insights.analytics.snapshot import digest
 from insights.api.schemas import Narrative as NarrativeSchema
@@ -14,6 +16,7 @@ from insights.db.models import Narrative, Snapshot
 from insights.narrative.evidence import build_evidence_pack
 from insights.narrative.llm import LLMUnavailable
 from insights.narrative.prompt import PROMPT_VERSION
+from insights.narrative.service import check_llm
 from insights.narrative.template import build_template
 from insights.redis import llm_error_key, narrative_key, narrative_lock_key
 
@@ -294,3 +297,17 @@ async def test_bedrock_failures_are_recorded_for_setup_and_cleared_on_success(ap
     app.state.llm = FakeLLMClient([valid])
     assert (await client.get(url)).json()["meta"]["generated_by"] == "llm"
     assert not await ctx["redis"].exists(llm_error_key())
+
+
+async def test_startup_check_records_and_clears_the_bedrock_status(api):
+    _, _, _, ctx = api
+    settings, redis = ctx["settings"], ctx["redis"]
+    llm = FakeLLMClient([])
+    llm.ping_error = LLMUnavailable("UnrecognizedClientException")
+    await check_llm(llm, redis, settings, NOW)
+    stored = orjson.loads(await redis.get(llm_error_key()))
+    assert stored["code"] == "UnrecognizedClientException"
+    assert stored["model_id"] == settings.bedrock_model_id
+    llm.ping_error = None
+    await check_llm(llm, redis, settings, NOW)
+    assert not await redis.exists(llm_error_key())

@@ -13,6 +13,9 @@ class StubLLMClient:
 
     model_id = "stub"
 
+    async def ping(self) -> None:
+        """No model to reach; the stub is always available."""
+
     async def submit(
         self, *, system: str, messages: list[dict[str, Any]], tool_spec: dict[str, Any]
     ) -> LLMReply:

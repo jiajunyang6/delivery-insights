@@ -10,6 +10,7 @@ class FakeLLMClient:
     ) -> None:
         self.model_id = model_id
         self.script = iter(script)
+        self.ping_error: Exception | None = None
         self.calls: list[dict[str, Any]] = []
 
     async def submit(
@@ -35,3 +36,7 @@ class FakeLLMClient:
             ],
         }
         return LLMReply(deepcopy(item), identifier, message, 0, 0)
+
+    async def ping(self) -> None:
+        if self.ping_error:
+            raise self.ping_error

@@ -59,7 +59,7 @@ export function setupItems(setup: SetupStatus): SetupItem[] {
         ? `Bedrock did not accept ${where} (${code}). Check BEDROCK_MODEL_ID and AWS_REGION.`
         : ENDPOINT_ERRORS.has(code)
           ? `Could not connect to Bedrock in region ${llm.region} (${code}), so BEDROCK_MODEL_ID was not checked yet. Check AWS_REGION and network or proxy access from the containers.`
-          : `The last Bedrock request failed (${code}); narratives fell back to the template.`;
+          : `The last Bedrock request failed (${code}); narratives fell back to the template. Check AWS_BEARER_TOKEN_BEDROCK, BEDROCK_MODEL_ID and AWS_REGION.`;
     items.push({ level: "problem", text });
   }
   return items;

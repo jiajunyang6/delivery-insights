@@ -57,6 +57,10 @@ class TracedClient:
         self.usage.record(reply)
         return reply
 
+    async def ping(self) -> None:
+        """Delegate the settings check; evaluation runs do not call it."""
+        await self.client.ping()
+
 
 async def evaluate(
     client: LLMClient, *, seeds: list[int], scenarios: list[str]
