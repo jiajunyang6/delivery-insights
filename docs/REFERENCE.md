@@ -218,7 +218,7 @@ Set `CI_COMPLETE=true` only if Actions telemetry covers the CI you intend to mea
 
 ## Operations
 
-`/v1/repos` also returns `setup`: whether `GITHUB_TOKEN` and `AWS_BEARER_TOKEN_BEDROCK` are set (never their values), sync statuses that point to configuration (`missing_token`, `auth_error`, `not_found`), the Bedrock region and model ID, and the latest Bedrock error code, cleared after the next successful call. The dashboard turns these into a Configuration notice that names the `.env` variable to fix.
+`/v1/repos` also returns `setup`: whether `GITHUB_TOKEN` and `AWS_BEARER_TOKEN_BEDROCK` are set (never their values), sync statuses that point to configuration (`missing_token`, `auth_error`, `not_found`), the Bedrock region and model ID, and the latest Bedrock error code, cleared after the next successful call and ignored once `BEDROCK_MODEL_ID` or `AWS_REGION` changes. A connection error (`EndpointConnectionError`) means the endpoint was not reached, so the model ID was not checked; an invalid model ID returns `ValidationException`. The dashboard turns these into a Configuration notice that names the `.env` variable to fix.
 
 Use `/healthz` for liveness and `/readyz` for dependency readiness. Read `/v1/repos`
 before judging missing data. Snapshots/narratives are retained for seven days and sync-job

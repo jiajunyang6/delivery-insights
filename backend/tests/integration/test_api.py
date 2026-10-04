@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import httpx
+import orjson
 import pytest
 from pydantic import SecretStr
 from redis.exceptions import ConnectionError as RedisConnectionError
@@ -349,8 +350,17 @@ async def test_repos_report_setup_problems_without_secret_values(api):
         await session.execute(update(Repository).values(last_sync_status="auth_error"))
     ctx["settings"].github_token = None
     ctx["settings"].aws_bearer_token_bedrock = SecretStr("bedrock-secret-value")
+    settings = ctx["settings"]
     await ctx["redis"].set(
-        llm_error_key(), b'{"code": "AccessDeniedException", "at": "2026-01-02T03:04:05Z"}'
+        llm_error_key(),
+        orjson.dumps(
+            {
+                "code": "AccessDeniedException",
+                "at": "2026-01-02T03:04:05Z",
+                "model_id": settings.bedrock_model_id,
+                "region": settings.aws_region,
+            }
+        ),
     )
     response = await client.get("/v1/repos")
     RepoList.model_validate(response.json())

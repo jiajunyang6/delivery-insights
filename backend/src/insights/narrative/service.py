@@ -293,9 +293,17 @@ class NarrativeService:
 
     async def record_llm_status(self, result: NarrativeResult) -> None:
         """Remember the latest Bedrock failure for the setup hint; clear it after a success."""
-        redis = self.snapshots.redis
+        redis, settings = self.snapshots.redis, self.snapshots.settings
         if result.llm_error:
-            value = orjson.dumps({"code": result.llm_error, "at": iso(self.snapshots.now)})
+            value = orjson.dumps(
+                {
+                    "code": result.llm_error,
+                    "at": iso(self.snapshots.now),
+                    # The setup hint ignores errors recorded under a different model or region.
+                    "model_id": settings.bedrock_model_id,
+                    "region": settings.aws_region,
+                }
+            )
             await self.snapshots.cache(redis.set(llm_error_key(), value, ex=7 * 86400))
         elif result.llm_reached:
             await self.snapshots.cache(redis.delete(llm_error_key()))

@@ -107,6 +107,13 @@ async def setup_status(settings: Settings, redis: Redis, items: list[RepoStatus]
     with suppress(RedisError, OSError, TimeoutError, orjson.JSONDecodeError, TypeError):
         raw = await redis.get(llm_error_key())
         last_error = orjson.loads(raw) if raw else None
+    # An error recorded before BEDROCK_MODEL_ID or AWS_REGION changed says nothing about the
+    # current settings, so it is dropped until a call with them fails again.
+    if last_error and (
+        last_error.get("model_id") != settings.bedrock_model_id
+        or last_error.get("region") != settings.aws_region
+    ):
+        last_error = None
     token = settings.github_token
     return SetupStatus(
         github=GithubSetup(

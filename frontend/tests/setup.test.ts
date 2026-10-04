@@ -77,3 +77,12 @@ test("an active sync after a fix shows progress instead of the old failure", () 
   });
   assert.match(idle[0].text, /no new sync is queued/);
 });
+
+test("a connection failure says the model ID was not checked yet", () => {
+  const [item] = setupItems({
+    ...healthy,
+    llm: { ...healthy.llm, last_error: "EndpointConnectionError" },
+  });
+  assert.match(item.text, /Could not connect to Bedrock in region us-west-2/);
+  assert.match(item.text, /BEDROCK_MODEL_ID was not checked yet/);
+});

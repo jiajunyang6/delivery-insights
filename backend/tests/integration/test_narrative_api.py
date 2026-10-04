@@ -285,6 +285,10 @@ async def test_bedrock_failures_are_recorded_for_setup_and_cleared_on_success(ap
     assert failed.json()["meta"]["fallback_reason"] == "llm_error"
     setup = (await client.get("/v1/repos")).json()["setup"]["llm"]
     assert setup["last_error"] == "AccessDeniedException" and setup["last_error_at"]
+    model = ctx["settings"].bedrock_model_id
+    ctx["settings"].bedrock_model_id = "us.anthropic.other-model"
+    assert (await client.get("/v1/repos")).json()["setup"]["llm"]["last_error"] is None
+    ctx["settings"].bedrock_model_id = model
     for key in await ctx["redis"].keys("di:narr:*"):
         await ctx["redis"].delete(key)
     app.state.llm = FakeLLMClient([valid])
