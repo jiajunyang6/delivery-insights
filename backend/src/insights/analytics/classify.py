@@ -22,12 +22,9 @@ LINK_FIELDS = (
     "reverts_pr_id",
     "reverted_by_pr_id",
     "reverted_at",
-    "is_reland",
     "reland_of_pr_id",
-    "superseded_by_pr_id",
     "close_class",
     "late_rejection",
-    "author_open_prs_at_ready",
 )
 
 
@@ -204,9 +201,7 @@ def link_reverts(
                 original = entries[index]
         if is_revert:
             if original and output[original.pr_id].is_revert:
-                facts = replace(
-                    facts, is_reland=True, reland_of_pr_id=output[original.pr_id].reverts_pr_id
-                )
+                facts = replace(facts, reland_of_pr_id=output[original.pr_id].reverts_pr_id)
             else:
                 facts = replace(
                     facts,
@@ -247,7 +242,7 @@ def link_relands_and_closes(
             ).strip('" ')
             if original_id is None:
                 original_id = reverted_by_title.get(quoted[1] if quoted else raw_title)
-            facts = replace(facts, is_reland=True, reland_of_pr_id=original_id)
+            facts = replace(facts, reland_of_pr_id=original_id)
         if pr.state == "CLOSED" and pr.closed_at and is_flow(facts):
             author = pr.author.login.lower() if pr.author.login else None
             superseded: list[tuple[datetime, int | None]] = []
@@ -299,9 +294,6 @@ def link_relands_and_closes(
                 final_close = max(closing, key=lambda e: e.occurred_at, default=None)
                 if final_close and human_event(final_close, pr.author.login):
                     close_class = "rejected"
-            successor = (
-                min(superseded, key=lambda pair: (pair[0], pair[1] or 0))[1] if superseded else None
-            )
             late = close_class == "rejected" and (
                 bool(
                     facts.ready_at
@@ -309,9 +301,7 @@ def link_relands_and_closes(
                 )
                 or facts.review_rounds >= LATE_REJECTION_ROUNDS
             )
-            facts = replace(
-                facts, close_class=close_class, superseded_by_pr_id=successor, late_rejection=late
-            )
+            facts = replace(facts, close_class=close_class, late_rejection=late)
         output[item.pr_id] = facts
 
 
@@ -328,9 +318,7 @@ def link_prs(
             reverts_pr_id=None,
             reverted_by_pr_id=None,
             reverted_at=None,
-            is_reland=False,
             reland_of_pr_id=None,
-            superseded_by_pr_id=None,
             close_class=None,
             late_rejection=False,
         )

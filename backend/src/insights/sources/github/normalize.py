@@ -170,9 +170,7 @@ def normalize_pr(
 ) -> PullRequestRecord:
     node = remove_nulls(node)
     author = node.get("author") or {}
-    typename = author.get("__typename", "Unknown")
     return PullRequestRecord(
-        source_id=node["id"],
         number=node["number"],
         title=node["title"],
         body_excerpt=(node.get("body") or "")[:4000],
@@ -180,7 +178,6 @@ def normalize_pr(
         state=node["state"],
         is_draft=node["isDraft"],
         author=actor(author, extra_bots),
-        author_type=typename if typename in {"User", "Bot", "Mannequin"} else "Unknown",
         author_association=node["authorAssociation"],
         base_ref=node["baseRefName"],
         head_ref=node["headRefName"],
@@ -188,13 +185,10 @@ def normalize_pr(
         updated_at=parse_time(node["updatedAt"]),
         closed_at=parse_time(node["closedAt"]) if node.get("closedAt") else None,
         merged_at=parse_time(node["mergedAt"]) if node.get("mergedAt") else None,
-        merged_by=(node.get("mergedBy") or {}).get("login"),
         merge_commit_oid=(node.get("mergeCommit") or {}).get("oid"),
         additions=node["additions"],
         deletions=node["deletions"],
-        changed_files=node["changedFiles"],
         labels=tuple(dict.fromkeys(n["name"] for n in node["labels"]["nodes"])),
         files=tuple(dict.fromkeys(n["path"] for n in (node.get("files") or {}).get("nodes", []))),
-        files_truncated=bool((node.get("files") or {}).get("pageInfo", {}).get("hasNextPage")),
         events=normalize_events(node["timelineItems"]["nodes"], extra_bots),
     )

@@ -19,7 +19,6 @@ def period_records():
     def old(number, events):
         return record(
             number=number,
-            source_id=f"PR{number}",
             url=f"https://github.com/a/b/pull/{number}",
             created_at=at(-200),
             updated_at=at(60),

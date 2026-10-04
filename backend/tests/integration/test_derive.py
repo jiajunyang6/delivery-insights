@@ -20,7 +20,6 @@ async def seed(ctx, count=1):
     records = tuple(
         record(
             number=i,
-            source_id=f"PR{i}",
             title=f"Title {i}",
             events=(
                 event("review", 2, review_id=f"r{i}"),
@@ -52,11 +51,11 @@ async def test_transactional_derivation_and_preserved_links(context):
             fact.state_at_close,
         )
         assert not check_invariants(result, pr_input(page.prs[0]))
-        fact.is_reland = True
+        fact.reland_of_pr_id = saved.pr_ids[0]
         await session.flush()
         await derive_prs(session, saved.pr_ids, settings=context["settings"], now=NOW)
         await session.refresh(fact)
-        assert fact.is_reland
+        assert fact.reland_of_pr_id == saved.pr_ids[0]
         assert await derivation_complete(session, repo_id, current_key(context["settings"]))
         again = await save_page(session, repo_id, page, now=NOW, settings=context["settings"])
         assert not again.prs_changed

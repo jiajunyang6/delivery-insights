@@ -57,13 +57,6 @@ def compute_facts(
             approvers.setdefault(event.actor.login.lower(), event.occurred_at)
     approval_times = sorted(approvers.values())
     first_commit = first_commit_at(events)
-    response_times = [
-        e.occurred_at
-        for e in events
-        if e.kind == EventKind.COMMENT and human_event(e, pr.author.login)
-    ]
-    if first_review:
-        response_times.append(first_review)
     locations, location_source = locations_for(
         pr, location_dimension, directory_depth, location_rules
     )
@@ -79,7 +72,6 @@ def compute_facts(
         in {"CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", "FIRST_TIMER", "NONE"},
         first_commit_at=first_commit,
         ready_at=timeline.ready_at,
-        first_response_at=min(response_times, default=None),
         first_review_at=first_review,
         first_approval_at=first_approval,
         approved_at=timeline.approved_at,
@@ -98,9 +90,6 @@ def compute_facts(
             for e in reviews
         ),
         commits_after_first_review=count_events(events, {EventKind.COMMIT}, after=first_review),
-        force_pushes_after_first_review=count_events(
-            events, {EventKind.FORCE_PUSH}, after=first_review
-        ),
         updates_after_approval=count_events(
             events,
             {EventKind.COMMIT, EventKind.FORCE_PUSH},
@@ -124,6 +113,4 @@ def compute_facts(
         location_source=location_source,
         state_at_close=timeline.state_at_end,
         ci_covered=ci_covered,
-        ready_weekday=timeline.ready_at.weekday() if timeline.ready_at else None,
-        ready_hour=timeline.ready_at.hour if timeline.ready_at else None,
     )

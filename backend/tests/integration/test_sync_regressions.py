@@ -8,17 +8,14 @@ from unittest.mock import AsyncMock
 import httpx
 import orjson
 import pytest
-from alembic import command
-from alembic.config import Config
-from sqlalchemy import select, update
+from sqlalchemy import select
 from tests.factories import at, event, record
 from tests.integration.test_sync import NOW, load_state, queued
 
 from insights.db.models import PrEvent, PrFact, PrFile, PrInterval, PullRequest, Repository
 from insights.domain import PageResult, RepoRef, RepositoryInfo
-from insights.sync.derive import current_key, link_repo
+from insights.sync.derive import link_repo
 from insights.sync.jobs import SyncRun
-from insights.sync.queue import ensure_repo
 from insights.sync.store import save_page
 
 pytestmark = pytest.mark.integration
@@ -39,7 +36,6 @@ def page(*records, cursor=None, more=False):
 
 def revert(merged=True):
     return record(
-        source_id="PR2",
         number=2,
         title='Revert "Change"',
         body_excerpt="Reverts a/b#1",
@@ -62,48 +58,6 @@ async def finalize(ctx, repo_id, job_id):
     run = SyncRun(ctx, repo, str(job_id))
     run.incremental = AsyncMock()
     await run.checkpoint()
-
-
-@pytest.mark.parametrize("legacy_revision", ["0001_initial", "0002_links_pending"])
-async def test_upgrade_existing_data_keeps_pending_links(context, legacy_revision):
-    job, _ = await queued(context)
-    repo, _ = await load_state(context)
-    saved = await save(context, repo.id, page(record(), revert()))
-    async with context["session_factory"]() as session, session.begin():
-        await session.execute(
-            update(Repository).values(
-                covered_since=at(-100),
-                derived_key=current_key(context["settings"]),
-                last_synced_at=NOW - timedelta(hours=1),
-                last_sync_status="failed",
-            )
-        )
-        version = await session.scalar(select(Repository.data_version))
-        empty = await ensure_repo(session, "empty/repo", NOW)
-        empty_id = empty.id
-    # Verify both pre-flag databases and databases that already applied the old flag migration.
-    await context["engine"].dispose()
-    await asyncio.to_thread(command.downgrade, Config("alembic.ini"), legacy_revision)
-    if legacy_revision == "0002_links_pending":
-        async with context["session_factory"]() as session, session.begin():
-            await session.execute(update(Repository).values(links_pending=False))
-    await context["engine"].dispose()
-    await asyncio.to_thread(command.upgrade, Config("alembic.ini"), "head")
-    async with context["session_factory"]() as session:
-        upgraded = await session.get(Repository, repo.id)
-        assert upgraded.data_version == version
-        assert (
-            await session.scalars(select(PullRequest.id).order_by(PullRequest.number))
-        ).all() == list(saved.pr_ids)
-        assert upgraded.links_pending is True
-        assert not (await session.get(Repository, empty_id)).links_pending
-    # Simulate the next sync seeing no new PRs; all fact identities are already current.
-    await finalize(context, repo.id, job.id)
-    async with context["session_factory"]() as session:
-        original = await session.get(PrFact, saved.pr_ids[0])
-        assert original.reverted_by_pr_id == saved.pr_ids[1]
-        assert original.reverted_at == at(30)
-        assert not (await session.get(Repository, repo.id)).links_pending
 
 
 async def test_existing_revert_merge_relinks_original(context):
@@ -135,7 +89,10 @@ async def test_stale_page_preserves_events_files_facts_and_data_version(context)
     await finalize(context, repo.id, job.id)
     async with context["session_factory"]() as session:
         version = (await session.get(Repository, repo.id)).data_version
-        computed_at = (await session.get(PrFact, saved.pr_ids[0])).computed_at
+        facts_before = {
+            column.name: getattr(await session.get(PrFact, saved.pr_ids[0]), column.name)
+            for column in PrFact.__table__.columns
+        }
         intervals = (await session.scalars(select(PrInterval))).all()
         expected_intervals = [(row.seq, row.state, row.start_at, row.end_at) for row in intervals]
     ignored = await save(context, repo.id, page(stale))
@@ -147,7 +104,10 @@ async def test_stale_page_preserves_events_files_facts_and_data_version(context)
         assert (await session.get(PullRequest, saved.pr_ids[0])).title == "fresh"
         assert (await session.scalars(select(PrFile.path))).all() == ["fresh.py"]
         assert len((await session.scalars(select(PrEvent))).all()) == 1
-        assert (await session.get(PrFact, saved.pr_ids[0])).computed_at == computed_at
+        stored_fact = await session.get(PrFact, saved.pr_ids[0])
+        assert {
+            column.name: getattr(stored_fact, column.name) for column in PrFact.__table__.columns
+        } == facts_before
         intervals = (await session.scalars(select(PrInterval))).all()
         assert [
             (row.seq, row.state, row.start_at, row.end_at) for row in intervals
@@ -187,7 +147,6 @@ async def test_prefetch_cannot_overwrite_checkpoint_catchup(context, prefetch):
     run = SyncRun(context, repo, str(job.id))
     downloaded = asyncio.Event()
     old = record(
-        source_id="PR2",
         number=2,
         title="stale",
         state="OPEN",
@@ -205,7 +164,6 @@ async def test_prefetch_cannot_overwrite_checkpoint_catchup(context, prefetch):
     )
     tail = replace(
         first,
-        source_id="PR3",
         number=3,
         created_at=NOW - timedelta(days=132),
         updated_at=NOW - timedelta(days=130),
@@ -216,7 +174,6 @@ async def test_prefetch_cannot_overwrite_checkpoint_catchup(context, prefetch):
     recent = [
         replace(
             old,
-            source_id=f"PR{i}",
             number=i,
             title="Other update",
             updated_at=NOW + timedelta(minutes=5),

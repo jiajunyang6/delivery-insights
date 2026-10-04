@@ -28,8 +28,8 @@ pytestmark = pytest.mark.integration
 async def test_ci_number_and_sha_mapping_rederive_idempotency_and_pipeline_parity(context):
     repo_id, _, page = await seed(context, 2)
     records = (
-        record(number=1, source_id="PR1", events=(event("commit", 0),)),
-        record(number=2, source_id="PR2"),
+        record(number=1, events=(event("commit", 0),)),
+        record(number=2),
     )
     page = replace(page, prs=records)
     runs = [run(1, 0, 5, pr_numbers=()), run(2, 1, 6, pr_numbers=(2,), head_sha="b" * 40)]

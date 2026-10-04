@@ -268,7 +268,6 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
         file_count = int(rng.integers(1, 6))
         closed_at = end if state != "OPEN" else None
         return PullRequestRecord(
-            source_id=f"syn-{number}",
             number=number,
             title=title or f"Change {number} in {area}",
             body_excerpt=body,
@@ -276,7 +275,6 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
             state=state,
             is_draft=draft and ready >= AS_OF,
             author=author,
-            author_type="Bot" if author.is_bot else "User",
             author_association="CONTRIBUTOR" if external else "MEMBER",
             base_ref=base,
             head_ref=f"change-{number}",
@@ -284,14 +282,11 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
             updated_at=max([created, *(e.occurred_at for e in events)]),
             closed_at=closed_at,
             merged_at=merge_at,
-            merged_by=reviewer.login if merge_at else None,
             merge_commit_oid=f"{number:040x}" if merge_at else None,
             additions=round(0.7 * size),
             deletions=size - round(0.7 * size),
-            changed_files=max(1, size // 40),
             labels=tuple(sorted(set(labels))),
             files=tuple(f"src/{area[-1]}/file{k}.cs" for k in range(file_count)),
-            files_truncated=False,
             events=tuple(sorted(events, key=lambda e: (e.occurred_at, e.kind, e.dedup_key))),
         )
 

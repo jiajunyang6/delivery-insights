@@ -17,9 +17,6 @@ def test_assignment_round_buckets_wip_and_submission_groups():
                 cycle_hours=20 + bucket * 10,
                 review_requested_before_first_review=bucket == 0,
                 pickup_hours=2 if bucket == 0 else 6,
-                author_open_prs_at_ready=bucket,
-                ready_weekday=bucket,
-                ready_hour=bucket * 6,
             )
             p = replace(
                 p,

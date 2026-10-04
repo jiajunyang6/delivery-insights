@@ -285,7 +285,6 @@ class SnapshotService:
                 repos=list(params.repos),
                 period_from=params.period_from,
                 period_to=params.period_to,
-                data_versions={r.repo: r.data_version for r in dataset.repos},
                 analytics_version=ANALYTICS_VERSION,
                 payload=payload,
                 etag=tag,

@@ -100,10 +100,7 @@ async def save_ownership(
     if new:
         await session.execute(
             insert(StoredRule),
-            [
-                {**asdict(r), "owners": list(r.owners), "repo_id": repo_id, "fetched_at": now}
-                for r in new
-            ],
+            [{**asdict(r), "owners": list(r.owners), "repo_id": repo_id} for r in new],
         )
     values: dict[str, Any] = {"data_version": Repository.data_version + 1}
     if code_changed:

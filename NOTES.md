@@ -90,7 +90,7 @@ per-decision log: [docs/DECISIONS.md](docs/DECISIONS.md).
 - **What I did:** product roadmap, tech stack, high-level architecture and product decisions
   (the metric, the trade-offs, the period-scoped dashboard), plus plan and diff reviews.
 - **How the output was checked:**
-  - 402 automated tests, 71 of them on real Postgres 16 and Redis 7.
+  - 402 automated tests, 69 of them on real Postgres 16 and Redis 7.
   - Strict ruff/mypy and the frontend typecheck and build.
   - The 20-case narrative evaluation (stub and real Bedrock on final prompt v8; rejected v8 trials retained).
   - Real GitHub sync and browser checks.
@@ -110,5 +110,7 @@ generation shares one evidence extraction and one total deadline across both att
 The frontend shares `useAbortable`, `GithubLink`, formatting and chart colors.
 
 [Refactor verification](docs/REFACTOR_VERIFICATION.md) separates automatic equivalence checks,
-synthetic browser verification and the later prompt/storage gates. The storage reset remains
-pending; the existing three migrations are retained until its prerequisites and confirmation.
+synthetic browser verification and the live storage gates. Storage now uses one initial
+migration and removes 16 unused persisted fields. Upgrades require an explicitly confirmed
+local reset and resync. The confirmed rebuild and live Bevy acceptance are recorded in
+[storage verification](docs/storage-rebuild-verification.json), including narrative fallbacks.

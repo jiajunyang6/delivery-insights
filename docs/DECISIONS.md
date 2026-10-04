@@ -19,7 +19,7 @@ This is the current set; superseded entries remain in Git history.
 | Decision | Reason |
 |---|---|
 | Closed intervals of reopened PRs are excluded from waiting time but kept in elapsed milestones. | Separates active waiting from calendar time, as the plan distinguishes. |
-| Revert, reland and supersession links are stored; chain-level delivery time is deferred. | Explicit plan deferral; cycle time stays per PR. |
+| Revert links, reland targets and close classifications are stored; unused reland flags and supersession-target IDs are removed. Chain-level delivery time is deferred. | Retains the inputs consumed by analytics while removing unused persisted outputs; cycle time stays per PR. |
 | Retained measures apply their existing sample gates. Missing CI is never treated as zero; unused author-WIP and post-approval overlap outputs were removed in analytics 1.5.0. | Avoids misleading small-sample numbers and unused computation. |
 | Analytics code has no I/O; the database loader lives in `db/dataset.py`. Window cohorts are memoized per dataset. | Keeps analytics pure and testable, and avoids repeated cohort scans without changing output. |
 | Concurrent identical snapshot requests may compute twice; Postgres deduplicates. | Identical inputs give identical bytes, so no distributed lock is needed on the read path. |
@@ -30,7 +30,7 @@ This is the current set; superseded entries remain in Git history.
 | Analytics 1.5.0 removes only unused snapshot outputs and keeps strict schemas. Cache/snapshot IDs use the current version; bootstrap seeds use the unchanged canonical parameters with `analytics_version=1.4.0`. | Prevents accidental changes to confidence intervals, significance, headlines and narrative scoring when trimming the payload. |
 | Shared cache/filter/error helpers live below API routes in `snapshots/`; pointer resolution stays independent, and CI mapping helpers used only by synthetic eval live in the eval pipeline. | Removes reverse and circular imports without merging modules that have distinct responsibilities. |
 | `HYPOTHESES` stores card titles and template subjects separately. Evidence is extracted once and generation enforces one deadline across the original call and repair. | Removes duplicated rules while retaining wording, attempts, fallback, cache and concurrency behavior. |
-| Storage migration consolidation and column deletion remain deferred until stages 0–8 are merged to main and the current local-data deletion is explicitly confirmed. | The reset deletes collected data; the refactor branch preserves the existing migrations and volumes. |
+| Migrations are consolidated into one initial revision because the project is unreleased. Stage 9 runs on `optimization-v2`; the user explicitly waived merging stages 0–8 into main. Old databases require a confirmed local reset and resync. | Removes unused columns and old upgrade paths. The current-time confirmation before deleting collected volumes still applies. |
 
 ## Sync and operations
 
@@ -41,7 +41,7 @@ This is the current set; superseded entries remain in Git history.
 | After two successful PR pages, adaptive pagination restores the configured page size (default 25). Any page failure resets the streak. | A transient GraphQL failure should not leave the entire sync at a reduced page size. |
 | Normal sync links PRs when inserted or changed PRs set the durable `links_pending` flag; unchanged pages skip the scan. Linking clears the flag transactionally, and explicit rederivation still rebuilds links. | Existing PR merges, closures and reference changes affect links too. A conservative changed-content trigger preserves correctness and pending work across failures. |
 | Incoming PR versions older than the stored `updated_at` are ignored before replacing raw data or derived facts; the upsert also guards the timestamp. | A prefetched backfill page must not overwrite a newer version written by checkpoint catch-up. Equal timestamps with changed content remain eligible. |
-| Revision 0003 marks populated repositories for one-time link reconciliation, including databases already upgraded to 0002. Its downgrade retains pending work. | Legacy interrupted jobs have no reliable linking-completion marker. A forward migration repairs the bootstrap without rewriting an applied schema revision or losing existing data. |
+| `links_pending` starts false in the consolidated initial revision and changed PRs set it transactionally. The populated-database bootstrap in retired revision 0003 is removed. | Reset/resync starts with an empty database, so legacy upgrade reconciliation is unnecessary; interrupted-job retry coverage remains. |
 | Default snapshot precomputation covers 7, 30 and 60 days. Snapshot orchestration lives in `snapshots/service.py`; `FakeLLMClient` lives in `tests/fakes.py`. | Matches dashboard presets, gives shared API/worker orchestration a package, and keeps test doubles out of production. |
 | GraphQL queries omit `Team.slug` for requested teams. | A public-repository token gets `INSUFFICIENT_SCOPES` for it, and team names do not affect analytics. |
 | Stale PR pagination after a sync clears rows and offers a refresh; pagination requests revalidate the cache. | A sync changes the snapshot identity, so old cursors are rejected. |

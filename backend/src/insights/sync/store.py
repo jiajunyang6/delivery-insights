@@ -23,18 +23,16 @@ class SaveResult:
     prs_created: int = 0
 
 
-def pr_values(record: PullRequestRecord, repo_id: int, now: datetime) -> dict[str, Any]:
+def pr_values(record: PullRequestRecord, repo_id: int) -> dict[str, Any]:
     fields = {
         name: getattr(record, name)
         for name in (
-            "source_id",
             "number",
             "title",
             "body_excerpt",
             "url",
             "state",
             "is_draft",
-            "author_type",
             "author_association",
             "base_ref",
             "head_ref",
@@ -42,12 +40,9 @@ def pr_values(record: PullRequestRecord, repo_id: int, now: datetime) -> dict[st
             "updated_at",
             "closed_at",
             "merged_at",
-            "merged_by",
             "merge_commit_oid",
             "additions",
             "deletions",
-            "changed_files",
-            "files_truncated",
         )
     }
     return {
@@ -57,7 +52,6 @@ def pr_values(record: PullRequestRecord, repo_id: int, now: datetime) -> dict[st
         "is_bot_author": record.author.is_bot,
         "labels": list(record.labels),
         "content_hash": content_hash(record),
-        "synced_at": now,
     }
 
 
@@ -94,7 +88,7 @@ async def save_page(
     )
     if not records:
         return SaveResult(0, 0, ())
-    values = [pr_values(pr, repo_id, now) for pr in records]
+    values = [pr_values(pr, repo_id) for pr in records]
     statement = insert(PullRequest).values(values)
     upsert = statement.on_conflict_do_update(
         index_elements=["repo_id", "number"],

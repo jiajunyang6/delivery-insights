@@ -56,7 +56,6 @@ class Event:
 
 @dataclass(frozen=True, slots=True)
 class PullRequestRecord:
-    source_id: str
     number: int
     title: str
     body_excerpt: str
@@ -64,7 +63,6 @@ class PullRequestRecord:
     state: str
     is_draft: bool
     author: Actor
-    author_type: str
     author_association: str
     base_ref: str
     head_ref: str
@@ -72,14 +70,11 @@ class PullRequestRecord:
     updated_at: datetime
     closed_at: datetime | None
     merged_at: datetime | None
-    merged_by: str | None
     merge_commit_oid: str | None
     additions: int
     deletions: int
-    changed_files: int
     labels: tuple[str, ...]
     files: tuple[str, ...]
-    files_truncated: bool
     events: tuple[Event, ...]
 
 

@@ -11,6 +11,21 @@ recoverable in Git history. Violations include first-attempt and final errors.
 Confidence is evidence strength, not a calibrated probability. Prompt refinement
 used these same synthetic cases; this is not a held-out real-world causal benchmark.
 
+Storage-stage offline recheck at 2026-10-04T04:12:16 UTC passed all eight gates across
+20 runs, with analytics 1.5.0 and unchanged prompt v8. First-valid/numeric/citation/hedge/
+abstention/high-precision rates are 1.00, root-cause hit rate 0.875 and fallback 0.00.
+Local report: `backend/reports/eval-20261004T041216Z-stub.json` (ignored). This checks the
+revised storage/domain pipeline on synthetic inputs; live reset/resync is a separate gate.
+
+After the confirmed storage rebuild and Bevy enrichment, a live audit of 7/30/60-day periods
+ending 2026-10-03 passed final Sonnet 4.6 validation for both audiences (6/6); the 30-day
+manager response needed one repair. Separate browser requests ending 2026-10-04 fell back
+to templates for both 60-day audiences after two invalid attempts: director
+`V8:invalid_downgrade`/`V7:hedge_mismatch`, manager `V7:hedge_mismatch`.
+These observations do not prove general first-attempt or causal quality. See
+[storage evidence](storage-rebuild-verification.json); the passing synthetic gates above
+remain a separate result.
+
 ## Historical offline English suite (v6)
 
 Started at 2026-10-03T20:13:23.231274+00:00; model `stub`, prompt `v6`, analytics `1.4.0`.

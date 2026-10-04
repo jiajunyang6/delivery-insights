@@ -30,8 +30,8 @@ def test_normalization_and_hash(github_page):
     node["author"] = None
     node["files"]["pageInfo"]["hasNextPage"] = True
     pr = normalize_pr(node)
-    assert pr.author.login is None and pr.author_type == "Unknown"
-    assert len(pr.body_excerpt) == 4000 and pr.files_truncated
+    assert pr.author.login is None and not pr.author.is_bot
+    assert len(pr.body_excerpt) == 4000
     assert pr.labels == ("area-A",)
     assert pr.files == ("src/A/file.cs",)
     assert content_hash(pr) == content_hash(replace(pr, events=tuple(reversed(pr.events))))

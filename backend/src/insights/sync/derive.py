@@ -103,7 +103,6 @@ async def derive_prs(
                 "pr_id": pr.id,
                 "repo_id": pr.repo_id,
                 "derive_key": current_key(settings),
-                "computed_at": now,
             }
         )
         interval_values.extend(

@@ -27,8 +27,6 @@ def test_generator_reviewers_reverts_and_normal_relands_match_source_contract():
     for p in syn.records:
         reviews = [e for e in p.events if e.kind == "review"]
         assert all(e.actor.login != "rev-x5" for e in reviews)
-        if p.merged_at and reviews:
-            assert p.merged_by == max(reviews, key=lambda e: e.occurred_at).actor.login
         if p.body_excerpt.startswith("Reverts synthetic/repo#"):
             original = by_number[int(p.body_excerpt.split("#")[1])]
             assert p.author.login != original.author.login and not p.author.is_bot

@@ -220,6 +220,61 @@ async def test_complete_timeline_before_normalize(client, github_page):
     assert orjson.loads(route.calls[1].request.content)["variables"]["cursor"] == "timeline-next"
 
 
+@pytest.mark.parametrize("typename, is_bot", [("Bot", True), ("User", False)])
+async def test_large_timeline_keeps_source_id_and_actor_type(client, github_page, typename, is_bot):
+    node = github_page["data"]["repository"]["pullRequests"]["nodes"][0]
+    person = {"__typename": typename, "login": "ordinary-account"}
+    node["author"] = person
+    events = [
+        {
+            "__typename": "IssueComment",
+            "id": f"comment-{number}",
+            "createdAt": "2026-01-02T00:00:00Z",
+            "author": person,
+        }
+        for number in range(205)
+    ]
+    node["timelineItems"] = {
+        "nodes": events[:100],
+        "pageInfo": {"hasNextPage": True, "endCursor": "after-100"},
+    }
+    responses = [httpx.Response(200, json=github_page)]
+    for start, end, more in ((100, 200, True), (200, 205, False)):
+        responses.append(
+            httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "rateLimit": github_page["data"]["rateLimit"],
+                        "node": {
+                            "timelineItems": {
+                                "nodes": events[start:end],
+                                "pageInfo": {"hasNextPage": more, "endCursor": f"after-{end}"},
+                            }
+                        },
+                    }
+                },
+            )
+        )
+    route = client.router.post(URL).mock(side_effect=responses)
+    page = await GitHubAdapter(client).pull_requests_page(
+        RepoRef("a", "b"), cursor=None, page_size=25
+    )
+    assert page.skipped_prs == 0 and page.graphql_cost == 3
+    pr = page.prs[0]
+    assert len(pr.events) == len({event.dedup_key for event in pr.events}) == 205
+    assert pr.author.is_bot is is_bot and all(event.actor.is_bot is is_bot for event in pr.events)
+    requests = [orjson.loads(call.request.content) for call in route.calls]
+    assert [request["variables"] for request in requests[1:]] == [
+        {"id": node["id"], "cursor": "after-100"},
+        {"id": node["id"], "cursor": "after-200"},
+    ]
+    assert "nodes { id number" in " ".join(requests[0]["query"].split())
+    assert "fragment ActorFields on Actor { __typename login }" in " ".join(
+        requests[0]["query"].split()
+    )
+
+
 async def test_rest_etag_cache(client):
     body = {"workflow_runs": []}
     redis = MagicMock()

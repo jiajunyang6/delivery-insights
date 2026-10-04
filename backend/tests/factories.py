@@ -37,7 +37,6 @@ def event(kind, hour, actor="reviewer", *, state=None, review_id=None, **payload
 
 def record(**changes):
     base = PullRequestRecord(
-        source_id="PR1",
         number=1,
         title="Change",
         body_excerpt="",
@@ -45,7 +44,6 @@ def record(**changes):
         state="MERGED",
         is_draft=False,
         author=Actor("author", False),
-        author_type="User",
         author_association="MEMBER",
         base_ref="main",
         head_ref="feature",
@@ -53,14 +51,11 @@ def record(**changes):
         updated_at=at(10),
         closed_at=at(10),
         merged_at=at(10),
-        merged_by="reviewer",
         merge_commit_oid=None,
         additions=20,
         deletions=5,
-        changed_files=1,
         labels=("area-A",),
         files=("src/a.py",),
-        files_truncated=False,
         events=(),
     )
     return replace(base, **changes)

@@ -244,6 +244,13 @@ Tokens, headers, raw upstream responses and prose are not logged; exceptions exp
 
 `docker compose down` stops the stack while preserving Postgres data.
 `docker compose down -v` intentionally deletes the local database volume; use only for reset.
+The unreleased storage schema is consolidated into `0001_initial`. Earlier three-migration
+databases require that confirmed reset and a new sync; applying this revision in place is
+unsupported. `links_pending` is included in the initial schema. Raw GitHub node IDs and
+actor types remain in the query for timeline paging and bot detection; five unused PR fields,
+four audit/duplicate metadata fields and seven unused fact fields are no longer persisted.
+Only the `ix_intervals_pr` index was removed, because `UNIQUE(pr_id, seq)` covers its prefix.
+Other indexes remain; no performance claim is made without representative EXPLAIN measurements.
 There is no authenticated administrative UI or backup orchestration in this demo.
 
 ## Security
@@ -285,12 +292,13 @@ Latest refactor checks: 2026-10-04 UTC, analytics 1.5.0, prompt v8.
 | Check | Observed result |
 |---|---|
 | Ruff check/format and strict mypy | Pass |
-| Unit suite | 331 passed |
-| Full suite | 402 passed, including 71 integration tests |
+| Unit suite | 333 cases in the passing full suite |
+| Full suite | 402 passed, including 69 integration tests |
 | Frontend tests, typecheck and build | 8 tests passed; typecheck/build pass with Node 24 |
 | Real sync / browser recovery | 50 rows → stale cursor 422 → rows cleared → refresh → 50 matching rows |
 | Refactor equivalence | Remaining snapshot values, evidence, scoring, templates, assembly, validator codes match `pre-refactor`; only allowlisted deletions and recomputed identity fields differ. Prompt messages matched through stage 7; stage 8 changes only prompt wording/format |
 | Refactored UI (synthetic fixtures) | Both views; 7/30/60 days; 5 → 12 risk rows; ownership counts; card/citation focus; three abstentions; pending sync; no console errors |
+| Stage 9 confirmed live rebuild | Bevy 7/30/120-day backfill and CI completed with zero invariant violations/skipped PRs; incremental changed zero PRs and all 1,640 hashes matched; 7/30/60-day HTTP/ETag and both views passed. Owners are null because the source yielded zero rules. Six final LLM responses passed, with separate current-day 60-day template fallbacks recorded in [storage evidence](storage-rebuild-verification.json) |
 
 Earlier acceptance measured 3,541 PRs with no invariant violations, three matching PR pages, 533 merged PRs with ledger rounding error 0.0000004833, cold compute 1,376.95 ms and warm HTTP p95 32.32 ms.
 Those analytics 1.2/1.3 measurements and npm ci/audit checks were not repeated here. They are local measurements, not production load evidence.
@@ -405,7 +413,7 @@ The GitHub Actions workflow applies backend lint/tests/eval and frontend typeche
 | Directory | Contents |
 |---|---|
 | `backend/src/insights/` | API, source, sync, database, analytics and narrative modules |
-| `backend/migrations/` | Alembic schema history |
+| `backend/migrations/` | Consolidated Alembic initial schema; earlier databases require reset/resync |
 | `backend/tests/` | Unit, integration, fixture and golden checks |
 | `backend/eval/` | Synthetic generator, scenarios and evaluation runner |
 | `frontend/` | React/TypeScript UI, shared abortable requests/formatting/links, Vite config and nginx image |

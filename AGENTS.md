@@ -29,7 +29,7 @@ Use four-space Python indentation, type annotations, snake_case functions/module
 
 ## Testing Guidelines
 
-Use pytest/pytest-asyncio; name files `test_*.py` and functions `test_*`. Mark integration tests `integration`; Testcontainers requires Docker for PostgreSQL 16 and Redis 7. Mock GitHub/Bedrock calls. Cover changed behavior, timeline invariants, deterministic snapshots, and narrative validation. Current suite: 402 backend tests (331 unit, 71 integration) and 8 frontend tests. No minimum coverage percentage is configured. For UI changes, run typecheck/build and verify affected browser flows.
+Use pytest/pytest-asyncio; name files `test_*.py` and functions `test_*`. Mark integration tests `integration`; Testcontainers requires Docker for PostgreSQL 16 and Redis 7. Mock GitHub/Bedrock calls. Cover changed behavior, timeline invariants, deterministic snapshots, and narrative validation. Current suite: 402 backend tests (333 unit, 69 integration) and 8 frontend tests. No minimum coverage percentage is configured. For UI changes, run typecheck/build and verify affected browser flows.
 
 ## Commit & Pull Request Guidelines
 

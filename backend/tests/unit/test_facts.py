@@ -40,14 +40,12 @@ def test_all_milestones_and_counts():
     )
     assert f.review_rounds == 2
     assert f.feedback_before_approval == 2
-    assert (f.commits_after_first_review, f.force_pushes_after_first_review) == (3, 2)
+    assert f.commits_after_first_review == 3
     assert f.updates_after_approval == 2
     assert f.distinct_approvers == 2 and f.second_approval_wait_hours == 2
-    assert f.first_response_at == at(1)
     assert f.first_review_at == at(2) and f.first_approval_at == at(6)
     assert f.review_requested_before_first_review and not f.merged_without_approval
     assert f.human_reviews == 4
-    assert f.ready_weekday == 3 and f.ready_hour == 0
     assert f.closed_at is None and f.end_at == at(10)
 
 
@@ -58,7 +56,6 @@ def test_missing_and_pre_ready_values():
     )
     f = facts(pr)
     assert f.pickup_hours == 0 and f.coding_hours == 0
-    assert f.first_response_at == at(2)
     empty = facts(record())
     assert empty.coding_hours is None and empty.pickup_hours is None
     assert empty.merged_without_approval
@@ -73,8 +70,8 @@ def test_size_boundaries(size, bucket):
     assert facts(record(additions=size, deletions=0)).size_bucket == bucket
 
 
-def test_scope_and_weekday():
+def test_scope_and_draft_readiness():
     f = facts(record(base_ref="release", author=Actor("robot", True), author_association="NONE"))
     assert f.is_bot_author and f.is_backport and f.external_contributor
     draft = facts(record(state="OPEN", merged_at=None, closed_at=None, is_draft=True))
-    assert draft.ready_at is None and draft.ready_hour is None
+    assert draft.ready_at is None

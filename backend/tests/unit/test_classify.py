@@ -9,7 +9,7 @@ from insights.domain import Actor, OwnershipRule
 
 
 def item(identifier=1, **changes):
-    pr = record(number=identifier, source_id=f"PR{identifier}", **changes)
+    pr = record(number=identifier, **changes)
     return LinkInput(
         identifier,
         pr,
@@ -118,7 +118,7 @@ def test_unmerged_cross_repo_and_revert_of_revert():
     b = replace(b, record=replace(b.record, merged_at=at(30), state="MERGED"))
     c = item(3, title='Revert "Revert "Original""', created_at=at(40), merged_at=at(50))
     result = linked(a, b, c)
-    assert result[3].is_reland and result[3].reland_of_pr_id == 1
+    assert result[3].reland_of_pr_id == 1
     assert not result[3].is_revert
     assert result[2].reverted_at is None
 
@@ -145,7 +145,7 @@ def test_superseded_current_source_overrides_stale_event():
     a = item(state="CLOSED", merged_at=None, events=(cross,))
     b = item(2, head_ref="different", merged_at=at(12))
     result = linked(a, b)[1]
-    assert result.close_class == "superseded" and result.superseded_by_pr_id == 2
+    assert result.close_class == "superseded"
 
 
 @pytest.mark.parametrize("unknown", [False, True])

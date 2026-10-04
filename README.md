@@ -82,10 +82,24 @@ cd frontend && npm ci && npm test && npm run typecheck && npm run build
 
 Analytics version **1.5.0** trims unused snapshot diagnostics while retaining dashboard,
 narrative and drilldown fields. Snapshot/cache identities use 1.5.0; statistical sampling
-keeps the original 1.4.0 seed parameters. Existing databases rederive on the version change;
-stages 1–8 require no database reset. See [refactor verification](docs/REFACTOR_VERIFICATION.md).
+keeps the original 1.4.0 seed parameters. See [refactor verification](docs/REFACTOR_VERIFICATION.md).
 
-Local checks: **402 backend tests** (331 unit, 71 integration), **8 frontend tests**,
+The unreleased application's migrations are now consolidated into `0001_initial`.
+Upgrading from the earlier three-migration schema requires deleting the local database
+and syncing again; an in-place upgrade is unsupported. After explicitly confirming that
+collected PRs, snapshots and narratives may be deleted, run:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+The worker resumes collection from an empty database, with 7-, 30- and 120-day backfill
+checkpoints under the default configuration. Wait for repository `last_sync_status=ok`
+and full coverage before checking the dashboard. Keep `BACKFILL_DAYS=120` for the 60-day
+view and its comparison period.
+
+Local checks: **402 backend tests** (333 unit, 69 integration), **8 frontend tests**,
 strict lint/types/build and all eight offline narrative gates pass.
 
 ## Documentation

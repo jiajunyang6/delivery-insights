@@ -1,4 +1,4 @@
-"""initial schema
+"""Consolidated initial schema for the unreleased application.
 
 Revision ID: 0001_initial
 Revises:
@@ -40,6 +40,7 @@ def upgrade() -> None:
         sa.Column("last_sync_error", sa.Text(), nullable=True),
         sa.Column("data_version", sa.BigInteger(), server_default=sa.text("0"), nullable=False),
         sa.Column("derived_key", sa.Text(), nullable=True),
+        sa.Column("links_pending", sa.Boolean(), server_default=sa.text("FALSE"), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -62,7 +63,6 @@ def upgrade() -> None:
         sa.Column("repos", postgresql.ARRAY(sa.Text()), nullable=False),
         sa.Column("period_from", sa.Date(), nullable=False),
         sa.Column("period_to", sa.Date(), nullable=False),
-        sa.Column("data_versions", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("analytics_version", sa.Text(), nullable=False),
         sa.Column("payload", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("etag", sa.Text(), nullable=False),
@@ -107,7 +107,6 @@ def upgrade() -> None:
         sa.Column("pattern", sa.Text(), nullable=False),
         sa.Column("owners", postgresql.ARRAY(sa.Text()), nullable=False),
         sa.Column("line_no", sa.Integer(), nullable=False),
-        sa.Column("fetched_at", sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(["repo_id"], ["repositories.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("repo_id", "source", "line_no"),
@@ -116,7 +115,6 @@ def upgrade() -> None:
         "pull_requests",
         sa.Column("id", sa.BigInteger(), nullable=False),
         sa.Column("repo_id", sa.Integer(), nullable=False),
-        sa.Column("source_id", sa.Text(), nullable=False),
         sa.Column("number", sa.Integer(), nullable=False),
         sa.Column("title", sa.Text(), nullable=False),
         sa.Column("body_excerpt", sa.Text(), server_default=sa.text("''"), nullable=False),
@@ -124,7 +122,6 @@ def upgrade() -> None:
         sa.Column("state", sa.Text(), nullable=False),
         sa.Column("is_draft", sa.Boolean(), nullable=False),
         sa.Column("author_login", sa.Text(), nullable=True),
-        sa.Column("author_type", sa.Text(), nullable=False),
         sa.Column("author_association", sa.Text(), nullable=False),
         sa.Column("is_bot_author", sa.Boolean(), nullable=False),
         sa.Column("base_ref", sa.Text(), nullable=False),
@@ -133,21 +130,16 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("closed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("merged_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("merged_by", sa.Text(), nullable=True),
         sa.Column("merge_commit_oid", sa.Text(), nullable=True),
         sa.Column("additions", sa.Integer(), nullable=False),
         sa.Column("deletions", sa.Integer(), nullable=False),
-        sa.Column("changed_files", sa.Integer(), nullable=False),
         sa.Column(
             "labels", postgresql.ARRAY(sa.Text()), server_default=sa.text("'{}'"), nullable=False
         ),
-        sa.Column("files_truncated", sa.Boolean(), server_default=sa.text("FALSE"), nullable=False),
         sa.Column("content_hash", sa.Text(), nullable=False),
-        sa.Column("synced_at", sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(["repo_id"], ["repositories.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("repo_id", "number"),
-        sa.UniqueConstraint("source_id"),
     )
     op.create_index(
         "ix_pr_merge_commit", "pull_requests", ["repo_id", "merge_commit_oid"], unique=False
@@ -244,7 +236,6 @@ def upgrade() -> None:
         sa.Column("external_contributor", sa.Boolean(), nullable=False),
         sa.Column("first_commit_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("ready_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("first_response_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("first_review_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("first_approval_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("approved_at", sa.DateTime(timezone=True), nullable=True),
@@ -259,7 +250,6 @@ def upgrade() -> None:
         sa.Column("review_rounds", sa.Integer(), nullable=False),
         sa.Column("feedback_before_approval", sa.Integer(), nullable=False),
         sa.Column("commits_after_first_review", sa.Integer(), nullable=False),
-        sa.Column("force_pushes_after_first_review", sa.Integer(), nullable=False),
         sa.Column("updates_after_approval", sa.Integer(), nullable=False),
         sa.Column("distinct_approvers", sa.Integer(), nullable=False),
         sa.Column("second_approval_wait_hours", sa.Float(), nullable=True),
@@ -274,24 +264,17 @@ def upgrade() -> None:
         sa.Column("reverts_pr_id", sa.BigInteger(), nullable=True),
         sa.Column("reverted_by_pr_id", sa.BigInteger(), nullable=True),
         sa.Column("reverted_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("is_reland", sa.Boolean(), server_default=sa.text("FALSE"), nullable=False),
         sa.Column("reland_of_pr_id", sa.BigInteger(), nullable=True),
-        sa.Column("superseded_by_pr_id", sa.BigInteger(), nullable=True),
         sa.Column("close_class", sa.Text(), nullable=True),
         sa.Column("state_at_close", sa.Text(), nullable=True),
         sa.Column("late_rejection", sa.Boolean(), server_default=sa.text("FALSE"), nullable=False),
         sa.Column("ci_covered", sa.Boolean(), server_default=sa.text("FALSE"), nullable=False),
-        sa.Column("author_open_prs_at_ready", sa.Integer(), nullable=True),
-        sa.Column("ready_weekday", sa.SmallInteger(), nullable=True),
-        sa.Column("ready_hour", sa.SmallInteger(), nullable=True),
         sa.Column("derive_key", sa.Text(), nullable=True),
-        sa.Column("computed_at", sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(["pr_id"], ["pull_requests.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["reland_of_pr_id"], ["pull_requests.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["repo_id"], ["repositories.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["reverted_by_pr_id"], ["pull_requests.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["reverts_pr_id"], ["pull_requests.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["superseded_by_pr_id"], ["pull_requests.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("pr_id"),
     )
     op.create_index("ix_facts_repo_end", "pr_facts", ["repo_id", "end_at"], unique=False)
@@ -318,7 +301,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("pr_id", "seq"),
     )
-    op.create_index("ix_intervals_pr", "pr_intervals", ["pr_id"], unique=False)
     op.create_index(
         "ix_intervals_repo_state_start",
         "pr_intervals",
@@ -330,7 +312,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade schema."""
     op.drop_index("ix_intervals_repo_state_start", table_name="pr_intervals")
-    op.drop_index("ix_intervals_pr", table_name="pr_intervals")
     op.drop_table("pr_intervals")
     op.drop_table("pr_files")
     op.drop_index("ix_facts_repo_ready", table_name="pr_facts")

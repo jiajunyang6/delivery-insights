@@ -40,7 +40,6 @@ async def test_metadata_reuse_retains_codeowners_and_area_owner_counts(context):
                     pattern="area-A",
                     owners=["alice", "bob"],
                     line_no=1,
-                    fetched_at=NOW,
                 ),
                 OwnershipRule(
                     repo_id=repo_id,
@@ -48,7 +47,6 @@ async def test_metadata_reuse_retains_codeowners_and_area_owner_counts(context):
                     pattern="src/*",
                     owners=["carol"],
                     line_no=1,
-                    fetched_at=NOW,
                 ),
             ]
         )
