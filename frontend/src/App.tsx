@@ -116,6 +116,8 @@ export default function App() {
         if (!signal.aborted) {
           setSnapshot(s);
           setPending(null);
+          // A finished sync may have resolved configuration problems shown earlier.
+          setSetupCheck((n) => n + 1);
         }
       })
       .catch((e) => {

@@ -463,6 +463,7 @@ class DateLimits(Contract):
 class GithubProblem(Contract):
     repo: str
     status: Literal["missing_token", "auth_error", "not_found"]
+    syncing: bool
 
 
 class GithubSetup(Contract):

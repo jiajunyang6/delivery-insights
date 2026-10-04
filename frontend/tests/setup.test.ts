@@ -23,8 +23,8 @@ test("each problem names the .env variable to fix", () => {
     github: {
       token_configured: true,
       problems: [
-        { repo: "a/b", status: "auth_error" },
-        { repo: "c/d", status: "not_found" },
+        { repo: "a/b", status: "auth_error", syncing: false },
+        { repo: "c/d", status: "not_found", syncing: false },
       ],
     },
     llm: { ...healthy.llm, last_error: "ValidationException" },
@@ -50,10 +50,30 @@ test("missing Bedrock key is informational and auth errors point to the key", ()
 test("a stale auth error is hidden while the token is missing", () => {
   const items = setupItems({
     ...healthy,
-    github: { token_configured: false, problems: [{ repo: "a/b", status: "auth_error" }] },
+    github: { token_configured: false, problems: [{ repo: "a/b", status: "auth_error", syncing: false }] },
   });
   assert.deepEqual(
     items.map((i) => i.text),
     ["Set GITHUB_TOKEN in .env to sync GitHub data."],
   );
+});
+
+test("an active sync after a fix shows progress instead of the old failure", () => {
+  const items = setupItems({
+    ...healthy,
+    github: {
+      token_configured: true,
+      problems: [{ repo: "a/b", status: "missing_token", syncing: true }],
+    },
+  });
+  assert.deepEqual(items.map((i) => i.level), ["info"]);
+  assert.match(items[0].text, /Syncing a\/b with the current settings/);
+  const idle = setupItems({
+    ...healthy,
+    github: {
+      token_configured: true,
+      problems: [{ repo: "a/b", status: "missing_token", syncing: false }],
+    },
+  });
+  assert.match(idle[0].text, /no new sync is queued/);
 });

@@ -146,6 +146,21 @@ async def test_unavailable_vs_local_rederive(api, values, status):
         assert response.json()["type"] == "/problems/data-unavailable"
 
 
+async def test_sync_after_configuration_fix_reports_progress_not_unavailable(api):
+    client, _, _, ctx = api
+    async with ctx["session_factory"]() as session:
+        await session.execute(
+            update(Repository).values(last_sync_status="missing_token", covered_since=None)
+        )
+        await session.commit()
+        job, _ = await enqueue_sync(ctx["redis"], session, "a/b", "manual", now=NOW)
+    result = await client.get(DELIVERY)
+    assert result.status_code == 202, result.text
+    assert result.json()["repos"][0]["job"]["id"] == str(job.id)
+    problems = (await client.get("/v1/repos")).json()["setup"]["github"]["problems"]
+    assert problems == [{"repo": "a/b", "status": "missing_token", "syncing": True}]
+
+
 async def test_partial_watermark(api):
     client, _, _, ctx = api
     async with ctx["session_factory"]() as session, session.begin():
@@ -342,7 +357,7 @@ async def test_repos_report_setup_problems_without_secret_values(api):
     setup = response.json()["setup"]
     assert setup["github"] == {
         "token_configured": False,
-        "problems": [{"repo": "a/b", "status": "auth_error"}],
+        "problems": [{"repo": "a/b", "status": "auth_error", "syncing": False}],
     }
     assert setup["llm"]["key_configured"] is True
     assert setup["llm"]["last_error"] == "AccessDeniedException"

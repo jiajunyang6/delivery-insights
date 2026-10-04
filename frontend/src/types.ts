@@ -10,7 +10,11 @@ export interface DateLimits {
 export interface SetupStatus {
   github: {
     token_configured: boolean;
-    problems: { repo: string; status: "missing_token" | "auth_error" | "not_found" }[];
+    problems: {
+      repo: string;
+      status: "missing_token" | "auth_error" | "not_found";
+      syncing: boolean;
+    }[];
   };
   llm: {
     key_configured: boolean;

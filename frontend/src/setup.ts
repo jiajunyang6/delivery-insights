@@ -19,6 +19,15 @@ export function setupItems(setup: SetupStatus): SetupItem[] {
   if (!github.token_configured)
     items.push({ level: "problem", text: "Set GITHUB_TOKEN in .env to sync GitHub data." });
   for (const p of github.problems) {
+    // The status comes from the last finished sync. While a new sync runs it may already use
+    // fixed settings, so report progress instead of the old failure.
+    if (p.syncing && github.token_configured) {
+      items.push({
+        level: "info",
+        text: `Syncing ${p.repo} with the current settings. This notice clears once the sync succeeds; refresh the page to check.`,
+      });
+      continue;
+    }
     // A stale auth_error is moot until a token is set; the missing-token item covers it.
     if (p.status === "auth_error" && github.token_configured)
       items.push({
@@ -33,7 +42,7 @@ export function setupItems(setup: SetupStatus): SetupItem[] {
     if (p.status === "missing_token" && github.token_configured)
       items.push({
         level: "problem",
-        text: `${p.repo} last synced without a token. Restart the services after setting GITHUB_TOKEN.`,
+        text: `${p.repo} last synced without a token and no new sync is queued. Run docker compose up -d so the worker reads GITHUB_TOKEN, then refresh the page.`,
       });
   }
   if (!llm.key_configured) {

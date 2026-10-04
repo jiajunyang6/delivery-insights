@@ -97,6 +97,7 @@ async def repositories(
 
 
 SETUP_SYNC_PROBLEMS = {"missing_token", "auth_error", "not_found"}
+SYNC_KINDS = {"manual", "incremental", "backfill"}
 
 
 async def setup_status(settings: Settings, redis: Redis, items: list[RepoStatus]) -> SetupStatus:
@@ -111,7 +112,16 @@ async def setup_status(settings: Settings, redis: Redis, items: list[RepoStatus]
         github=GithubSetup(
             token_configured=bool(token and token.get_secret_value()),
             problems=[
-                GithubProblem(repo=item.repo, status=item.last_sync_status)
+                GithubProblem(
+                    repo=item.repo,
+                    status=item.last_sync_status,
+                    # The status is from the last finished sync; an active one may succeed now.
+                    syncing=bool(
+                        item.latest_job
+                        and item.latest_job.kind in SYNC_KINDS
+                        and item.latest_job.status in {"queued", "running"}
+                    ),
+                )
                 for item in items
                 if item.last_sync_status in SETUP_SYNC_PROBLEMS
             ],

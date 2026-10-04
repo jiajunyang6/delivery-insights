@@ -19,7 +19,7 @@ export function SetupNotice({ setup }: { setup: SetupStatus | null }) {
       </ul>
       <small>
         After editing .env, run <code>docker compose up -d</code> so the containers pick up
-        the change.
+        the change, then refresh this page.
       </small>
     </section>
   );
