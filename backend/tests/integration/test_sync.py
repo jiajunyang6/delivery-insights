@@ -110,7 +110,7 @@ async def test_changed_content_replaces_events_and_files(context, github_page):
         assert (await session.scalars(select(PrFile.path))).all() == ["src/B/new.cs"]
 
 
-async def test_linking_runs_only_for_new_prs_and_pending_work_survives_failure(
+async def test_linking_runs_only_for_changed_prs_and_pending_work_survives_failure(
     context, github_page, monkeypatch
 ):
     from unittest.mock import AsyncMock
@@ -128,12 +128,13 @@ async def test_linking_runs_only_for_new_prs_and_pending_work_survives_failure(
     repo, _ = await load_state(context)
     assert not repo.links_pending
 
-    # No-op pages and edits to an existing PR must not trigger a repository scan.
+    # No-op pages skip the scan; changed titles may alter revert/reland matching.
     assert await sync_repo(context, "a/b", "incremental", str(job.id)) == "succeeded"
+    assert linking.await_count == 1
     github_page["data"]["repository"]["pullRequests"]["nodes"][0]["title"] = "Changed title"
     route.respond(200, json=github_page)
     assert await sync_repo(context, "a/b", "incremental", str(job.id)) == "succeeded"
-    assert linking.await_count == 1
+    assert linking.await_count == 2
     repo, _ = await load_state(context)
     previous_watermark = repo.sync_watermark
 
@@ -146,12 +147,12 @@ async def test_linking_runs_only_for_new_prs_and_pending_work_survives_failure(
     )
     assert await sync_repo(context, "a/b", "incremental", str(job.id)) == "failed"
     repo, _ = await load_state(context)
-    assert repo.links_pending and linking.await_count == 1
+    assert repo.links_pending and linking.await_count == 2
     assert repo.sync_watermark == previous_watermark
     route.respond(200, json=response_page(github_page, 2, 0))
     assert await sync_repo(context, "a/b", "incremental", str(job.id)) == "succeeded"
     repo, _ = await load_state(context)
-    assert not repo.links_pending and linking.await_count == 2
+    assert not repo.links_pending and linking.await_count == 3
 
 
 async def test_failed_page_write_does_not_advance_backfill_cursor(

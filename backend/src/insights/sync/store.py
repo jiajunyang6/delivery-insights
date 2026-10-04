@@ -68,18 +68,24 @@ async def save_page(
     now: datetime,
     settings: Settings | None = None,
 ) -> SaveResult:
-    existing = dict(
-        (
+    existing = {
+        number: (stored_hash, updated_at)
+        for number, stored_hash, updated_at in (
             await session.execute(
-                select(PullRequest.number, PullRequest.content_hash).where(
+                select(PullRequest.number, PullRequest.content_hash, PullRequest.updated_at).where(
                     PullRequest.repo_id == repo_id,
                     PullRequest.number.in_([p.number for p in page.prs]),
                 )
             )
         ).all()
-    )
-    records = [p for p in page.prs if existing.get(p.number) != content_hash(p)]
-    created = sum(p.number not in existing for p in records)
+    }
+    # A backfill page can have been downloaded before a checkpoint's catch-up.
+    records = [
+        p
+        for p in page.prs
+        if p.number not in existing
+        or (p.updated_at >= existing[p.number][1] and content_hash(p) != existing[p.number][0])
+    ]
     await session.execute(
         update(Repository)
         .where(Repository.id == repo_id)
@@ -96,8 +102,13 @@ async def save_page(
             for field in values[0]
             if field not in {"repo_id", "number"}
         },
+        where=statement.excluded.updated_at >= PullRequest.updated_at,
     ).returning(PullRequest.number, PullRequest.id)
     ids: dict[int, int] = dict((await session.execute(upsert)).all())
+    records = [pr for pr in records if pr.number in ids]
+    if not records:
+        return SaveResult(0, 0, ())
+    created = sum(p.number not in existing for p in records)
     pr_ids = tuple(ids[pr.number] for pr in records)
     await session.execute(delete(PrEvent).where(PrEvent.pr_id.in_(pr_ids)))
     await session.execute(delete(PrFile).where(PrFile.pr_id.in_(pr_ids)))
@@ -124,7 +135,8 @@ async def save_page(
         .where(Repository.id == repo_id)
         .values(
             data_version=Repository.data_version + 1,
-            links_pending=True if created else Repository.links_pending,
+            # Lifecycle, title/reference, and timeline changes can alter existing links too.
+            links_pending=True,
         )
     )
     violations = await derive_prs(session, pr_ids, settings=settings or Settings(), now=now)
