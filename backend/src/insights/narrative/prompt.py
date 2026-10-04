@@ -4,7 +4,7 @@ from insights.analytics.snapshot import canonical
 from insights.narrative.hypotheses import abstention, allowed_ids
 from insights.narrative.validator import ABSTAIN_SENTENCES
 
-PROMPT_VERSION = "v8"
+PROMPT_VERSION = "v9"
 SYSTEM_PROMPT = (
     "Write concise English delivery narratives from the supplied structured evidence "
     "pack.\n"
@@ -15,6 +15,10 @@ SYSTEM_PROMPT = (
     "the team; never name individual people, write dates or alter repository/location "
     "names.\n"
     "\n"
+    "PR-hours measure elapsed waiting across PRs, not labor effort. A high waiting "
+    "total does not establish a cause of slower delivery. Closed-unmerged PRs did "
+    "not merge; reverted PRs merged and were later reverted. Do not describe their "
+    "combined waiting time as work that never shipped or as wasted labor.\n"
     "Rules:\n"
     "1. In prose, quote only a cited item's current value in its own unit: hours as h "
     "(one\n"
@@ -174,11 +178,11 @@ def user_message(pack: dict[str, Any]) -> dict[str, Any]:
     else:
         outline = (
             f"Exactly 3 narrative sentences: (1) current key metric: {fact}; "
-            "(2) required abstention; (3) current largest time sink as a fact."
+            "(2) required abstention; (3) top finding by cumulative PR waiting time as a fact."
             if pack["audience"] == "director"
             else (
                 f"Exactly 4 narrative sentences: (1) current key metric: {fact}; "
-                "(2) required abstention; (3) current largest time sink as a fact; "
+                "(2) required abstention; (3) top finding by cumulative PR waiting time as a fact; "
                 "(4) at-risk work and one imperative next step."
             )
         )

@@ -10,7 +10,7 @@ FINDINGS = {
     "merge_blocked": "approved PRs waiting to merge",
     "ci_wait": "waiting on CI",
     "rework_high": "rework after review",
-    "waste_high": "work that never shipped",
+    "waste_high": "PRs closed without merging or later reverted",
     "quality_guardrail": "a quality warning",
     "external_contributor_wait": "slow first reviews for external contributors",
 }
@@ -95,7 +95,9 @@ def build_template(pack: Mapping[str, Any], snapshot: Mapping[str, Any]) -> dict
             name = FINDINGS[finding["type"]]
         share = percent(evidence["E71"]["value"])
         parts["S3"] = sentence(
-            f"The largest time sink is {name}, about {share} of finished PR waiting time", ["E71"]
+            f"The top finding by cumulative PR waiting time concerns {name}, "
+            f"about {share} of finished PR waiting time",
+            ["E71"],
         )
     elif waits := [i for i in WAITING if evidence.get(i, {}).get("value") is not None]:
         largest = max(waits, key=lambda i: (evidence[i]["value"], -int(i[1:])))

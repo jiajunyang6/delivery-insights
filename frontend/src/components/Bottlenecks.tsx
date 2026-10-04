@@ -16,13 +16,16 @@ export function Bottlenecks({
           <h2>What to work on next</h2>
           <p>Prioritized waiting patterns and suggested actions, supported by measured evidence.</p>
         </div>
-        <span>Ranked by impact on PR time</span>
+        <span>Ranked by cumulative PR waiting time</span>
       </div>
       <details className="metric-guide">
         <summary>How impact and estimates are measured</summary>
         <p>
           PR-hours add time across PRs: two PRs waiting for three hours contribute
-          six PR-hours. Each finding's impact compares its affected time with the
+          six PR-hours. This measures elapsed waiting, not labor hours: a PR can
+          accumulate waiting time while nobody is working on it. A high total
+          flags a pattern to investigate; it does not establish a cause of slower
+          delivery. Each finding's impact compares its affected time with the
           finished PR waiting time: the post-ready waiting time of eligible PRs
           that merged or closed unmerged this period. It excludes open PRs,
           bot and backport PRs and pre-ready coding time, and can include
@@ -59,7 +62,7 @@ export function Bottlenecks({
             </div>
             <h3>{f.title}</h3>
             <p className="muted">
-              {hours(f.impact_pr_hours)} PR-hours affected
+              {hours(f.impact_pr_hours)} accumulated across PRs while waiting
             </p>
             <dl className="finding-evidence">
               {f.evidence.map((e) => (

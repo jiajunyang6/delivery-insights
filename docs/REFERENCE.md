@@ -1,7 +1,7 @@
 # Technical reference
 
 Detailed behavior moved out of the README. Start with the [README](../README.md) and [NOTES](../NOTES.md).
-Current contracts are in code and this reference; [the consolidated plan](plan/PLAN.md) retains historical design input. Implementation decisions are in [DECISIONS.md](DECISIONS.md).
+Current contracts are in code and this reference; [the consolidated plan](PLAN.md) retains historical design input. Implementation decisions are in [DECISIONS.md](DECISIONS.md).
 
 ## The insight and why this metric
 
@@ -36,20 +36,23 @@ flowchart LR
   GH[GitHub GraphQL and REST] -->|read-only access| W[worker: arq]
   W -->|raw records and derived facts| PG[(Postgres)]
   UI[React: nginx] -->|same-origin /api| API[FastAPI]
-  API -->|local records| PG
+  API <-->|local reads and stored reports| PG
   API <-->|caches, locks, limits and jobs| R[(Redis)]
   W <--> R
   API -->|structured evidence| BR[Bedrock Converse]
-  BR --> V{Validator}
+  BR --> V{Local validator}
   V -->|valid| API
-  V -->|repair fails| T[Deterministic template]
+  V -->|invalid: one repair attempt| BR
+  V -->|still invalid| T[Local deterministic template]
+  BR -->|unavailable or timeout| T
+  API -->|LLM disabled or busy| T
   T --> API
 ```
 
-1. **Sync:** staged backfill, overlapping incremental windows and open-PR sweeps write idempotent batches. Checkpoints advance only after successful phase completion.
-2. **Derive:** a causal state machine creates non-overlapping intervals and per-PR facts. Reverts, relands and superseded PRs are linked; ownership changes trigger rederivation.
-3. **Snapshot:** one repeatable-read database view feeds pure analytics, deterministic bootstrap comparisons and canonical JSON. Parameters, versions and watermarks set identity.
-4. **Narrative:** code selects evidence and scores hypotheses. Bedrock supplies wording; code validates it, repairs once if necessary, then falls back to a checked template.
+1. **Sync:** staged backfill, overlapping incremental windows and open-PR sweeps write idempotent batches. Coverage and success checkpoints advance after phase completion; the resumable backfill cursor is saved with each batch.
+2. **Derive:** an event-driven state machine creates non-overlapping intervals and per-PR facts. Reverts, relands and superseded PRs are linked. CODEOWNERS changes trigger rederivation; area-owner changes update the data version and enqueue snapshot precomputation.
+3. **Snapshot:** cached or persisted snapshots are reused. On a miss, a read-only repeatable-read transaction loads a consistent dataset for pure analytics, deterministic bootstrap comparisons and canonical JSON; the result is persisted in a separate write transaction. Parameters, versions and watermarks set identity.
+4. **Narrative:** code selects evidence and scores hypotheses. Bedrock supplies wording; local code validates the LLM reply and requests at most one repair. A deterministic template is used when the LLM is disabled, busy, unavailable, times out or remains invalid. The validator and template run inside the API process; the template does not pass through the LLM validator at runtime.
 
 | Component | Responsibility |
 |---|---|
@@ -67,7 +70,7 @@ It may call Bedrock for an uncached narrative; heavy analytics and boto3 run in 
 ## API
 
 OpenAPI is available at `/openapi.json` and `/docs`; the historical design is
-[API contract chapter](plan/PLAN.md#plan-06). Dates and timestamps use UTC.
+[API contract chapter](PLAN.md#plan-06). Dates and timestamps use UTC.
 `from` and `to` are inclusive dates; comparison uses the preceding equal-length period. `as_of` is capped by the least recent repository sync watermark.
 
 | Method | Path | Purpose |
@@ -111,7 +114,7 @@ A `202` is a Pending object, not a snapshot. Respect `Retry-After`; inspect each
 PR pages accept `status`, `at_risk`, `state`, `location`, `limit` and `cursor`.
 A cursor is tied to snapshot identity and filters; refresh if the data version changes.
 
-## Snapshot contract in analytics 1.5.0
+## Snapshot contract in analytics 1.5.3
 
 The strict `api/schemas.py` models are the current field contract (`extra="forbid"`).
 Retained metrics, samples, comparisons, significance, findings and their what-if estimates,
@@ -127,7 +130,20 @@ Only outputs without dashboard, narrative, finding or eval consumers were remove
 | Metadata / risk | Exclusion/location-source diagnostics, extra sample counts, risk-by-state, risk PR size/external contributor |
 | Ledger / guardrail / series | Ledger scope/previous count/total, prior revert-rate/change-pp, queue growth, weekly days/reverts, KM step/events outputs |
 
-Identity and caches use analytics 1.5.0. Sampling uses `digest(seed_params)[:16]` with exactly
+Analytics 1.5.1 changed finding impact shares to use the post-ready waiting time of all
+eligible PRs finished in the period, merged or closed without merging. Analytics 1.5.2
+clarifies that PR-hours measure cumulative elapsed waiting, not labor effort. The waste
+finding includes non-superseded PRs closed without merging and merged PRs later reverted;
+its waiting-time rank does not establish a root cause of slower delivery. Metric values,
+ranking rules and hypothesis scores are unchanged by this wording update. Prompt v9
+applies the same distinction to generated narratives; the v8 evaluation below is historical.
+
+Analytics 1.5.3 separates the cycle-time sentence from a type-specific finding phrase
+and quotes the top finding's share of finished PR waiting time. Findings without quantified
+waiting impact do not receive that sentence. A what-if sentence comes only from the top
+finding's own estimate; card titles do not supply headline prose.
+
+Identity and caches use analytics 1.5.3. Sampling uses `digest(seed_params)[:16]` with exactly
 the former canonical parameter structure and only `analytics_version` replaced by frozen
 `SAMPLING_SEED_VERSION="1.4.0"`. Existing snapshots and narrative caches remain isolated;
 HTTP conditional requests still return 304 for matching current ETags. Repositories with old
@@ -425,5 +441,5 @@ The GitHub Actions workflow applies backend lint/tests/eval and frontend typeche
 | `backend/src/insights/snapshots/` | Shared orchestration, caching, filtering and domain errors |
 | `backend/src/insights/sync/queue.py` | Shared job lifecycle, locks, queue helpers and success lookup |
 | `scripts/` | HTTP smoke entrypoint |
-| `docs/plan/PLAN.md` | Consolidated historical design input |
+| `PLAN.md` | Consolidated historical design input |
 | `docs/` | Decisions, acceptance evidence and evaluation records in Markdown |

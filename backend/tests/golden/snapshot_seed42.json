@@ -578,9 +578,9 @@
       "impact_share": 0.1847,
       "location": null,
       "rank": 2,
-      "recommendation": "Review late rejections and PRs lost while waiting for review; align on scope earlier and triage stale PRs.",
+      "recommendation": "Inspect PRs closed after long waits and reverted changes; check review coverage, closure reasons and revert causes before choosing an action.",
       "severity": "medium",
-      "title": "Significant work never ships",
+      "title": "Waiting time on unmerged or reverted PRs",
       "type": "waste_high",
       "what_if": null
     },
@@ -933,13 +933,13 @@
     "revert_rate": 0.0246,
     "verdict": "ok"
   },
-  "headline": "Median cycle time is 40.0h (-2% vs previous period, no meaningful change); the main bottleneck is high rework after review.",
+  "headline": "Median cycle time is 40.0h (-2% vs previous period, no meaningful change). The largest share of finished PR waiting time (24%) is on PRs waiting for authors to rework after review.",
   "links": {
-    "narrative": "/v1/snapshots/s_820184a5215d7746/narrative",
-    "self": "/v1/snapshots/s_820184a5215d7746"
+    "narrative": "/v1/snapshots/s_b5619709f895dc1b/narrative",
+    "self": "/v1/snapshots/s_b5619709f895dc1b"
   },
   "meta": {
-    "analytics_version": "1.5.1",
+    "analytics_version": "1.5.3",
     "ci_source": "none",
     "comparison_available": true,
     "data_freshness": [
@@ -1222,7 +1222,7 @@
       "value": null
     }
   },
-  "snapshot_id": "s_820184a5215d7746",
+  "snapshot_id": "s_b5619709f895dc1b",
   "time_ledger": {
     "ci_coverage": 0.0,
     "ci_data_available": false,

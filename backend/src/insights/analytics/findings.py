@@ -6,6 +6,21 @@ from insights.analytics.dataset import Dataset, closed, hours, merged
 from insights.analytics.pointer import resolve_pointer
 from insights.analytics.stats import ratio
 
+HEADLINE_PHRASES = {
+    "waste_high": "on PRs that were closed without merging or later reverted",
+    "merge_blocked": "on approved PRs waiting to merge",
+    "review_capacity": "on PRs waiting for a first review in {location}",
+    "review_queue_growth": (
+        "on PRs waiting for a first review while review demand outpaces first reviews"
+    ),
+    "review_concentration": (
+        "on PRs waiting for reviewers while reviews are concentrated on a few people"
+    ),
+    "ci_wait": "on PRs waiting for CI",
+    "rework_high": "on PRs waiting for authors to rework after review",
+    "external_contributor_wait": "on external contributors' PRs waiting for a first review",
+}
+
 
 def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str, Any]]:
     if snapshot["efficiency"]["merged_prs"]["value"] < t.MIN_SAMPLES_P50:
@@ -213,9 +228,9 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
     ):
         add(
             "waste_high",
-            "Significant work never ships",
-            "Review late rejections and PRs lost while waiting for review; "
-            "align on scope earlier and triage stale PRs.",
+            "Waiting time on unmerged or reverted PRs",
+            "Inspect PRs closed after long waits and reverted changes; "
+            "check review coverage, closure reasons and revert causes before choosing an action.",
             snapshot["waste"]["wasted_pr_hours"],
             [
                 ("Waste share", "/efficiency/waste_share", "share"),
@@ -293,10 +308,12 @@ def headline(snapshot: dict[str, Any]) -> str:
         )
     if snapshot["bottlenecks"]:
         first = snapshot["bottlenecks"][0]
-        text += "; the main bottleneck is " + first["title"][0].lower() + first["title"][1:]
-        if first["type"] in {"review_capacity", "review_queue_growth"}:
-            share = snapshot["time_ledger"]["states"]["waiting_reviewer"]["share"]
-            text += f" ({share * 100:.0f}% of PR time waits on reviewers)"
+        phrase = HEADLINE_PHRASES.get(first["type"])
+        if phrase and first["impact_pr_hours"] > 0 and first["impact_share"] > 0:
+            text += (
+                f". The largest share of finished PR waiting time ({first['impact_share']:.0%}) "
+                f"is {phrase.format(location=first['location'])}"
+            )
         scenario = first["what_if"]
         if scenario and scenario["change_rel"] is not None:
             text += (
