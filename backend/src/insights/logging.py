@@ -23,6 +23,7 @@ LOGGING_CONFIG: dict[str, Any] = orjson.loads(
 
 
 def json_dumps(value: Any, **kwargs: Any) -> str:
+    """Serialize sorted-key log JSON, ignoring extra serializer arguments."""
     return orjson.dumps(value, option=orjson.OPT_SORT_KEYS).decode()
 
 
@@ -42,12 +43,14 @@ def sanitize_exception(logger: Any, method: str, event: EventDict) -> EventDict:
 def log_uncaught(
     kind: type[BaseException], error: BaseException, traceback: TracebackType | None
 ) -> None:
+    """Forward uncaught process exceptions to the configured sanitized logging pipeline."""
     logging.getLogger("insights.process").error(
         "unhandled_exception", exc_info=(kind, error, traceback)
     )
 
 
 def json_formatter() -> structlog.stdlib.ProcessorFormatter:
+    """Build a formatter shared by structlog and standard logs with sanitized exceptions."""
     return structlog.stdlib.ProcessorFormatter(
         foreign_pre_chain=SHARED,
         processors=[
@@ -59,6 +62,7 @@ def json_formatter() -> structlog.stdlib.ProcessorFormatter:
 
 
 def configure_logging(level: str = "INFO") -> None:
+    """Configure sanitized JSON logs and exception handling, reducing noisy transport logs."""
     sys.excepthook = log_uncaught
     structlog.configure(
         processors=[*SHARED, structlog.stdlib.ProcessorFormatter.wrap_for_formatter],

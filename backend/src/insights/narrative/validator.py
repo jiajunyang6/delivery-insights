@@ -58,6 +58,7 @@ class ToolModel(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def no_explicit_null(cls, value: Any) -> Any:
+        """Reject explicitly null fields; optional tool fields must be omitted instead."""
         if isinstance(value, dict) and any(v is None for v in value.values()):
             raise ValueError("Optional fields must be omitted")
         return value
@@ -94,26 +95,31 @@ class Violation:
 
 
 def sentences(text: str) -> list[str]:
+    """Split prose at sentence punctuation after normalizing common dotted abbreviations."""
     cleaned = re.sub(r"\b(?:vs\.|e\.g\.|i\.e\.)", lambda m: m[0].replace(".", ""), text, flags=re.I)
     return [s.strip() for s in re.split(r"(?<=[.!?])\s+", cleaned.strip()) if s.strip()]
 
 
 def citations(text: str) -> set[str]:
+    """Extract the unique numbered evidence IDs appearing in bracketed citations."""
     return set(CITATION.findall(text))
 
 
 def hedge_levels(text: str) -> set[int]:
+    """Detect supported uncertainty phrases and return their low/medium/high numeric bands."""
     patterns = (r"\blikely\b", r"\b(may|might|possibly|could)\b", r"\bearly signs?\b")
     return {2 - i for i, pattern in enumerate(patterns) if re.search(pattern, text, re.I)}
 
 
 def hedge_ok(text: str, level: str) -> bool:
+    """Require wording for the target band with no detected hedge stronger than that band."""
     levels = hedge_levels(text)
     target = LEVEL_ORDER[level]
     return target in levels and max(levels) <= target
 
 
 def numeric_tokens(text: str) -> list[tuple[float, int, str]]:
+    """Extract numeric magnitudes, displayed precision and units, including shared-unit ranges."""
     matches = list(NUMBER.finditer(text))
     result = []
     for i, match in enumerate(matches):
@@ -128,6 +134,7 @@ def numeric_tokens(text: str) -> list[tuple[float, int, str]]:
 
 
 def unit(suffix: str) -> str:
+    """Classify the unit immediately following a number, defaulting to plain when unrecognized."""
     return next((name for name, pattern in SUFFIXES if re.match(pattern, suffix, re.I)), "plain")
 
 
@@ -150,6 +157,7 @@ def allowed_numbers(entry: Mapping[str, Any]) -> list[AllowedNumber]:
     identifier = entry["id"]
 
     def add(value: Any, category: str, field: str = "", divisor: float = 1) -> None:
+        """Append a scaled numeric allowance linked to this item/field; exclude booleans."""
         if isinstance(value, (float, int)) and not isinstance(value, bool):
             result.append(AllowedNumber(float(value) / divisor, category, identifier, field))
 
@@ -187,6 +195,10 @@ def match_numbers(
     evidence: Mapping[str, dict[str, Any]],
     allowed: list[AllowedNumber],
 ) -> tuple[list[Violation], dict[str, set[str]]]:
+    """Match sentence numbers to allowed magnitudes/units and return violations plus matched fields.
+
+    Remove citation IDs, dates and scope names before tokenizing; tolerance follows text precision.
+    """
     cleaned = CITATION.sub("", sentence)
     remove = [*pack["scope"]["repos"], *(e["location"] for e in evidence.values() if e["location"])]
     period = pack["period"]
@@ -198,6 +210,8 @@ def match_numbers(
     errors = []
     matched: dict[str, set[str]] = {}
     for value, decimals, category in numeric_tokens(cleaned):
+        # Accept rounding to the precision used in the sentence, then check units separately:
+        # equal magnitudes in hours and percentages do not support the same claim.
         tolerance = 0.5 * 10 ** (-decimals) + 1e-9
         values = [a for a in allowed if abs(value - abs(a.value)) <= tolerance]
         compatible = [
@@ -277,6 +291,7 @@ def validate_hypotheses(
     """
 
     def fail(code: str, message: str) -> None:
+        """Collect a hypothesis-contract violation without interrupting the remaining checks."""
         errors.append(Violation(code, message))
 
     seen: set[str] = set()
@@ -333,11 +348,13 @@ def validate(
     """Return every violation in one tool output, deduplicated; an empty list means valid.
 
     Schema errors do not stop the semantic checks, so a single repair message can list all
-    problems. A None output (no tool call) yields schema violations only.
+    problems. A None output (no tool call) yields schema violations only. Numeric support is
+    scoped to each sentence's citations, not to every number available anywhere in the pack.
     """
     errors: list[Violation] = []
 
     def fail(code: str, message: str) -> None:
+        """Collect a schema or semantic violation for the complete repair feedback."""
         errors.append(Violation(code, message))
 
     try:

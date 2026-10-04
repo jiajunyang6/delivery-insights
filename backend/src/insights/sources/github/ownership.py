@@ -9,6 +9,7 @@ OWNER = re.compile(r"@[A-Za-z0-9._/-]+")
 
 
 def parse_codeowners(text: str) -> list[OwnershipRule]:
+    """Parse ordered CODEOWNERS patterns and unique @owners, stripping unescaped comments/NULs."""
     text = text.replace("\x00", "")
     rules = []
     for number, raw in enumerate(text.splitlines(), 1):
@@ -27,6 +28,7 @@ def parse_codeowners(text: str) -> list[OwnershipRule]:
 
 
 def parse_area_owners(text: str) -> list[OwnershipRule]:
+    """Parse Markdown area rows and deduplicate owner mentions from the next two columns."""
     text = text.replace("\x00", "")
     rules = []
     for number, raw in enumerate(text.splitlines(), 1):

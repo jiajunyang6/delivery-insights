@@ -11,6 +11,7 @@ from insights.domain import Event, EventKind, OwnershipRule, PullRequestRecord
 
 
 def hours_between(start: datetime | None, end: datetime | None) -> float | None:
+    """Return signed elapsed hours, or None when either endpoint is absent."""
     return (end - start).total_seconds() / 3600 if start is not None and end is not None else None
 
 
@@ -21,6 +22,7 @@ def count_events(
     after: datetime | None,
     before: datetime | None = None,
 ) -> int:
+    """Count matching event kinds strictly after after and, if given, strictly before before."""
     return sum(
         e.kind in kinds
         and after is not None

@@ -41,6 +41,7 @@ WEIGHTS = {
 
 
 def read(snapshot: Mapping[str, Any], pointer: str) -> Any:
+    """Resolve optional snapshot evidence; return None for missing or structurally absent data."""
     try:
         return resolve_pointer(snapshot, pointer)
     except (KeyError, IndexError, TypeError):
@@ -66,6 +67,7 @@ def extract_evidence(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
         side: str = "bottleneck",
         location: str | None = None,
     ) -> None:
+        """Append a catalog item with normalized values and safe examples; skip absent values."""
         raw = read(snapshot, ref)
         if raw is None:
             return
@@ -312,6 +314,7 @@ def build_evidence_pack(
     locations: dict[str, str] = {}
 
     def sanitize(name: str | None) -> str | None:
+        """Keep allowed location names or assign a stable placeholder; preserve None."""
         if name is None:
             return None
         if name not in locations:

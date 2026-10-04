@@ -22,6 +22,7 @@ async def snapshot(
     snapshot_id: str,
     service: Annotated[SnapshotService, Depends(get_snapshot_service)],
 ) -> Response:
+    """Serve a stored snapshot by validated ID, honoring conditional ETags and retention."""
     return response(
         await service.by_id(validate_snapshot_id(snapshot_id), request.headers.get("if-none-match"))
     )
@@ -35,6 +36,10 @@ async def narrative(
     audience: str = "manager",
     lang: Literal["en"] = "en",
 ) -> Response:
+    """Serve a retained snapshot's English narrative for manager or director audiences.
+
+    Audience is checked here; FastAPI restricts lang to en before calling this route.
+    """
     sid = validate_snapshot_id(snapshot_id)
     if audience not in {"director", "manager"}:
         raise invalid("audience")

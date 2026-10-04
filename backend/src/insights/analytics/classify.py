@@ -32,6 +32,7 @@ LINK_FIELDS = (
 
 def is_flow(facts: PrFacts) -> bool:
     # Flow metrics cover human, ready-for-review PRs; bot and backport PRs are excluded.
+    """Return whether the PR is ready and eligible for human, non-backport flow metrics."""
     return not facts.is_bot_author and not facts.is_backport and facts.ready_at is not None
 
 
@@ -88,6 +89,7 @@ class HeadIndex:
     """Range minimum over creation times; avoids quadratic supersession scans."""
 
     def __init__(self, items: Sequence[LinkInput]) -> None:
+        """Index PR creation dates in a segment tree holding minimum merge-time/ID pairs."""
         ordered = sorted(items, key=lambda p: (p.record.created_at, p.pr_id))
         self.dates = [p.record.created_at for p in ordered]
         self.size = 1 << max(0, (len(ordered) - 1).bit_length())
@@ -104,9 +106,11 @@ class HeadIndex:
     def minimum(
         a: tuple[datetime, int] | None, b: tuple[datetime, int] | None
     ) -> tuple[datetime, int] | None:
+        """Return the earlier pair, treating None as an empty segment."""
         return b if a is None else (a if b is None else min(a, b))
 
     def earliest(self, start: datetime, end: datetime) -> tuple[datetime, int] | None:
+        """Earliest merge among indexed PRs created in inclusive [start, end]; None if empty."""
         left = self.size + bisect_left(self.dates, start)
         right = self.size + bisect_right(self.dates, end)
         result = None
@@ -134,6 +138,10 @@ class LinkIndexes:
 
 
 def build_link_indexes(prs: Sequence[LinkInput], default_branch: str) -> LinkIndexes:
+    """Build chronological title/SHA lookups and same-author/head supersession indexes.
+
+    SHA prefixes include abbreviated revert references; lookup positions use merge-time order.
+    """
     merged_titles: dict[str, list[LinkInput]] = defaultdict(list)
     sha_index: dict[str, list[LinkInput]] = defaultdict(list)
     heads: dict[tuple[str, str], list[LinkInput]] = defaultdict(list)
@@ -176,6 +184,11 @@ def link_reverts(
     indexes: LinkIndexes,
     repo_full_name: str,
 ) -> None:
+    """Update output in place, resolving explicit repo references before SHA/title heuristics.
+
+    SHA/title fallbacks consider only PRs merged before the revert was created. A detected
+    revert affects its original's reverted_at only after the revert itself is merged.
+    """
     # Creation order lets a revert of a revert see its target already marked as a revert.
     for item in sorted(prs, key=lambda p: (p.record.created_at, p.pr_id)):
         pr, facts = item.record, output[item.pr_id]
@@ -232,6 +245,11 @@ def link_relands_and_closes(
     indexes: LinkIndexes,
     repo_full_name: str,
 ) -> None:
+    """Update reland and closure classifications using the repository's already-resolved reverts.
+
+    A same-author merged successor takes precedence over no_review/abandoned/rejected, so
+    superseded PRs do not become waste simply because their original PR closed unmerged.
+    """
     reverted = {identifier: facts for identifier, facts in output.items() if facts.reverted_at}
     reverted_by_title = {
         indexes.by_id[identifier].record.title: identifier for identifier in sorted(reverted)
@@ -349,6 +367,7 @@ def link_prs(
 
 
 def ownership_counts(rules: Sequence[OwnershipRule]) -> tuple[tuple[str, int], ...]:
+    """Count distinct area owners and last-rule CODEOWNERS owners in sorted pattern order."""
     areas: dict[str, set[str]] = {}
     code: dict[str, int] = {}
     for rule in sorted(rules, key=lambda r: (r.source, r.line_no)):

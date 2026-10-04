@@ -37,10 +37,12 @@ logger = structlog.get_logger(__name__)
 
 
 def current_key(settings: Settings) -> str:
+    """Compute the active derivation identity from location grouping and directory depth."""
     return derive_key(settings.location_dimension, settings.directory_depth)
 
 
 def pending_prs(repo_id: int, key: str) -> Select[int]:
+    """Find missing or outdated facts; IS DISTINCT FROM also treats a NULL derive key as stale."""
     return (
         select(PullRequest.id)
         .outerjoin(PrFact, PrFact.pr_id == PullRequest.id)
@@ -49,6 +51,7 @@ def pending_prs(repo_id: int, key: str) -> Select[int]:
 
 
 async def derivation_complete(session: AsyncSession, repo_id: int, key: str) -> bool:
+    """Test whether all repository PRs have facts matching this derivation key."""
     return await session.scalar(pending_prs(repo_id, key).limit(1)) is None
 
 
@@ -58,6 +61,8 @@ async def derive_prs(
     """Rebuild intervals and facts for the given PRs; return how many violate invariants.
 
     Stored link fields are kept: they depend on other PRs and are owned by link_repo.
+    The caller owns commit/rollback. Invariant violations are logged and counted, not rejected;
+    intervals and facts are still rebuilt so the job can report all affected PRs.
     """
     if not pr_ids:
         return 0
@@ -117,6 +122,8 @@ async def derive_prs(
             for seq, interval in enumerate(result.intervals)
         )
     await session.execute(delete(PrInterval).where(PrInterval.pr_id.in_(pr_ids)))
+    # Replacement is atomic only inside the caller's transaction: readers must not see the
+    # deletion separately from the new intervals and facts.
     if interval_values:
         await session.execute(insert(PrInterval), interval_values)
     if fact_values:
@@ -168,6 +175,7 @@ async def link_repo(session: AsyncSession, repo_id: int, *, increment_version: b
             changed,
         )
         if increment_version:
+            # Link changes affect historical waste/throughput even when raw PR rows are unchanged.
             await session.execute(
                 update(Repository)
                 .where(Repository.id == repo_id)
@@ -180,6 +188,7 @@ async def link_repo(session: AsyncSession, repo_id: int, *, increment_version: b
 
 
 async def enqueue_rederivation(ctx: dict[str, Any]) -> None:
+    """Queue covered tracked repositories whose completed derivation identity is stale."""
     key = current_key(cast(Settings, ctx["settings"]))
     async with sessions_for(ctx)() as session:
         repos = (

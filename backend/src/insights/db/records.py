@@ -13,6 +13,7 @@ from insights.domain import Actor, Event, EventKind, PullRequestRecord
 
 
 def facts_from_row(row: PrFact) -> PrFacts:
+    """Convert stored fact fields to immutable analytics records with tuple locations."""
     values = {field.name: getattr(row, field.name) for field in fields(PrFacts)}
     values["locations"] = tuple(values["locations"])
     return PrFacts(**values)
@@ -21,6 +22,10 @@ def facts_from_row(row: PrFact) -> PrFacts:
 async def load_records(
     session: AsyncSession, prs: Sequence[PullRequest]
 ) -> dict[int, PullRequestRecord]:
+    """Load ordered events/files and reconstruct immutable source records keyed by database ID.
+
+    An empty input returns an empty mapping; this function does not commit or derive new facts.
+    """
     ids = [pr.id for pr in prs]
     if not ids:
         return {}

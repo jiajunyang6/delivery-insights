@@ -33,6 +33,7 @@ JOB_ROUTES = {
 
 
 async def ensure_repo(session: AsyncSession, repo_full_name: str, now: datetime) -> Repository:
+    """Insert a repository if absent and return its case-insensitive identity without committing."""
     match = REPO_RE.fullmatch(repo_full_name)
     if not match:
         raise ValueError("Invalid repository")
@@ -68,6 +69,8 @@ async def enqueue_sync(
     repo = await ensure_repo(session, repo_full_name, now)
     job = SyncJob(id=uuid4(), repo_id=repo.id, kind=kind, status="queued", stats={}, created_at=now)
     session.add(job)
+    # Redis/arq is a separate system: commit the ledger before dispatch so a fast worker can
+    # find it. An enqueue failure is recorded explicitly rather than rolling back that ledger.
     await session.commit()
     try:
         enqueued = await arq.enqueue_job(
@@ -104,6 +107,7 @@ async def enqueue_sync(
 
 
 RELEASE_LOCK = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) end"
+# A TTL may expire and be acquired by another job; renew/release only the original token's lock.
 RENEW_LOCK = (
     "if redis.call('get', KEYS[1]) == ARGV[1] then "
     "return redis.call('expire', KEYS[1], ARGV[2]) end"
@@ -111,20 +115,24 @@ RENEW_LOCK = (
 
 
 def now_for(ctx: dict[str, Any]) -> datetime:
+    """Read the injected job clock, defaulting to current aware UTC time."""
     clock = cast(Callable[[], datetime], ctx.get("now", lambda: datetime.now(UTC)))
     return clock()
 
 
 def sessions_for(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
+    """Return the async database session factory stored in the worker context."""
     return cast(async_sessionmaker[AsyncSession], ctx["session_factory"])
 
 
 async def set_repo(ctx: dict[str, Any], repo_id: int, **values: Any) -> None:
+    """Commit supplied repository fields in a separate short transaction."""
     async with sessions_for(ctx)() as session, session.begin():
         await session.execute(update(Repository).where(Repository.id == repo_id).values(**values))
 
 
 async def set_job(ctx: dict[str, Any], job_id: str, **values: Any) -> None:
+    """Commit supplied sync-job fields in a separate short transaction."""
     async with sessions_for(ctx)() as session, session.begin():
         await session.execute(update(SyncJob).where(SyncJob.id == UUID(job_id)).values(**values))
 
@@ -152,6 +160,7 @@ async def repository_lock(ctx: dict[str, Any], repo: str, job_id: str) -> AsyncI
         return
 
     async def renew() -> None:
+        """Renew only this job's lock token every ten minutes; raise if ownership is lost."""
         while True:
             await asyncio.sleep(600)
             renewed = await cast(Awaitable[Any], redis.eval(RENEW_LOCK, 1, key, job_id, "7200"))
@@ -171,6 +180,7 @@ async def repository_lock(ctx: dict[str, Any], repo: str, job_id: str) -> AsyncI
 
 
 async def enqueue_precompute(ctx: dict[str, Any], repo: Repository) -> None:
+    """Queue snapshot warming under a deduplicated, case-insensitive repository job ID."""
     await ctx["redis"].enqueue_job(
         "precompute_snapshots",
         repo.full_name,
@@ -179,6 +189,7 @@ async def enqueue_precompute(ctx: dict[str, Any], repo: Repository) -> None:
 
 
 async def last_success(ctx: dict[str, Any], repo_id: int, kind: str) -> datetime | None:
+    """Return the latest successful finish time for this repository/job kind, or None."""
     async with sessions_for(ctx)() as session:
         return await session.scalar(
             select(SyncJob.finished_at)
@@ -200,6 +211,10 @@ class JobRun:
     async def finish(
         self, result: str = "succeeded", error: str | None = None, *, include_stats: bool = True
     ) -> None:
+        """Persist terminal status and permitted stats, then mark this run finished.
+
+        Failure text is capped at 500 characters; failed enrichment preserves existing stats.
+        """
         values: dict[str, Any] = {"status": result, "finished_at": now_for(self.ctx)}
         if include_stats and (result == "succeeded" or self.kind not in {"ownership", "ci_runs"}):
             values["stats"] = self.stats

@@ -31,6 +31,7 @@ class RepoRef:
 
     @property
     def full_name(self) -> str:
+        """Repository identity in owner/name form, preserving the stored spelling."""
         return f"{self.owner}/{self.name}"
 
 

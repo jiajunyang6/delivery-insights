@@ -16,16 +16,19 @@ SNAPSHOT_RETENTION = timedelta(days=7)
 
 
 def matches_etag(header: str | None, etag: str) -> bool:
+    """Match comma-separated If-None-Match values, accepting weak tags and the wildcard."""
     if header is None:
         return False
     return any(part.strip().removeprefix("W/").strip() in {"*", etag} for part in header.split(","))
 
 
 def alive(created_at: datetime, now: datetime) -> bool:
+    """Test whether snapshot retention expires strictly after the supplied observation time."""
     return created_at + SNAPSHOT_RETENTION > now
 
 
 def cache_ttl(created_at: datetime, now: datetime, maximum: int = 86400) -> int:
+    """Bound cache life by both its maximum TTL and the snapshot's remaining retention."""
     return max(0, min(maximum, int((created_at + SNAPSHOT_RETENTION - now).total_seconds())))
 
 
@@ -39,6 +42,7 @@ class Reply:
 def snapshot_reply(
     sid: str, body: bytes, etag: str, conditional: str | None, *, immutable: bool
 ) -> Reply:
+    """Build conditional 200/304 snapshot replies with mutable or immutable cache headers."""
     headers = {
         "ETag": etag,
         "Cache-Control": "private, max-age=86400, immutable"
@@ -64,6 +68,10 @@ def encode_cursor(sid: str, offset: int, filters: PrFilters) -> str:
 
 
 def decode_cursor(cursor: str | None, sid: str, filters: PrFilters) -> int:
+    """Return the page offset, or raise 422 for malformed or mismatched snapshot/filter identity.
+
+    Base64 is transport encoding, not authentication; validate every decoded field explicitly.
+    """
     if cursor is None:
         return 0
     try:
@@ -113,6 +121,7 @@ def page_rows(
     ]
 
     def score(row: dict[str, Any]) -> float:
+        """Choose descending priority by risk ratio, closure time, cycle hours or state age."""
         if filters.at_risk:
             threshold = row["at_risk"]["threshold_hours"]
             return float(row["current_state_age_hours"] / threshold) if threshold else float("inf")

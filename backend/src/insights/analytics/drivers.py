@@ -11,14 +11,20 @@ from insights.analytics.stats import percentile
 
 
 def quotient(value: float | None, baseline: float | None) -> float | None:
+    """Return value divided by a nonzero baseline; missing inputs or a zero baseline yield None."""
     return value / baseline if value is not None and baseline else None
 
 
 def pickup_group(prs: Sequence[PrData]) -> dict[str, Any]:
+    """Count PRs and report median pickup hours when at least ten values are present."""
     return {"n": len(prs), "pickup_p50_hours": percentile(values(prs, "pickup_hours"), 50, 10)}
 
 
 def build_drivers(dataset: Dataset) -> dict[str, Any]:
+    """Describe assignment, re-review and slowest-decile associations among current merged PRs.
+
+    These group comparisons are descriptive; the slowest-decile view needs at least 50 PRs.
+    """
     prs = merged(dataset, dataset.current)
     assigned = pickup_group([p for p in prs if p.facts.review_requested_before_first_review])
     unassigned = pickup_group([p for p in prs if not p.facts.review_requested_before_first_review])
@@ -37,6 +43,7 @@ def build_drivers(dataset: Dataset) -> dict[str, Any]:
         slow, rest = ordered[:n], ordered[n:]
 
         def features(group: Sequence[PrData]) -> dict[str, float | None]:
+            """Compute size/round medians and contributor, location and assignment shares."""
             return {
                 "size_lines_p50": percentile(values(group, "size_lines"), 50, 10),
                 "external_share": sum(p.facts.external_contributor for p in group) / len(group),

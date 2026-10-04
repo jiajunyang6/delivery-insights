@@ -24,6 +24,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        """Initialize app clients/session factories and close them on shutdown.
+
+        Queue startup is best effort; manual-sync dependencies can reconnect lazily.
+        """
         configure_logging(configuration.log_level)
         engine, sessions = create_database(configuration)
         redis = create_redis(configuration)

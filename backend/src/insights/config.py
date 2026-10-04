@@ -17,6 +17,7 @@ NAME_RE = re.compile(r"^(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$")
 
 
 def split_list(value: str) -> list[str]:
+    """Split comma-separated configuration, trimming whitespace and omitting empty entries."""
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
@@ -51,6 +52,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_settings(self) -> Self:
+        """Validate repository syntax, scheduling relationships and analytics configuration."""
         if not self.tracked_repo_list or any(
             REPO_RE.fullmatch(repo) is None for repo in self.tracked_repo_list
         ):
@@ -82,19 +84,23 @@ class Settings(BaseSettings):
 
     @property
     def llm_enabled(self) -> bool:
+        """Whether a nonempty Bedrock API key is configured for narrative generation."""
         return bool(
             self.aws_bearer_token_bedrock and self.aws_bearer_token_bedrock.get_secret_value()
         )
 
     @property
     def backfill_phases(self) -> list[int]:
+        """Sorted unique backfill targets: seven days, thirty days and the configured horizon."""
         return sorted({7, 30, self.backfill_days})
 
     @property
     def location_label_prefix(self) -> str | None:
+        """Label prefix for label:<prefix> grouping, or None for another location dimension."""
         return self.location_dimension[6:] if self.location_dimension.startswith("label:") else None
 
 
 @lru_cache
 def get_settings() -> Settings:
+    """Load and cache application settings on first use."""
     return Settings()

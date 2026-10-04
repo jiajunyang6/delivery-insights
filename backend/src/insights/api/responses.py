@@ -8,6 +8,7 @@ from insights.snapshots.caching import Reply
 
 
 def job_response(job: SyncJob, repo: str) -> SyncJobResponse:
+    """Project a persisted sync job and repository name into its public status contract."""
     return SyncJobResponse(
         id=str(job.id),
         repo=repo,
@@ -24,6 +25,7 @@ def job_response(job: SyncJob, repo: str) -> SyncJobResponse:
 
 
 def response(reply: Reply) -> Response:
+    """Convert domain reply bytes/status/headers into JSON, omitting media type for 304."""
     return Response(
         reply.body,
         status_code=reply.status,

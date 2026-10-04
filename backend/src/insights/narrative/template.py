@@ -28,10 +28,12 @@ WAITING = {
 
 
 def percent(value: float) -> str:
+    """Format a fractional share as percent, keeping one decimal below ten percent in magnitude."""
     return f"{value * 100:.1f}%" if abs(value * 100) < 10 else f"{value * 100:.0f}%"
 
 
 def phrase(candidate: Mapping[str, Any]) -> str:
+    """Render a candidate's location and confidence band using the matching uncertainty wording."""
     if candidate["id"] == "H_review_capacity":
         location = candidate["location"]
         subject = (
@@ -61,9 +63,11 @@ def build_template(pack: Mapping[str, Any], snapshot: Mapping[str, Any]) -> dict
     candidates = pack["hypotheses"]
 
     def hour(value: float) -> str:
+        """Format an elapsed-hour value with one decimal and its unit."""
         return f"{value:.1f} h"
 
     def sentence(text: str, ids: list[str]) -> str:
+        """Append up to three evidence citations and a final period to the supplied text."""
         return f"{text} {''.join(f'[{i}]' for i in ids[:3])}" + "."
 
     cycle = evidence.get("E1")

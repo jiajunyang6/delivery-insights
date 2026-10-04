@@ -24,6 +24,7 @@ class SnapshotParams:
     ci_source: str = "none"
 
     def canonical_dict(self) -> dict[str, Any]:
+        """Return normalized parameters and versions used to identify deterministic snapshots."""
         return {
             "repos": sorted(repo.lower() for repo in self.repos),
             "from": self.period_from.isoformat(),
@@ -62,6 +63,7 @@ class PrData:
     human_activity_at: tuple[datetime, ...] = ()
 
     def __post_init__(self) -> None:
+        """Sort activity timestamps on the frozen record for bisect-based cohort selection."""
         object.__setattr__(self, "human_activity_at", tuple(sorted(self.human_activity_at)))
 
 
@@ -87,6 +89,7 @@ class Window:
 
     def contains(self, at: datetime | None) -> bool:
         # Half-open [start, end): adjacent periods and weeks never both count a boundary event.
+        """Test membership in [start, end); None never belongs to a window."""
         return at is not None and self.start <= at < self.end
 
 
@@ -108,38 +111,51 @@ class Dataset:
 
     @property
     def start(self) -> datetime:
+        """Inclusive report start at UTC midnight."""
         return datetime.combine(self.period_from, datetime.min.time(), UTC)
 
     @property
     def to_excl(self) -> datetime:
+        """UTC midnight after the inclusive report end date."""
         return datetime.combine(self.period_to + timedelta(days=1), datetime.min.time(), UTC)
 
     @property
     def as_of(self) -> datetime:
         # Clamp to the least recently synced repo so no repo is read past its synced data.
+        """Observation cutoff: the earlier of report end and the least-recent repository sync."""
         return min(self.to_excl, min(r.last_synced_at for r in self.repos))
 
     @property
     def days(self) -> int:
+        """Number of requested calendar days, including both report dates."""
         return (self.period_to - self.period_from).days + 1
 
     @property
     def current(self) -> Window:
+        """Current half-open window, clipped to the common observation cutoff."""
         return Window(self.start, self.as_of)
 
     @property
     def previous(self) -> Window:
+        """Previous window of equal requested length, ending at the current start."""
         return Window(self.start - timedelta(days=self.days), self.start)
 
     @property
     def comparison_available(self) -> bool:
+        """Whether every repository's history covers the entire previous window."""
         return all(r.covered_since <= self.previous.start for r in self.repos)
 
     @property
     def flow(self) -> tuple[PrData, ...]:
+        """Eligible period-active PRs in the current window."""
         return self.flow_in(self.current)
 
     def flow_in(self, window: Window) -> tuple[PrData, ...]:
+        """Select ready, non-bot, non-backport PRs created or human-active in this window.
+
+        Ended/open status is filtered by each consumer; creation/activity decides membership.
+        The cache belongs to this Dataset, so replacing its inputs cannot reuse an old cohort.
+        """
         cached = self.cohort_cache.get(window)
         if cached is None:
             flow = tuple(p for p in self.prs if is_flow(p.facts) and active_in(p, window))
@@ -148,6 +164,7 @@ class Dataset:
         return cached[0]
 
     def reviews_in(self, window: Window) -> tuple[Review, ...]:
+        """Review events in the window on its active flow cohort; n counts reviews, not PRs."""
         flow = self.flow_in(window)
         cached = self.cohort_cache[window][1]
         if cached is None:
@@ -176,6 +193,7 @@ def merged(dataset: Dataset, window: Window, *, scope: Window | None = None) -> 
 
 
 def closed(dataset: Dataset, window: Window) -> tuple[PrData, ...]:
+    """Select active flow PRs closed without merging during this half-open window."""
     return tuple(
         p
         for p in dataset.flow_in(window)
@@ -184,25 +202,30 @@ def closed(dataset: Dataset, window: Window) -> tuple[PrData, ...]:
 
 
 def open_at(pr: PrData, at: datetime) -> bool:
+    """Test whether a ready PR occupies a waiting state at this historical instant."""
     return is_open_at(pr.facts.ready_at, pr.facts.end_at, pr.intervals, at)
 
 
 def hours(pr: PrData, *, end: datetime) -> dict[str, float]:
+    """Sum post-ready elapsed waiting hours, clipped to lifecycle end and the supplied cutoff."""
     return ledger_hours(
         pr.intervals, start=pr.facts.ready_at or end, end=min(pr.facts.end_at or end, end)
     )
 
 
 def reverted(pr: PrData, at: datetime) -> bool:
+    """Test whether a linked revert was merged strictly before the supplied cutoff."""
     return pr.facts.reverted_at is not None and pr.facts.reverted_at < at
 
 
 def effective_review(pr: PrData) -> datetime | None:
+    """Return first-review time clamped to ready time, or None if either is missing."""
     f = pr.facts
     return max(f.first_review_at, f.ready_at) if f.first_review_at and f.ready_at else None
 
 
 def weeks(window: Window) -> Iterator[Window]:
+    """Yield Monday-aligned UTC windows, clipping partial weeks to the supplied bounds."""
     start = window.start
     while start < window.end:
         next_monday = datetime.combine(

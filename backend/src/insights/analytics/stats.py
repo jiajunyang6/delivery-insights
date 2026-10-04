@@ -18,6 +18,7 @@ Statistic = Literal["median", "p90", "mean", "ratio"]
 
 
 def percentile(values: Sequence[float], q: float, min_samples: int) -> float | None:
+    """Compute a linear percentile (q from 0 to 100), or None below the minimum sample count."""
     return (
         float(np.percentile(values, q, method="linear"))
         if len(values) >= max(1, min_samples)
@@ -48,7 +49,10 @@ def bootstrap_diff(
     rng = np.random.default_rng(seed)
 
     def sample(values: Sequence[float] | Sequence[tuple[float, float]]) -> NDArray[np.float64]:
+        """Resample observations with the shared seeded RNG and compute each draw's statistic."""
         array = np.asarray(values, dtype=np.float64)
+        # Resample whole observations. In ratio mode this preserves each numerator's
+        # relationship to its denominator instead of drawing the two components independently.
         draws = array[rng.integers(0, len(values), size=(BOOTSTRAP_ITERATIONS, len(values)))]
         if statistic == "ratio":
             numerator, denominator = draws[:, :, 0].sum(axis=1), draws[:, :, 1].sum(axis=1)
@@ -69,6 +73,7 @@ def bootstrap_diff(
 
 
 def ratio(numerator: float, denominator: float) -> float:
+    """Divide numerator by denominator, returning 0.0 when the denominator is zero."""
     return numerator / denominator if denominator else 0.0
 
 

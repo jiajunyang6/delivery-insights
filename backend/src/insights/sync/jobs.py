@@ -38,6 +38,7 @@ class SyncRun:
     """One sync job: resumes the backfill cursor, advances the watermark, records coverage."""
 
     def __init__(self, ctx: dict[str, Any], repo: Repository, job_id: str) -> None:
+        """Bind one repo/job, capture start time and initialize ingestion/derivation counters."""
         self.ctx, self.repo, self.job_id = ctx, repo, job_id
         self.adapter = cast(SourceAdapter, ctx["adapter"])
         self.settings = cast(Settings, ctx["settings"])
@@ -54,6 +55,7 @@ class SyncRun:
         }
 
     async def fetch(self, cursor: str | None, *, open_only: bool = False) -> PageResult:
+        """Fetch one source page using the run's repository and configured maximum page size."""
         return await self.adapter.pull_requests_page(
             RepoRef(self.repo.owner, self.repo.name),
             cursor=cursor,
@@ -62,6 +64,10 @@ class SyncRun:
         )
 
     async def store(self, page: PageResult, *, backfill: bool = False) -> None:
+        """Commit a page's records, derived facts and optional resume cursor in one transaction.
+
+        Stats advance after commit; a failure leaves the previous cursor available for replay.
+        """
         async with sessions_for(self.ctx)() as session, session.begin():
             result = await save_page(
                 session, self.repo.id, page, now=now_for(self.ctx), settings=self.settings
@@ -127,6 +133,7 @@ class SyncRun:
 
         # Read 10 minutes past the cutoff; PRs that did not change are skipped by content hash.
         def stop(page: PageResult) -> bool:
+            """Stop once a page reaches before the watermark's ten-minute overlap margin."""
             return (
                 page.oldest_updated_at is not None
                 and page.oldest_updated_at < cutoff - timedelta(minutes=10)
@@ -209,6 +216,7 @@ class SyncRun:
         )
 
         def stop(page: PageResult) -> bool:
+            """Stop once a page's oldest update precedes the final history threshold."""
             return page.oldest_updated_at is not None and page.oldest_updated_at < final_threshold
 
         async with aclosing(
@@ -245,6 +253,10 @@ class SyncRun:
                     index += 1
 
     async def execute(self) -> None:
+        """Resume changes/backfill, refresh open PRs, then publish the final successful checkpoint.
+
+        Completing incremental pagination alone does not establish historical period coverage.
+        """
         if self.repo.sync_watermark:
             await set_job(self.ctx, self.job_id, phase="incremental")
             await self.incremental(self.repo.sync_watermark)
@@ -261,6 +273,10 @@ class SyncRun:
 
 
 async def reconcile_tracked_repos(ctx: dict[str, Any]) -> None:
+    """Reconcile the configured allowlist and queue missing history plus stale derivations.
+
+    Without a GitHub token, record missing_token rather than scheduling source ingestion.
+    """
     settings = cast(Settings, ctx["settings"])
     async with sessions_for(ctx)() as session:
         await session.execute(update(Repository).values(tracked=False))
@@ -287,6 +303,7 @@ async def reconcile_tracked_repos(ctx: dict[str, Any]) -> None:
 
 
 async def incremental_sync_all(ctx: dict[str, Any]) -> None:
+    """Queue stale derivations and, when credentials exist, incremental sync for tracked repos."""
     await enqueue_rederivation(ctx)
     if not cast(Settings, ctx["settings"]).github_token:
         return
@@ -299,6 +316,7 @@ async def incremental_sync_all(ctx: dict[str, Any]) -> None:
 
 
 async def enqueue_enrichment(ctx: dict[str, Any], repo: Repository) -> None:
+    """Queue due CI and ownership refreshes based on their last successful completion times."""
     settings = cast(Settings, ctx["settings"])
     async with sessions_for(ctx)() as session:
         for kind, interval in (("ci_runs", timedelta(hours=1)), ("ownership", timedelta(days=1))):

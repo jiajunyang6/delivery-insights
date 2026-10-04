@@ -52,6 +52,7 @@ class GitHubClient:
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         clock: Callable[[], float] = time,
     ) -> None:
+        """Create authenticated HTTP/quota handling with injectable time and sleep."""
         self.settings = settings
         self.redis = redis
         self.sleep = sleep
@@ -70,9 +71,11 @@ class GitHubClient:
         )
 
     async def aclose(self) -> None:
+        """Close the owned HTTP client; supplied Redis remains caller-owned."""
         await self.http.aclose()
 
     async def _wait(self, delay: float, waited: float, reason: str) -> float:
+        """Sleep and return accumulated wait in seconds; reject totals above 900."""
         delay = max(0.0, delay)
         if waited + delay > 900:
             raise GitHubRateLimited("wait_budget_exceeded")
@@ -135,6 +138,8 @@ class GitHubClient:
         """POST a query and return its `data`, mapping GraphQL errors to GitHubError types.
 
         Requests are serialized, so a quota wait here pauses every caller of this client.
+        Reject errors even with HTTP 200 and partial data: storing an incomplete event history
+        as a successful page would make derived metrics and sync checkpoints unreliable.
         """
         async with self.lock:
             response = await self._request(
@@ -183,6 +188,11 @@ class GitHubClient:
         *,
         accept: str | None = None,
     ) -> RestResponse:
+        """Fetch a relative API path, reusing an ETag only with its cached response body.
+
+        Relative paths keep authenticated requests on the configured GitHub API host.
+        Redis is best-effort; a 304 without a body is an error, never an empty success.
+        """
         if not path.startswith("/") or path.startswith("//") or "://" in path or "\\" in path:
             raise ValueError("REST path must be a relative API path")
         url = str(httpx.URL(self.settings.github_api_url.rstrip("/") + path, params=params))

@@ -13,6 +13,7 @@ logger = structlog.get_logger(__name__)
 
 
 def normalize_run(raw: dict[str, Any]) -> CiRun:
+    """Convert a GitHub Actions response into a CI record with sorted unique PR numbers."""
     raw = remove_nulls(raw)
     return CiRun(
         int(raw["id"]),
@@ -41,6 +42,7 @@ async def fetch_runs(
     path = f"/repos/{repo.full_name}/actions/runs"
 
     async def window(created: str, *, split: bool) -> bool:
+        """Fetch up to ten pages, or return False to split a window exceeding 1,000 runs."""
         response = await client.rest_get(
             path, {"created": created, "event": "pull_request", "per_page": 100, "page": 1}
         )

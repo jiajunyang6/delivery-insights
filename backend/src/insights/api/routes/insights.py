@@ -25,6 +25,7 @@ def parameters(
 ) -> SnapshotParams:
     # The query arguments above only document the API in OpenAPI; parse_params reads the raw
     # query so every invalid field is reported together in one 422 problem.
+    """Parse the raw snapshot query and collect validation errors into one 422 response."""
     return parse_params(request.query_params, service.settings, service.now)
 
 
@@ -34,6 +35,7 @@ async def delivery(
     params: Annotated[SnapshotParams, Depends(parameters)],
     service: Annotated[SnapshotService, Depends(deps.get_snapshot_service)],
 ) -> Response:
+    """Serve current local analytics, honoring the request's conditional ETag."""
     return response(await service.delivery(params, request.headers.get("if-none-match")))
 
 
@@ -50,5 +52,6 @@ async def prs(
     cursor: str | None = None,
 ) -> Response:
     # As in parameters(): filter arguments are declared for OpenAPI, parsed by parse_filters.
+    """Parse drilldown filters and serve a cursor page from the corresponding snapshot."""
     filters, parsed_limit, parsed_cursor = parse_filters(request.query_params)
     return response(await service.rows(params, filters, parsed_limit, parsed_cursor))

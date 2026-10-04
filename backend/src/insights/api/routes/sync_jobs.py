@@ -20,6 +20,7 @@ router = APIRouter(prefix="/v1/sync-jobs", tags=["Sync jobs"])
 async def sync_job(
     job_id: str, session: Annotated[AsyncSession, Depends(get_session)]
 ) -> SyncJobResponse:
+    """Load a job by canonical UUID and return its repository/status, or raise 404."""
     identifier = validate_job_id(job_id)
     row = (
         await session.execute(

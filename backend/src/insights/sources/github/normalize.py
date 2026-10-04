@@ -49,6 +49,7 @@ KINDS = {
 
 
 def parse_time(value: str) -> datetime:
+    """Parse an aware upstream timestamp and normalize to UTC; reject missing timezones."""
     parsed = datetime.fromisoformat(value)
     if parsed.tzinfo is None:
         raise ValueError("Upstream timestamps must include a timezone")
@@ -67,6 +68,7 @@ def remove_nulls(value: Any) -> Any:
 
 
 def actor(node: dict[str, Any] | None, extra_bots: frozenset[str] = frozenset()) -> Actor:
+    """Normalize actors and detect bots from GraphQL type, login suffix and configured names."""
     node = remove_nulls(node or {})
     login = node.get("login")
     lowered = (login or "").lower()
@@ -80,6 +82,7 @@ def actor(node: dict[str, Any] | None, extra_bots: frozenset[str] = frozenset())
 
 
 def dedup_key(kind: str, occurred_at: datetime, actor_login: str | None, stable: str) -> str:
+    """Build a stable 16-hex event identity hash; SHA-1 here is for deduplication, not security."""
     value = f"{kind}|{occurred_at.isoformat()}|{actor_login or ''}|{stable}"
     return sha1(value.encode(), usedforsecurity=False).hexdigest()[:16]
 
@@ -176,6 +179,7 @@ def normalize_events(
 def normalize_pr(
     node: dict[str, Any], extra_bots: frozenset[str] = frozenset()
 ) -> PullRequestRecord:
+    """Convert a GraphQL PR node to a record, clipping the body excerpt to 4,000 characters."""
     node = remove_nulls(node)
     author = node.get("author") or {}
     return PullRequestRecord(

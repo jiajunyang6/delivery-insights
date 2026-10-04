@@ -21,18 +21,22 @@ from insights.analytics.timeline import state_at
 
 
 def iso(at: datetime) -> str:
+    """Format a timestamp in UTC at whole-second precision with a trailing Z."""
     return at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def canonical(value: Any) -> bytes:
+    """Sorted-key JSON bytes shared by content hashes, stored payloads and HTTP ETags."""
     return orjson.dumps(value, option=orjson.OPT_SORT_KEYS)
 
 
 def digest(value: Any) -> str:
+    """Return the full SHA-256 digest of canonical JSON bytes."""
     return hashlib.sha256(canonical(value)).hexdigest()
 
 
 def freshness(dataset: Dataset) -> list[dict[str, Any]]:
+    """Serialize repository coverage, sync status and data versions in repository order."""
     return [
         {
             "repo": r.repo,
@@ -63,17 +67,26 @@ def identifiers(dataset: Dataset, params: SnapshotParams) -> tuple[str, str, str
 
 
 def sampling_hash(params: SnapshotParams) -> str:
-    """Bootstrap seed hash: canonical params with SAMPLING_SEED_VERSION as analytics_version."""
+    """Bootstrap seed hash using SAMPLING_SEED_VERSION instead of the output schema version.
+
+    Data/cache identity can change without randomly changing a comparison's sampled draws.
+    """
     seed_params = params.canonical_dict()
     seed_params["analytics_version"] = SAMPLING_SEED_VERSION
     return digest(seed_params)[:16]
 
 
 def etag(payload: bytes) -> str:
+    """Return a quoted 32-hex-character SHA-256 prefix for these exact payload bytes."""
     return '"' + hashlib.sha256(payload).hexdigest()[:32] + '"'
 
 
 def rounded(value: Any, key: str = "", unit: str = "") -> Any:
+    """Apply display precision recursively after computation; reject non-finite numbers.
+
+    Shares/relative changes retain four decimals, most other floats two. Independently rounded
+    current, previous and delta values can differ from arithmetic on the displayed values.
+    """
     if isinstance(value, dict):
         if str(value.get("feature", "")).endswith("_share"):
             return {

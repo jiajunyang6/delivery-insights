@@ -14,4 +14,5 @@ class PrFilters:
     location: str | None = None
 
     def canonical_dict(self) -> dict[str, object]:
+        """Serialize all filter fields for stable cursor identity checks."""
         return asdict(self)

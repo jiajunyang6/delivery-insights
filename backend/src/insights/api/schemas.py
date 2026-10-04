@@ -20,6 +20,7 @@ class Contract(BaseModel):
 
     @field_serializer("*", when_used="json")
     def serialize_timestamp(self, value: Any) -> Any:
+        """Serialize datetime values as whole-second UTC strings; leave other values unchanged."""
         return iso(value) if isinstance(value, datetime) else value
 
 

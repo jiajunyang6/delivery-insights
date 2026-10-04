@@ -22,9 +22,14 @@ class RequestMiddleware:
     """Tag requests with an id, rate-limit /v1/ per client IP and minute, and log completion."""
 
     def __init__(self, app: ASGIApp) -> None:
+        """Wrap the downstream ASGI application."""
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Attach request context/security headers and rate-limit HTTP /v1/ requests.
+
+        Redis failure leaves reads available; uncaught errors become problems before headers start.
+        """
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -41,6 +46,7 @@ class RequestMiddleware:
         limited = request.url.path.startswith("/v1/")
 
         async def wrapped_send(message: Message) -> None:
+            """Track response start/status and append request, cache and rate-limit headers."""
             nonlocal status, response_started
             if message["type"] == "http.response.start":
                 response_started = True

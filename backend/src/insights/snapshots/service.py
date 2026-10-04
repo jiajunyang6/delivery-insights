@@ -44,6 +44,7 @@ logger = structlog.get_logger(__name__)
 
 
 def not_found() -> ResourceError:
+    """Construct the shared 404 domain error without exposing resource existence details."""
     return ResourceError(404, "not-found", "Not found", "The requested resource was not found.")
 
 
@@ -69,9 +70,14 @@ class SnapshotService:
         settings: Settings,
         now: datetime,
     ) -> None:
+        """Bind database/cache dependencies and a fixed request or job observation time."""
         self.sessions, self.redis, self.settings, self.now = sessions, redis, settings, now
 
     async def cache(self, operation: Awaitable[Any]) -> Any:
+        """Treat Redis reads/writes as best effort; callers fall back to database/computation.
+
+        This handles cache transport failures only, not SQL or analytics errors.
+        """
         try:
             return await operation
         except (RedisError, OSError, TimeoutError) as exc:
@@ -205,12 +211,14 @@ class SnapshotService:
 
     @staticmethod
     def cache_created(raw: Any) -> datetime | None:
+        """Parse cached creation time from bytes/text, or return None for invalid values."""
         try:
             return datetime.fromisoformat(raw.decode() if isinstance(raw, bytes) else raw)
         except (ValueError, TypeError):
             return None
 
     async def put_cache(self, sid: str, body: bytes, tag: str, created_at: datetime) -> None:
+        """Best-effort cache of snapshot body/ETag/creation time, bounded by remaining retention."""
         ttl = cache_ttl(created_at, self.now)
         if ttl:
             pipe = self.redis.pipeline()
@@ -224,6 +232,7 @@ class SnapshotService:
     async def cached_reply(
         self, sid: str, conditional: str | None, *, immutable: bool
     ) -> Reply | None:
+        """Serve a retained Redis snapshot or matching 304; return None on a miss/cache failure."""
         key = snapshot_key(sid)
         if conditional:
             fields = await self.cache(
@@ -252,6 +261,7 @@ class SnapshotService:
     async def persisted_reply(
         self, session: AsyncSession, sid: str, conditional: str | None, *, immutable: bool
     ) -> Reply | None:
+        """Serve a retained database snapshot and warm Redis; return None if absent or expired."""
         row = await session.get(Snapshot, sid)
         if row is None or not alive(row.created_at, self.now):
             return None
@@ -260,6 +270,10 @@ class SnapshotService:
         return snapshot_reply(sid, body, row.etag, conditional, immutable=immutable)
 
     async def by_id(self, sid: str, conditional: str | None = None) -> Reply:
+        """Read an existing snapshot within retention; never recompute it from newer repo data.
+
+        Old analytics-version snapshots remain readable by ID until they expire.
+        """
         cached = await self.cached_reply(sid, conditional, immutable=True)
         if cached is not None:
             return cached
@@ -291,6 +305,8 @@ class SnapshotService:
             dataset = await load_dataset(session, params, now=self.now, metadata=metadata)
             load_ms = (perf_counter() - load_started) * 1000
             compute_started = perf_counter()
+            # SQL has already materialized immutable records; the CPU work uses no DB session
+            # and runs off the event loop while retaining the metadata view used for this ID.
             payload = await asyncio.to_thread(build_snapshot, dataset, params=params)
             compute_ms = (perf_counter() - compute_started) * 1000
         body, tag = canonical(payload), etag(canonical(payload))

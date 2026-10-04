@@ -162,7 +162,8 @@ async def generate(
 
     persist is True for a validated LLM answer, or for the template when the LLM is
     disabled; fallbacks after LLM errors, validation failure or a busy lock are served but
-    not stored, so a later request can try the LLM again.
+    not stored in Postgres, so a later request can try the LLM again after any short Redis
+    cache expires. Both LLM attempts share one deadline; repair gets only the remaining time.
     """
     started = perf_counter()
     deadline = monotonic() + NARRATIVE_DEADLINE_SECONDS
@@ -244,6 +245,8 @@ async def generate(
                 if reply.tool_use_id
                 else {"text": feedback}
             )
+            # Preserve the rejected answer and its tool-use ID so repair addresses these
+            # exact violations rather than producing an unrelated answer from the pack alone.
             messages += [reply.assistant_message, {"role": "user", "content": [content]}]
     payload = assemble(output, snapshot, pack, candidates, meta, evidence=evidence)
     logger.info(
@@ -263,6 +266,7 @@ async def generate(
 
 
 def narrative_reply(body: bytes, tag: str, conditional: str | None, persist: bool) -> Reply:
+    """Build a 200/304 reply; persisted output is private-cacheable, fallbacks are no-store."""
     matched = matches_etag(conditional, tag)
     return Reply(
         b"" if matched else body,
@@ -276,9 +280,11 @@ def narrative_reply(body: bytes, tag: str, conditional: str | None, persist: boo
 
 class NarrativeService:
     def __init__(self, snapshots: SnapshotService, llm: LLMClient | None) -> None:
+        """Bind snapshot/cache access and an optional LLM client for narrative orchestration."""
         self.snapshots, self.llm = snapshots, llm
 
     async def cached(self, key: str, conditional: str | None) -> Reply | None:
+        """Return a complete cached conditional reply, or None on a miss/cache failure."""
         values = await self.snapshots.cache(cast(Awaitable[Any], self.snapshots.redis.hgetall(key)))
         if values and values.get(b"body") and values.get(b"etag"):
             return narrative_reply(
@@ -290,6 +296,7 @@ class NarrativeService:
         return None
 
     async def put_cache(self, key: str, body: bytes, tag: str, persist: bool, ttl: int) -> None:
+        """Best-effort cache of payload, ETag and persistence flag, skipping nonpositive TTLs."""
         if ttl > 0:
             pipe = self.snapshots.redis.pipeline()
             pipe.hset(key, mapping={"body": body, "etag": tag, "persist": "1" if persist else "0"})
@@ -339,6 +346,8 @@ class NarrativeService:
             body = canonical(existing.payload)
             await self.put_cache(key, body, existing.etag, True, ttl)
             return narrative_reply(body, existing.etag, conditional, True)
+        # The lock is broader than the cache identity: even different model/prompt versions
+        # serialize generation for this snapshot and audience while Redis is available.
         lock, token, locked = narrative_lock_key(sid, audience, lang), uuid4().hex, False
         if settings.llm_enabled:
             try:

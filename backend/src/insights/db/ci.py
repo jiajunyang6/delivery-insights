@@ -14,6 +14,7 @@ from insights.domain import CiRun
 
 
 def run_from_row(row: WorkflowRun) -> CiRun:
+    """Convert a persisted workflow run into an immutable domain record."""
     return CiRun(
         row.id,
         row.workflow_name,

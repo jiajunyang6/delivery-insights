@@ -41,16 +41,19 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
     states = ledger["states"]
     # Shares use the waiting time of every PR finished this period, merged or not. The
     # time ledger covers merged PRs only, but waste also counts unmerged PRs; one shared
-    # denominator keeps every finding's share comparable and at most 100%.
+    # denominator keeps every finding's share comparable and at most 100%. Findings may cover
+    # the same PR intervals, so their shares are not an exclusive partition summing to 100%.
     finished_pr_hours = ledger["total_pr_hours"] + sum(
         sum(hours(p, end=dataset.as_of).values()) for p in closed(dataset, dataset.current)
     )
 
     def value(path: str) -> Any:
+        """Resolve a snapshot pointer and unwrap a metric's value when present."""
         resolved = resolve_pointer(snapshot, path)
         return resolved["value"] if isinstance(resolved, dict) and "value" in resolved else resolved
 
     def above(path: str, threshold: float) -> bool:
+        """Test a resolved value against an inclusive threshold; missing values do not qualify."""
         v = value(path)
         return v is not None and v >= threshold
 
@@ -65,6 +68,7 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
         location: str | None = None,
         stage: str | None = None,
     ) -> None:
+        """Append a finding with waiting-hour share, referenced evidence and optional what-if."""
         result.append(
             {
                 "id": f"{kind}:{location}" if location else kind,

@@ -17,6 +17,7 @@ from insights.sync.maintenance import housekeeping, precompute_snapshots
 
 
 async def startup(ctx: dict[str, Any]) -> None:
+    """Initialize worker database/GitHub dependencies and reconcile tracked sync/derivation jobs."""
     settings = Settings()
     configure_logging(settings.log_level)
     engine, sessions = create_database(settings)
@@ -32,6 +33,7 @@ async def startup(ctx: dict[str, Any]) -> None:
 
 
 async def shutdown(ctx: dict[str, Any]) -> None:
+    """Close the worker-owned GitHub client and dispose its database engine."""
     await ctx["client"].aclose()
     await ctx["engine"].dispose()
 

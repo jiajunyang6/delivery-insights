@@ -17,6 +17,7 @@ class ResourceError(Exception):
         headers: dict[str, str] | None = None,
         extensions: dict[str, Any] | None = None,
     ) -> None:
+        """Carry domain error details, headers and extensions without depending on FastAPI."""
         super().__init__(title)
         self.status = status
         self.type_slug = type_slug
@@ -28,6 +29,7 @@ class ResourceError(Exception):
 
 
 def invalid(param: str, message: str = "invalid value") -> ResourceError:
+    """Construct a 422 domain problem identifying one invalid parameter."""
     return ResourceError(
         422,
         "invalid-parameter",

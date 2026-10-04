@@ -30,6 +30,7 @@ async def repositories(
     settings: Annotated[Settings, Depends(get_settings)],
     now: Annotated[datetime, Depends(get_now)],
 ) -> RepoList:
+    """Report configured repositories, latest persisted jobs and allowed reporting dates."""
     configured = settings.tracked_repo_list
     repos = {
         r.full_name_lower: r
@@ -85,6 +86,7 @@ async def repositories(
 def validated_repo_path(
     owner: str, name: str, settings: Annotated[Settings, Depends(get_settings)]
 ) -> str:
+    """Resolve route owner/name to an allowed repository through the shared validator."""
     return parse_repo_path(owner, name, settings)
 
 
@@ -98,6 +100,10 @@ async def manual_sync(
     arq: Annotated[ArqRedis, Depends(get_arq)],
     now: Annotated[datetime, Depends(get_now)],
 ) -> SyncJobResponse:
+    """Claim the repository cooldown, enqueue manual sync and return its status URL.
+
+    An existing cooldown raises 429; unavailable queue transport raises a sanitized 503.
+    """
     try:
         key = sync_cooldown_key(repo)
         # SET NX EX claims the cooldown atomically, so concurrent requests enqueue one job.

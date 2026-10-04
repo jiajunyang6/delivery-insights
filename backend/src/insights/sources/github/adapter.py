@@ -26,10 +26,12 @@ logger = structlog.get_logger(__name__)
 
 class GitHubAdapter:
     def __init__(self, client: GitHubClient) -> None:
+        """Bind the shared GitHub client and initialize adaptive pagination state."""
         self.client = client
         self.reset()
 
     def reset(self) -> None:
+        """Restore configured page size and clear the consecutive-success counter."""
         self.page_size = self.client.settings.graphql_page_size
         self.successful_pages = 0
 
@@ -57,6 +59,12 @@ class GitHubAdapter:
     async def _pull_requests_page(
         self, repo: RepoRef, *, cursor: str | None, page_size: int, open_only: bool = False
     ) -> PageResult:
+        """Materialize a page, completing each PR's timeline before normalization.
+
+        Page bounds retain available raw updatedAt values even when other fields are malformed,
+        so normalization skips do not discard watermark progress. Upstream failures propagate;
+        they must not be treated as a successfully completed page with missing history.
+        """
         if not REPO_RE.fullmatch(repo.full_name):
             raise ValueError("Invalid repository")
         size = min(page_size, self.page_size)
@@ -138,11 +146,16 @@ class GitHubAdapter:
     async def ci_runs(
         self, repo: RepoRef, *, created_from: datetime, created_to: datetime
     ) -> list[CiRun]:
+        """Validate the repository and fetch pull-request CI runs within inclusive time bounds."""
         if not REPO_RE.fullmatch(repo.full_name):
             raise ValueError("Invalid repository")
         return await fetch_runs(self.client, repo, created_from=created_from, created_to=created_to)
 
     async def ownership_rules(self, repo: RepoRef) -> list[OwnershipRule]:
+        """Read the first available CODEOWNERS file plus configured area-owner rules.
+
+        Missing files are allowed; other upstream errors propagate instead of implying no owners.
+        """
         if not REPO_RE.fullmatch(repo.full_name):
             raise ValueError("Invalid repository")
         rules: list[OwnershipRule] = []

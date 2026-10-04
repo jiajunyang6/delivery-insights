@@ -1,8 +1,12 @@
+"""Planted process changes and expected top explanations for synthetic evaluation."""
+
 from dataclasses import replace
 
 from insights_eval.generator import AREAS, ScenarioSpec
 
 BASELINE = ScenarioSpec.baseline()
+# Alter source-generating assumptions, not snapshot metrics or hypothesis scores. The real
+# analytics/scoring pipeline must detect the planted changes despite sampling variation.
 SCENARIOS = {
     "review_capacity": replace(
         BASELINE,
@@ -31,6 +35,8 @@ SCENARIOS = {
     ),
     "no_signal": BASELINE,
 }
+# An expected location constrains the top-hit check. None for the hypothesis ID means the
+# correct outcome is abstention; a planted change can still be too weak to qualify in one seed.
 EXPECTED = {
     "review_capacity": ("H_review_capacity", "area-B"),
     "ci_slowdown": ("H_ci_bottleneck", None),

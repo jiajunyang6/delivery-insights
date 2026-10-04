@@ -11,6 +11,7 @@ from insights.domain import CiRun
 
 
 def union_intervals(runs: Sequence[CiRun]) -> tuple[tuple[datetime, datetime], ...]:
+    """Merge overlapping or touching run lifetimes; omit empty or reversed intervals."""
     ranges = sorted((r.created_at, r.updated_at) for r in runs if r.updated_at > r.created_at)
     result: list[tuple[datetime, datetime]] = []
     for start, end in ranges:
@@ -22,6 +23,10 @@ def union_intervals(runs: Sequence[CiRun]) -> tuple[tuple[datetime, datetime], .
 
 
 def measures(dataset: Dataset, window: Window) -> tuple[dict[str, Measure], list[CiRun]]:
+    """Collect CI queue/runtime minutes and rerun flags for runs created in the window.
+
+    Runs must link to its active flow cohort; runtime samples include completed runs only.
+    """
     eligible = {(p.repo, p.number) for p in dataset.flow_in(window)}
     runs = [
         (repo, replace(r, pr_numbers=numbers))
@@ -51,6 +56,7 @@ def measures(dataset: Dataset, window: Window) -> tuple[dict[str, Measure], list
 
 
 def build_ci(dataset: Dataset, params_hash: str) -> dict[str, Any]:
+    """Compare CI metrics with seeded bootstrap intervals when previous coverage is available."""
     current, _ = measures(dataset, dataset.current)
     previous, _ = measures(dataset, dataset.previous)
     result: dict[str, Any] = {}

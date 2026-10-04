@@ -87,10 +87,12 @@ def install_handlers(app: FastAPI) -> None:
 
 
 def unavailable(detail: str) -> ProblemError:
+    """Construct a sanitized 503 dependency-unavailable problem with the supplied detail."""
     return ProblemError(503, "dependency-unavailable", "Dependency unavailable", detail)
 
 
 def invalid_many(errors: list[dict[str, str]]) -> ProblemError:
+    """Construct one 422 problem containing all collected parameter validation errors."""
     return ProblemError(
         422,
         "invalid-parameter",

@@ -95,6 +95,7 @@ def parse_params(query: QueryParams, settings: Settings, now: datetime) -> Snaps
 
 
 def parse_repo_path(owner: str, name: str, settings: Settings) -> str:
+    """Validate owner/name syntax and return its tracked repository, or raise a problem."""
     if OWNER_RE.fullmatch(owner) is None:
         raise invalid("owner")
     if NAME_RE.fullmatch(name) is None:
@@ -103,12 +104,14 @@ def parse_repo_path(owner: str, name: str, settings: Settings) -> str:
 
 
 def validate_snapshot_id(value: str) -> str:
+    """Return a valid snapshot identifier unchanged, or raise a 422 parameter problem."""
     if SNAPSHOT_RE.fullmatch(value) is None:
         raise invalid("snapshot_id")
     return value
 
 
 def validate_job_id(value: str) -> UUID:
+    """Parse a canonical lowercase, hyphenated UUID, or raise a 422 parameter problem."""
     try:
         parsed = UUID(value)
         if str(parsed) != value:

@@ -11,6 +11,7 @@ from insights.config import Settings
 
 
 def create_database(settings: Settings) -> tuple[AsyncEngine, async_sessionmaker[AsyncSession]]:
+    """Create an async engine and session factory that retains loaded attributes after commit."""
     engine = create_async_engine(settings.database_url, pool_pre_ping=True)
     # Jobs keep reading ORM rows, such as Repository, after their session commits.
     return engine, async_sessionmaker(engine, expire_on_commit=False)

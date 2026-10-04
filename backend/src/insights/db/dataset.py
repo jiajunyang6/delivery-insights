@@ -74,6 +74,8 @@ async def load_dataset(
     ]
     start, end = metadata.start, metadata.to_excl
     previous_start, as_of = metadata.previous.start, metadata.as_of
+    # This SQL selects a loadable superset, including lifecycle overlaps and excluded PRs.
+    # Dataset.flow_in applies the exact creation/human-activity cohort after materialization.
     rows = (
         await session.execute(
             select(

@@ -39,10 +39,12 @@ DEFAULT_ABSTAIN_REASON = "insufficient_signal"
 
 
 def location_id(index: int, slot: str) -> str:
+    """Return the reserved evidence ID for one zero-based location slot."""
     return f"E{51 + 4 * index + LOCATION_SLOTS[slot]}"
 
 
 def chain_ids(candidate: Mapping[str, Any]) -> list[str]:
+    """Flatten the candidate's ordered evidence steps, removing duplicate IDs."""
     return list(dict.fromkeys(i for step in STEPS for i in candidate["chain"].get(step, [])))
 
 
@@ -59,6 +61,7 @@ def allowed_ids(candidate: Mapping[str, Any]) -> set[str]:
 
 
 def abstention(pack: Mapping[str, Any]) -> tuple[str, str]:
+    """Choose the abstention reason and its cycle-time or merged-count citation."""
     reason = pack.get("abstain_reason") or DEFAULT_ABSTAIN_REASON
     identifier = "E1" if any(e["id"] == "E1" for e in pack["evidence"]) else "E3"
     return reason, identifier
@@ -78,6 +81,7 @@ ATTRIBUTION_MIN_SHARE = REVIEW_CAPACITY_MIN_WAIT_SHARE
 
 
 def level(score: float) -> str | None:
+    """Return the highest qualifying confidence band, or None below all band thresholds."""
     for name, band in reversed(LEVELS.items()):
         if score > band.minimum if band.exclusive else score >= band.minimum:
             return name
@@ -104,12 +108,14 @@ def changed(
 
 
 def flat_rel(entry: Mapping[str, Any] | None, threshold: float) -> bool:
+    """Test whether the absolute relative change is strictly below the threshold."""
     return bool(
         entry and entry.get("change_rel") is not None and abs(entry["change_rel"]) < threshold
     )
 
 
 def at_least(entry: Mapping[str, Any] | None, threshold: float) -> bool:
+    """Test an available evidence value against an inclusive threshold."""
     return bool(entry and entry.get("value") is not None and entry["value"] >= threshold)
 
 
@@ -146,6 +152,7 @@ class Signal:
 
 class SignalContext:
     def __init__(self, snapshot: Mapping[str, Any], evidence: Mapping[str, dict[str, Any]]) -> None:
+        """Prepare reusable source availability, localization and counter-evidence predicates."""
         self.evidence = evidence
         ci = (
             snapshot["bottleneck_analysis"].get("ci") is not None
@@ -154,6 +161,7 @@ class SignalContext:
         drivers = snapshot.get("drivers") is not None
 
         def available(identifier: str) -> bool:
+            """Test source availability for an evidence family, independently of item presence."""
             return (
                 ci
                 if identifier in CI_EVIDENCE_IDS
@@ -163,6 +171,7 @@ class SignalContext:
             )
 
         def signal(role: str, ids: tuple[str, ...], condition: bool) -> Signal:
+            """Build a signal that is present only when its condition and all required IDs hold."""
             eligible = all(available(i) for i in ids)
             return Signal(
                 role,
@@ -213,6 +222,7 @@ class SignalContext:
 
 
 def build_review_capacity(context: SignalContext) -> dict[str, Any]:
+    """Define review-capacity symptoms, demand/load mechanisms and location support."""
     return {
         "localization": context.localized["value"] if context.localized else 0,
         "location": context.location,
@@ -254,6 +264,7 @@ def build_review_capacity(context: SignalContext) -> dict[str, Any]:
 
 
 def build_ci_bottleneck(context: SignalContext) -> dict[str, Any]:
+    """Define CI-related symptoms, queue/runtime/rerun mechanisms and counter-evidence."""
     return {
         "localization": (context.e("E39") or {}).get("value", 0),
         "location": None,
@@ -275,6 +286,7 @@ def build_ci_bottleneck(context: SignalContext) -> dict[str, Any]:
 
 
 def build_pr_size_growth(context: SignalContext) -> dict[str, Any]:
+    """Define delivery/rework symptoms and size-growth mechanisms with descriptive support."""
     return {
         "localization": (context.e("E42") or {}).get("value", 0),
         "location": None,
@@ -306,6 +318,7 @@ def build_pr_size_growth(context: SignalContext) -> dict[str, Any]:
 
 
 def build_quality_tradeoff(context: SignalContext) -> dict[str, Any]:
+    """Define faster-delivery symptoms and revert/approval mechanisms suggesting a trade-off."""
     return {
         "localization": (context.e("E43") or {}).get("value", 0),
         "location": None,
@@ -325,6 +338,7 @@ def build_quality_tradeoff(context: SignalContext) -> dict[str, Any]:
 
 
 def review_actions(location: str | None) -> tuple[str, str]:
+    """Return reviewer-capacity action and follow-up wording, optionally scoped to a location."""
     return (
         f"Add reviewers or code owners for {location} and enable team auto-assignment."
         if location
@@ -396,6 +410,7 @@ HYPOTHESES = {
 
 
 def actions(identifier: str, location: str | None) -> tuple[str, str]:
+    """Return the registered hypothesis's action and verification wording."""
     return HYPOTHESES[identifier].action(location)
 
 
@@ -411,7 +426,8 @@ def evaluate_candidate(
 
     Eligible requires an adequate main-metric sample, a symptom, a mechanism and at least
     low confidence. Signals whose data source is unavailable leave the agreement denominator,
-    so missing data neither supports nor counts against a hypothesis.
+    so missing data neither supports nor counts against a hypothesis. Confidence is a weighted
+    evidence-strength score, not a calibrated probability that this hypothesis is the cause.
     """
     definition = hypothesis.build(context)
     main_id = hypothesis.main
@@ -515,7 +531,7 @@ def evaluate_candidate(
         "main_available": context.available(main_id),
         "sample_ok": sample_ok,
         # A symptom alone shows that something changed and a mechanism alone shows a possible
-        # lever; only both together support a cause for this period's change.
+        # lever; both are required to propose an explanation for this period's change.
         "eligible": sample_ok and symptom and mechanism and confidence >= LEVELS["low"].minimum,
     }
 
@@ -607,4 +623,5 @@ def abstain_reason(
 
 
 def stage_ids(*items: tuple[str, bool]) -> tuple[str, ...]:
+    """Retain evidence IDs whose paired stage condition is true, preserving input order."""
     return tuple(identifier for identifier, shows_change in items if shows_change)

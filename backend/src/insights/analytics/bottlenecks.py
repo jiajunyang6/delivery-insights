@@ -24,6 +24,7 @@ from insights.analytics.timeline import WAITING_STATES, state_at
 
 
 def location_names(pr: PrData, dataset: Dataset) -> tuple[str, ...]:
+    """Return location names, prefixed by repository when comparing multiple repositories."""
     return tuple(
         f"{pr.repo}:{name}" if len(dataset.repos) > 1 else name for name in pr.facts.locations
     )
@@ -107,6 +108,7 @@ def at_risk(
 
 
 def risk_summary(risks: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Count all at-risk PRs and the subset classified as critical."""
     return {
         "total": len(risks),
         "critical": sum(p["severity"] == "critical" for p in risks),
@@ -148,6 +150,10 @@ def time_ledger(dataset: Dataset) -> dict[str, Any]:
 
 
 def review_queue(dataset: Dataset, window: Window) -> dict[str, Any]:
+    """Track weekly ready arrivals, first-review departures and unreviewed open PRs.
+
+    Weekly counts use this window's active cohort; net inflow share is None without arrivals.
+    """
     result: list[dict[str, Any]] = []
     for week in weeks(window):
         result.append(
@@ -176,6 +182,11 @@ def review_queue(dataset: Dataset, window: Window) -> dict[str, Any]:
 def locations(
     dataset: Dataset, risks: Sequence[dict[str, Any]], ledger: dict[str, Any]
 ) -> list[dict[str, Any]]:
+    """Allocate merged-PR reviewer wait to locations while retaining active-cohort queue/risk data.
+
+    Multi-location hours are split evenly, but a PR can belong to several location counts.
+    Small or excess locations are pooled into other, preserving their allocated waiting hours.
+    """
     current = {p.pr_id: p for p in merged(dataset, dataset.current)}
     previous = {p.pr_id: p for p in merged(dataset, dataset.previous)}
     all_prs = {p.pr_id: p for p in dataset.flow}
@@ -291,6 +302,10 @@ def what_if(dataset: Dataset, stage: str, location: str | None = None) -> dict[s
 
 
 def merge_blockers(dataset: Dataset) -> dict[str, Any]:
+    """Summarize multiple approvals and post-approval updates among approved merged PRs.
+
+    Each share is None when fewer than ten PRs qualify.
+    """
     prs = [p for p in merged(dataset, dataset.current) if p.facts.approved_at is not None]
     return {
         "second_approval_share": sum(p.facts.distinct_approvers >= 2 for p in prs) / len(prs)
@@ -304,6 +319,7 @@ def merge_blockers(dataset: Dataset) -> dict[str, Any]:
 
 
 def review_load(dataset: Dataset) -> dict[str, Any]:
+    """Count review events by reviewer and return the ten largest shares in stable order."""
     counts = Counter(r.reviewer for r in dataset.reviews_in(dataset.current))
     total = sum(counts.values())
     return {
@@ -317,6 +333,11 @@ def review_load(dataset: Dataset) -> dict[str, Any]:
 
 
 def waste_rework(dataset: Dataset) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Describe unmerged/reverted outcomes and their accumulated waiting, not engineering effort.
+
+    Superseded closures are excluded from wasted_pr_hours because a merged successor is linked.
+    Reverts are observed only before as_of; future reverts cannot alter a historical outcome.
+    """
     prs, lost = merged(dataset, dataset.current), closed(dataset, dataset.current)
     wasted = [p for p in lost if p.facts.close_class != "superseded"]
     reverted_prs = [p for p in prs if reverted(p, dataset.as_of)]
@@ -350,6 +371,10 @@ def waste_rework(dataset: Dataset) -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 def guardrail(efficiency: dict[str, Any]) -> dict[str, Any]:
+    """Flag increased reverts, with a suspected trade-off when cycle time also improves.
+
+    This combines observed signals; the verdict does not establish that speed caused reverts.
+    """
     cycle, revert = efficiency["cycle_time_p50_hours"], efficiency["revert_rate"]
     delta = (
         (revert["value"] - revert["previous"])
@@ -374,6 +399,7 @@ def guardrail(efficiency: dict[str, Any]) -> dict[str, Any]:
 def signal_measures(
     dataset: Dataset, window: Window, risks: Sequence[dict[str, Any]]
 ) -> dict[str, Measure]:
+    """Collect PR-size, approval and review-wait signals using each metric's own sample."""
     prs = merged(dataset, window)
     internal = percentile(
         values([p for p in prs if not p.facts.external_contributor], "pickup_hours"), 50, 10
@@ -412,6 +438,7 @@ def signal_measures(
 
 
 def signals(dataset: Dataset, risks: Sequence[dict[str, Any]], params_hash: str) -> dict[str, Any]:
+    """Compare current signals to the previous cohort and its risks at the previous period end."""
     current = signal_measures(dataset, dataset.current, risks)
     # Previous-period risks are taken at the previous period's end, mirroring as_of.
     previous = (
@@ -434,6 +461,10 @@ def signals(dataset: Dataset, risks: Sequence[dict[str, Any]], params_hash: str)
 
 
 def series(dataset: Dataset, window: Window) -> list[dict[str, Any]]:
+    """Build weekly metrics for merged PRs that belong to the overall window's active cohort.
+
+    Waiting shares aggregate elapsed PR-hours; weekly percentiles require adequate samples.
+    """
     result = []
     for week in weeks(window):
         prs = merged(dataset, week, scope=window)
@@ -467,6 +498,11 @@ def series(dataset: Dataset, window: Window) -> list[dict[str, Any]]:
 def attribution(
     dataset: Dataset, ledger: dict[str, Any], locations_: list[dict[str, Any]]
 ) -> dict[str, Any] | None:
+    """Decompose mean hours per merged PR; this is accounting, not a causal explanation.
+
+    Positive and negative component changes have separate gross totals. Their shares do not
+    divide by the net cycle-time change, which could be small or cancelled by other components.
+    """
     current, previous = merged(dataset, dataset.current), merged(dataset, dataset.previous)
     if not dataset.comparison_available or min(len(current), len(previous)) < t.MIN_SAMPLES_P50:
         return None
@@ -546,4 +582,5 @@ def attribution(
 def trend(
     dataset: Dataset, ledger: dict[str, Any], locations_: list[dict[str, Any]]
 ) -> dict[str, Any]:
+    """Wrap the accounting attribution, or None when a comparable sample is unavailable."""
     return {"attribution": attribution(dataset, ledger, locations_)}

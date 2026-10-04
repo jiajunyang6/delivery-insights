@@ -85,6 +85,10 @@ async def save_runs(
 async def save_ownership(
     session: AsyncSession, repo_id: int, rules: list[OwnershipRule], *, now: datetime
 ) -> tuple[bool, bool]:
+    """Replace changed rules and return (code_changed, area_changed) without committing.
+
+    Both changes advance data version; CODEOWNERS changes also invalidate per-PR derivation.
+    """
     old = [
         OwnershipRule(r.source, r.pattern, tuple(r.owners), r.line_no)
         for r in await session.scalars(

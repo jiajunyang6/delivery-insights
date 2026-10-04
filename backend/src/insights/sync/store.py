@@ -26,6 +26,7 @@ class SaveResult:
 
 
 def pr_values(record: PullRequestRecord, repo_id: int) -> dict[str, Any]:
+    """Project source PR fields, author/labels and content hash into a database insert mapping."""
     fields = {
         name: getattr(record, name)
         for name in (
@@ -106,6 +107,8 @@ async def save_page(
         },
         where=statement.excluded.updated_at >= PullRequest.updated_at,
     ).returning(PullRequest.number, PullRequest.id)
+    # Older overlapping pages can lose the updated_at guard. Rebuild child rows only for PRs
+    # actually returned by the upsert, or a stale page could replace their newer event history.
     ids: dict[int, int] = dict((await session.execute(upsert)).all())
     records = [pr for pr in records if pr.number in ids]
     if not records:
@@ -146,6 +149,7 @@ async def save_page(
 
 
 def content_hash(pr: PullRequestRecord) -> str:
+    """Hash normalized source content with stable event order; identical re-reads skip writes."""
     normalized = replace(
         pr, events=tuple(sorted(pr.events, key=lambda e: (e.occurred_at, e.kind, e.dedup_key)))
     )
