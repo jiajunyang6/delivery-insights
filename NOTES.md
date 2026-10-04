@@ -89,9 +89,6 @@ Main decisions:
   focused on the required path and add extensions only where their value justified the added
   complexity.
 
-Details: [trade-offs](docs/REFERENCE.md#trade-offs-and-limitations),
-[evaluation](docs/EVALUATION.md) and [decision log](docs/DECISIONS.md).
-
 ## 3. With one more day
 
 1. **Add a "Sync now" button** for tracked repositories in the dashboard. The API
@@ -122,3 +119,6 @@ Details: [trade-offs](docs/REFERENCE.md#trade-offs-and-limitations),
   - Real GitHub sync and browser checks.
   - Refactor equivalence across golden, ten planted datasets and an ownership fixture;
     synthetic browser checks for both views, presets, Load more, cards and abstentions.
+
+The other details: [trade-offs](docs/REFERENCE.md#trade-offs-and-limitations),
+[evaluation](docs/EVALUATION.md) and [decision log](docs/DECISIONS.md).

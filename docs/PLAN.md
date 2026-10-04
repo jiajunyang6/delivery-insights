@@ -47,7 +47,7 @@ The output has two parts:
 
 The headline joins both parts: efficiency change → main bottleneck → recommendation → expected benefit.
 
-Demo repository: **`dotnet/runtime`** (large, active, with ownership areas identified by `area-*` labels).
+Demo repository: **`bevyengine/bevy`** (large, active, with ownership areas identified by `area-*` labels).
 
 ### 2. Scope
 
@@ -66,7 +66,7 @@ Demo repository: **`dotnet/runtime`** (large, active, with ownership areas ident
 1. Eval harness(`make eval`).
 2. Single-page React frontend.
 3. CODEOWNERS and `docs/area-owners.md` parsing, with owner counts by location.
-4. CI waiting: queue/run durations and flaky reruns from GitHub Actions runs (dotnet/runtime's main CI uses Azure Pipelines and appears as GitHub check runs, which this version does not collect; incomplete CI data caps CI-hypothesis confidence).
+4. CI waiting: queue/run durations and flaky reruns from GitHub Actions runs (bevyengine/bevy's main CI uses Azure Pipelines and appears as GitHub check runs, which this version does not collect; incomplete CI data caps CI-hypothesis confidence).
 5. Drivers: assignment, review-round costs, concurrent author PRs, submission timing, and characteristics of the slowest 10%.
 6. Survival analysis (Kaplan–Meier) and predictability metrics.
 7. Director and manager narrative variants (implemented with M7).
@@ -335,7 +335,7 @@ docker compose down -v
 ```bash
 make lint && make test-unit
 # Credentials required:
-cd backend && uv run python -m insights.sources.github.smoke --repo dotnet/runtime --pages 1
+cd backend && uv run python -m insights.sources.github.smoke --repo bevyengine/bevy --pages 1
 #   Expected: "prs=25 events=... rate_limit_remaining=...", no GraphQL errors
 ```
 
@@ -366,7 +366,7 @@ docker compose up --build -d
 sleep 180
 docker compose exec postgres psql -U insights -d insights -c \
   "select full_name, covered_since, data_version, last_sync_status from repositories"
-#   Expected: dotnet/runtime covered_since approximately now() - 7 days or earlier, data_version >= 1
+#   Expected: bevyengine/bevy covered_since approximately now() - 7 days or earlier, data_version >= 1
 docker compose exec postgres psql -U insights -d insights -c "select count(*) from pull_requests"
 ```
 
@@ -392,7 +392,7 @@ docker compose exec postgres psql -U insights -d insights -c "select count(*) fr
 ```bash
 make lint && make test
 # Credentials required (M3 data already synchronized):
-docker compose exec api python -m insights.sync.invariants --repo dotnet/runtime   # 0 violations
+docker compose exec api python -m insights.sync.invariants --repo bevyengine/bevy   # 0 violations
 ```
 
 ---
@@ -469,7 +469,7 @@ make lint && make test
 ```bash
 make lint && make test
 # No Bedrock key: narrative endpoint returns 200 with meta.generated_by == "template"
-# Bedrock credentials required: last-30-day dotnet/runtime narrative has meta.generated_by == "llm", meta.validation == "passed"
+# Bedrock credentials required: last-30-day bevyengine/bevy narrative has meta.generated_by == "llm", meta.validation == "passed"
 ```
 
 **P0 completion**: execute every P0 item in [12-acceptance-checklist.md](#plan-12); proceed to P1 only after all pass.
@@ -487,7 +487,7 @@ make lint && make test
 
 **Tests**: `test_ci.py`, `test_ownership.py`; integration covers run-to-PR mapping.
 
-**DoD**: `make lint && make test`; snapshot includes `bottleneck_analysis.ci` and `time_ledger.ci_coverage`; with credentials, dotnet/runtime area locations have `owners_count`.
+**DoD**: `make lint && make test`; snapshot includes `bottleneck_analysis.ci` and `time_ledger.ci_coverage`; with credentials, bevyengine/bevy area locations have `owners_count`.
 
 ---
 
@@ -561,7 +561,7 @@ Use pydantic-settings `BaseSettings`, reading environment variables with `model_
 | `GITHUB_TOKEN` | `SecretStr \| None` | `None` | Required for worker synchronization, not API; absent token fails sync with `missing_token` |
 | `GITHUB_API_URL` | `str` | `https://api.github.com` | Configuration only; no request override |
 | `GITHUB_GRAPHQL_URL` | `str` | `https://api.github.com/graphql` | Same restriction |
-| `TRACKED_REPOS` | `str` (comma-separated) | `dotnet/runtime` | `tracked_repo_list: list[str]`; validate repository pattern (`06` §3.1), compare lowercase, retain display casing |
+| `TRACKED_REPOS` | `str` (comma-separated) | `bevyengine/bevy` | `tracked_repo_list: list[str]`; validate repository pattern (`06` §3.1), compare lowercase, retain display casing |
 | `LOCATION_DIMENSION` | `str` | `label:area-` | `label:<prefix>`, `codeowners`, or `directory` |
 | `DIRECTORY_DEPTH` | `int` | `2` | Leading path segments for directory dimension, 1–3 |
 | `BACKFILL_DAYS` | `int` | `120` | 30–365; stages `[7, 30, BACKFILL_DAYS]`, deduplicated and sorted |
@@ -581,7 +581,7 @@ Use pydantic-settings `BaseSettings`, reading environment variables with `model_
 | `MAX_REPOS_PER_REQUEST` | `int` | `20` | |
 | `PRECOMPUTE_DAYS` | `str` (comma-separated) | `7,30,90` | Period lengths precomputed after synchronization |
 | `CI_SOURCE` | `Literal["actions", "none"]` | `actions` | P1 |
-| `CI_COMPLETE` | `bool` | `false` | P1: whether Actions is the repository's main CI. False caps CI-hypothesis confidence at 0.5 (`07` §4.3). Keep false for dotnet/runtime's Azure Pipelines CI |
+| `CI_COMPLETE` | `bool` | `false` | P1: whether Actions is the repository's main CI. False caps CI-hypothesis confidence at 0.5 (`07` §4.3). Keep false for bevyengine/bevy's Azure Pipelines CI |
 | `AREA_OWNERS_PATH` | `str` | `docs/area-owners.md` | P1; skip if absent in upstream repository |
 | `LOG_LEVEL` | `str` | `INFO` | |
 
@@ -821,7 +821,7 @@ GITHUB_TOKEN=
 AWS_BEARER_TOKEN_BEDROCK=
 AWS_REGION=us-west-2
 BEDROCK_MODEL_ID=us.anthropic.claude-sonnet-4-6
-TRACKED_REPOS=dotnet/runtime
+TRACKED_REPOS=bevyengine/bevy
 LOCATION_DIMENSION=label:area-
 BACKFILL_DAYS=120
 SYNC_INTERVAL_MINUTES=15
@@ -862,7 +862,7 @@ CI requires no secrets.
 ```sql
 CREATE TABLE repositories (
   id                   SERIAL PRIMARY KEY,
-  full_name            TEXT NOT NULL,                 -- Display name, e.g. "dotnet/runtime"
+  full_name            TEXT NOT NULL,                 -- Display name, e.g. "bevyengine/bevy"
   full_name_lower      TEXT NOT NULL UNIQUE,          -- Comparison key
   owner                TEXT NOT NULL,
   name                 TEXT NOT NULL,
@@ -1074,7 +1074,7 @@ CREATE TABLE snapshots (
   repos             TEXT[] NOT NULL,
   period_from       DATE NOT NULL,
   period_to         DATE NOT NULL,
-  data_versions     JSONB NOT NULL,     -- {"dotnet/runtime": 42}
+  data_versions     JSONB NOT NULL,     -- {"bevyengine/bevy": 42}
   analytics_version TEXT NOT NULL,
   payload           JSONB NOT NULL,     -- Full snapshot from 06 §4
   etag              TEXT NOT NULL,
@@ -1124,7 +1124,7 @@ CREATE INDEX ix_sync_jobs_repo_created ON sync_jobs (repo_id, created_at DESC);
 
 #### 2.12 Retention
 
-Worker `housekeeping` runs daily at 03:17 UTC, deleting snapshots older than seven days (cascading narratives) and sync jobs finished over 30 days ago. The snapshot service explicitly writes the same injected `now` to Postgres and Redis `created_at`, and uses it for logical expiry rather than database `DEFAULT now()`. Frequent dotnet/runtime changes create new precomputed snapshots; seven-day retention bounds the table. Expired snapshot links return 404 (document under README Operations).
+Worker `housekeeping` runs daily at 03:17 UTC, deleting snapshots older than seven days (cascading narratives) and sync jobs finished over 30 days ago. The snapshot service explicitly writes the same injected `now` to Postgres and Redis `created_at`, and uses it for logical expiry rather than database `DEFAULT now()`. Frequent bevyengine/bevy changes create new precomputed snapshots; seven-day retention bounds the table. Expired snapshot links return 404 (document under README Operations).
 
 Expiry must be consistent across stores:
 
@@ -1156,7 +1156,7 @@ See [05-analytics.md](#plan-05) §12.3 for `snapshot_id`, `params_hash`, and `ve
 ### 1. Overview
 
 - All GitHub calls run in the worker; the API process does not import `insights.sources`.
-- Authentication: `Authorization: Bearer <GITHUB_TOKEN>`. Recommend a fine-grained token with Repository access "Public repositories", no extra permissions (public read access is built in and GraphQL supports it). GitHub check-runs API supports fine-grained tokens without extra permissions on public repositories, but this implementation collects only GitHub Actions runs (§9). dotnet/runtime's main Azure Pipelines CI appears as check runs and is not collected; CI is incomplete (`CI_COMPLETE=false` by default, CI-hypothesis confidence capped at 0.5, `07` §4.3). Check-run collection is a future enhancement.
+- Authentication: `Authorization: Bearer <GITHUB_TOKEN>`. Recommend a fine-grained token with Repository access "Public repositories", no extra permissions (public read access is built in and GraphQL supports it). GitHub check-runs API supports fine-grained tokens without extra permissions on public repositories, but this implementation collects only GitHub Actions runs (§9). bevyengine/bevy's main Azure Pipelines CI appears as check runs and is not collected; CI is incomplete (`CI_COMPLETE=false` by default, CI-hypothesis confidence capped at 0.5, `07` §4.3). Check-run collection is a future enhancement.
 - Serial requests: worker `max_jobs = 1`; client `asyncio.Lock` allows one request in flight to avoid secondary limits.
 
 ### 2. Domain model (`insights/domain.py`) and adapter interface
@@ -1893,7 +1893,7 @@ author_open_prs_at_ready counts other same-author flow PRs with ready_at_other<=
 #### 4.7 Implementation and timing
 
 - Pure classify.link_prs(prs: Sequence[LinkInput], *, repo_full_name: str, default_branch: str) -> dict[int, LinkResult]: inputs PR number/author/title/body/head/base/timestamps/merge OID, commit OIDs/reverts, cross references, computed facts; outputs all §4.3–§4.6 linkage fields: close_class, late_rejection, revert/reland/supersession, author_open_prs_at_ready. Eval calls it directly (`08` §2.5).
-- I/O link_repo(session, repo_id) in sync/derive.py runs at each sync/rederive completion over **all repository PRs** (bounded by backfill retention, thousands for dotnet/runtime). Load required number/author/title/body/head/times/merge OID/commit OIDs/reverts/cross references/facts once; call link_prs; bulk-update changed linkage rows only, incrementing data_version in the same transaction (`05` §12.3). Full processing avoids missing old links when only changed PRs are inspected.
+- I/O link_repo(session, repo_id) in sync/derive.py runs at each sync/rederive completion over **all repository PRs** (bounded by backfill retention, thousands for bevyengine/bevy). Load required number/author/title/body/head/times/merge OID/commit OIDs/reverts/cross references/facts once; call link_prs; bulk-update changed linkage rows only, incrementing data_version in the same transaction (`05` §12.3). Full processing avoids missing old links when only changed PRs are inspected.
 
 ### 5. Statistics utilities (`insights/analytics/stats.py`)
 
@@ -2441,7 +2441,7 @@ All metrics share one structure, computed identically for current/previous:
   "comparison_available": true,
   "ci_source": "actions",
   "data_freshness": [
-    {"repo": "dotnet/runtime", "data_version": 1234, "covered_since": "2026-04-05T09:00:00Z",
+    {"repo": "bevyengine/bevy", "data_version": 1234, "covered_since": "2026-04-05T09:00:00Z",
      "last_synced_at": "2026-10-02T09:45:12Z", "last_sync_status": "ok"}
   ],
   "sample": {"merged_prs": 812, "closed_unmerged_prs": 141, "ready_prs": 968,
@@ -2557,7 +2557,7 @@ Definitions: `05` §8. change_pp rounded to two decimals.
 
 ```json
 {
-  "repo": "dotnet/runtime", "number": 108123, "title": "…", "url": "https://github.com/dotnet/runtime/pull/108123",
+  "repo": "bevyengine/bevy", "number": 108123, "title": "…", "url": "https://github.com/bevyengine/bevy/pull/108123",
   "author": "octocat", "state": "waiting_reviewer", "age_hours": 212.4,
   "threshold_hours": 70.1, "critical_threshold_hours": 160.3, "severity": "critical",
   "baseline_source": "90d", "locations": ["area-System.Net.Http"], "external_contributor": true, "size_lines": 84
@@ -2803,7 +2803,7 @@ Return SyncJob (§7.4); missing 404; invalid UUID 422.
   "detail": "Data for the requested period is still being synced.",
   "retry_after_seconds": 30,
   "repos": [
-    {"repo": "dotnet/runtime", "covered_since": "2026-09-25T10:00:00Z", "required_since": "2026-09-03T00:00:00Z",
+    {"repo": "bevyengine/bevy", "covered_since": "2026-09-25T10:00:00Z", "required_since": "2026-09-03T00:00:00Z",
      "open_sweep_done": true, "last_sync_status": "ok", "reason": "backfill",
      "job": {"id": "0f8c…", "status": "running", "phase": "backfill:30d", "url": "/v1/sync-jobs/0f8c…"}}
   ]
@@ -2822,7 +2822,7 @@ repos lists unready repositories only; reasons never_synced/backfill/open_sweep/
   "total": 812,
   "items": [
     {
-      "repo": "dotnet/runtime", "number": 108001, "title": "…", "url": "https://github.com/dotnet/runtime/pull/108001",
+      "repo": "bevyengine/bevy", "number": 108001, "title": "…", "url": "https://github.com/bevyengine/bevy/pull/108001",
       "author": "octocat", "status": "merged",
       "created_at": "…", "ready_at": "…", "merged_at": "…", "closed_at": null,
       "size_lines": 120, "size_bucket": "M", "locations": ["area-System.Net.Http"], "external_contributor": false,
@@ -2847,7 +2847,7 @@ repos lists unready repositories only; reasons never_synced/backfill/open_sweep/
 
 ```json
 {
-  "repo": "dotnet/runtime", "default_branch": "main",
+  "repo": "bevyengine/bevy", "default_branch": "main",
   "covered_since": "2026-04-05T09:00:00Z", "backfill_target_days": 180, "backfill_complete": true,
   "sync_watermark": "2026-10-02T09:40:00Z", "last_synced_at": "2026-10-02T09:45:12Z",
   "last_open_sweep_at": "2026-10-02T09:30:00Z", "last_sync_status": "ok", "last_sync_error": null,
@@ -2861,7 +2861,7 @@ backfill_complete = covered_since non-null and <=now-BACKFILL_DAYS days.
 
 ```json
 {
-  "id": "0f8c2a3e-…", "repo": "dotnet/runtime", "kind": "manual", "status": "running", "phase": "incremental",
+  "id": "0f8c2a3e-…", "repo": "bevyengine/bevy", "kind": "manual", "status": "running", "phase": "incremental",
   "stats": {"prs_fetched": 75, "prs_changed": 12, "events": 640, "pages": 3, "graphql_cost": 4},
   "error": null, "created_at": "…", "started_at": "…", "finished_at": null,
   "url": "/v1/sync-jobs/0f8c2a3e-…"
@@ -2879,30 +2879,30 @@ FROM=$(python3 -c 'import datetime as d; print(d.datetime.now(d.timezone.utc).da
 curl -s "$API/v1/repos" | python3 -m json.tool
 
 # 2. Last-30-day insight → 200; unfinished backfill 202 with Retry-After/Location
-curl -si "$API/v1/insights/delivery?repo=dotnet/runtime&from=$FROM&to=$TO" | head -20
+curl -si "$API/v1/insights/delivery?repo=bevyengine/bevy&from=$FROM&to=$TO" | head -20
 
 # 3. Conditional GET → 304; inspect headers only (GET routes do not handle HEAD)
-ETAG=$(curl -s -D - -o /dev/null "$API/v1/insights/delivery?repo=dotnet/runtime&from=$FROM&to=$TO" | awk -F': ' 'tolower($1)=="etag"{print $2}' | tr -d '\r')
-curl -s -o /dev/null -w '%{http_code}\n' -H "If-None-Match: $ETAG" "$API/v1/insights/delivery?repo=dotnet/runtime&from=$FROM&to=$TO"
+ETAG=$(curl -s -D - -o /dev/null "$API/v1/insights/delivery?repo=bevyengine/bevy&from=$FROM&to=$TO" | awk -F': ' 'tolower($1)=="etag"{print $2}' | tr -d '\r')
+curl -s -o /dev/null -w '%{http_code}\n' -H "If-None-Match: $ETAG" "$API/v1/insights/delivery?repo=bevyengine/bevy&from=$FROM&to=$TO"
 
 # 4. Invalid parameter → 422 problem+json, no raw input echo
 curl -s "$API/v1/insights/delivery?repo=../../etc&from=$FROM&to=$TO"
-curl -s "$API/v1/insights/delivery?repo=dotnet/runtime&from=$TO&to=$FROM"
-curl -s "$API/v1/insights/delivery?repo=dotnet/runtime&org=dotnet"
+curl -s "$API/v1/insights/delivery?repo=bevyengine/bevy&from=$TO&to=$FROM"
+curl -s "$API/v1/insights/delivery?repo=bevyengine/bevy&org=dotnet"
 
 # 5. Outside whitelist → 403
 curl -s -o /dev/null -w '%{http_code}\n' "$API/v1/insights/delivery?repo=torvalds/linux&from=$FROM&to=$TO"
 
 # 6. Snapshot by ID → 200, immutable Cache-Control
-SID=$(curl -s "$API/v1/insights/delivery?repo=dotnet/runtime&from=$FROM&to=$TO" | python3 -c 'import sys,json; print(json.load(sys.stdin)["snapshot_id"])')
+SID=$(curl -s "$API/v1/insights/delivery?repo=bevyengine/bevy&from=$FROM&to=$TO" | python3 -c 'import sys,json; print(json.load(sys.stdin)["snapshot_id"])')
 curl -s -D - -o /dev/null "$API/v1/snapshots/$SID" | grep -i -E '^(etag|cache-control)'
 
 # 7. At-risk details → 200
-curl -s "$API/v1/insights/delivery/prs?repo=dotnet/runtime&from=$FROM&to=$TO&at_risk=true&limit=5" | python3 -m json.tool
+curl -s "$API/v1/insights/delivery/prs?repo=bevyengine/bevy&from=$FROM&to=$TO&at_risk=true&limit=5" | python3 -m json.tool
 
 # 8. Manual sync → 202; immediate repeat → 429
-curl -si -X POST "$API/v1/repos/dotnet/runtime/sync" | head -5
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$API/v1/repos/dotnet/runtime/sync"
+curl -si -X POST "$API/v1/repos/bevyengine/bevy/sync" | head -5
+curl -s -o /dev/null -w '%{http_code}\n' -X POST "$API/v1/repos/bevyengine/bevy/sync"
 
 # 9. Narrative → 200; unconfigured Bedrock gives meta.generated_by == "template"
 curl -s "$API/v1/snapshots/$SID/narrative?audience=director&lang=en" | python3 -m json.tool
@@ -3058,7 +3058,7 @@ Sort score descending → kind (contradiction,anomaly,change) → first evidence
   "audience": "manager",
   "lang": "en",
   "period": {"from": "2026-09-03", "to": "2026-10-02", "days": 30, "compared_to": {"from": "2026-08-04", "to": "2026-09-02"}},
-  "scope": {"repos": ["dotnet/runtime"], "location_dimension": "label:area-"},
+  "scope": {"repos": ["bevyengine/bevy"], "location_dimension": "label:area-"},
   "comparison_available": true,
   "data_gaps": ["ci_data_incomplete"],
   "evidence": [
@@ -3227,7 +3227,7 @@ Display chain (does not change scores): a stage item appears only when it shows 
 
 #### 4.3 Data-completeness caps
 
-- H_ci_bottleneck cap=0.5, cap_reason=ci_data_incomplete unless ci_data_available, coverage>=CI_COVERAGE_MIN (0.5), and CI_COMPLETE=true. dotnet/runtime's Azure Pipelines check runs are uncollected; only Actions (`04` §1), default false.
+- H_ci_bottleneck cap=0.5, cap_reason=ci_data_incomplete unless ci_data_available, coverage>=CI_COVERAGE_MIN (0.5), and CI_COMPLETE=true. bevyengine/bevy's Azure Pipelines check runs are uncollected; only Actions (`04` §1), default false.
 - Other hypotheses uncapped (cap=null).
 
 #### 4.4 Bands and wording
@@ -4000,7 +4000,7 @@ Each file covers at least these cases; English behavioral names, e.g. test_reply
 
 **test_rows.py**: three statuses; historical open excludes closed; own-repo risk baselines/count reconciliation; ledger clipped/excludes closure; current_state; deleted author null.
 
-**test_params.py**: valid/invalid repos a/b,dotnet/runtime,-a/b,a/..,a/b/c,oversized owner,a b/c; repo/org exclusivity, dedup, repo cap; four date rules/defaults; malformed cursors; state/status combinations.
+**test_params.py**: valid/invalid repos a/b,bevyengine/bevy,-a/b,a/..,a/b/c,oversized owner,a b/c; repo/org exclusivity, dedup, repo cap; four date rules/defaults; malformed cursors; state/status combinations.
 
 **test_caching.py**: multiple If-None-Match tags/W/*; ETag computation.
 
@@ -4150,14 +4150,14 @@ docker compose up --build -d
 open http://localhost:5173    # UI   (API docs: http://localhost:8000/docs)
 ```
 
-The worker starts backfilling `dotnet/runtime` immediately (7 days first, then 30 and 120).
+The worker starts backfilling `bevyengine/bevy` immediately (7 days first, then 30 and 120).
 Until the requested period is covered the API answers `202 Accepted` with `Retry-After`,
 and the UI shows sync progress.
 
 ```bash
 TO=$(python3 -c 'import datetime as d; print(d.datetime.now(d.timezone.utc).date())')
 FROM=$(python3 -c 'import datetime as d; print(d.datetime.now(d.timezone.utc).date() - d.timedelta(days=6))')
-curl -s "http://localhost:8000/v1/insights/delivery?repo=dotnet/runtime&from=$FROM&to=$TO" | python3 -m json.tool | head -40
+curl -s "http://localhost:8000/v1/insights/delivery?repo=bevyengine/bevy&from=$FROM&to=$TO" | python3 -m json.tool | head -40
 ```
 
 Without `AWS_BEARER_TOKEN_BEDROCK` everything works; the narrative endpoint uses a deterministic template
@@ -4222,7 +4222,7 @@ flowchart LR
 | Rate limiting | Fixed window per client IP; requests through the bundled nginx share one bucket | Coarse | Per-user limits once there is authentication |
 | Commit time | Commit events use the committer date; GitHub does not expose push time | Coding time and "commits after review" are approximations | Push events from webhooks |
 | Reopened PRs | Time while a PR was closed (before being reopened) is not attributed to any waiting state | Cycle and stage times are milestone-to-milestone and still include that time, so they can exceed the ledger total for such PRs | Subtract closed periods from milestone durations if reopened PRs turn out to be common |
-| CI data (demo repo) | Only GitHub Actions runs are collected; dotnet/runtime's main CI runs in Azure Pipelines and shows up as check runs, which this version does not collect | CI waiting is under-reported; CI hypotheses are capped at 0.5 confidence (`CI_COMPLETE=false`) | Collect check runs (the check-runs API works with the same fine-grained token on public repos) |
+| CI data (demo repo) | Only GitHub Actions runs are collected; bevyengine/bevy's main CI runs in Azure Pipelines and shows up as check runs, which this version does not collect | CI waiting is under-reported; CI hypotheses are capped at 0.5 confidence (`CI_COMPLETE=false`) | Collect check runs (the check-runs API works with the same fine-grained token on public repos) |
 | Confidence calibration | Deterministic evidence-strength score, checked only on synthetic scenarios | The score is not a calibrated probability; real hit rates per band are unknown | Backtest thresholds on four quarters of history and calibrate the bands against a small hand-labeled set |
 
 #### 7.2 Things deliberately not done
@@ -4254,7 +4254,7 @@ List completed extras only: deterministic confidence/chains/validator/fallback; 
 - Teams listed as owners (for example `@dotnet/gc`) may have private membership, so owners are counted as teams.
 - Small samples: percentiles need at least 20 (p50) or 30 (p90) PRs and rates need 30 cases with 5 events; below that the API returns `insufficient_sample` instead of a misleading number.
 - Thresholds and confidence weights are initial, explained values (see [05-analytics.md](#plan-05) §1 and [07-narrative.md](#plan-07) §4); they have not been backtested on real data yet.
-- To verify after the first sync of dotnet/runtime: human review coverage, bot PR share, and the share of PRs with an area label (`meta.location_sources`).
+- To verify after the first sync of bevyengine/bevy: human review coverage, bot PR share, and the share of PRs with an area label (`meta.location_sources`).
 
 #### 7.5 AI assistance (agent draft, submitter finalizes)
 
@@ -4275,7 +4275,7 @@ Be truthful. Agent writes only confirmed facts: its tool/model, authored compone
 ```markdown
 ### With one more day
 
-1. Backtest the at-risk and significance thresholds on four quarters of dotnet/runtime history, and calibrate the confidence bands against a small hand-labeled set.
+1. Backtest the at-risk and significance thresholds on four quarters of bevyengine/bevy history, and calibrate the confidence bands against a small hand-labeled set.
 2. Collect Azure Pipelines check runs so CI waiting and the CI hypothesis are complete.
 3. Time superseded and revert/reland chains from their first PR.
 4. Add an optional business-hours mode per repository.
@@ -4338,7 +4338,7 @@ Choose public Git repository or zip/tarball containing .git. M12 only **prepares
 
 - [ ] **A1** `[P0]` Clean clone: cp .env.example .env → docker compose up --build -d; migrate exits0, api healthy, worker running. Inspect docker compose ps -a (without -a hides exited migration).
 - [ ] **A2** `[P0]` healthz {status:ok}, readyz200; docker compose stop redis →readyz503 with checks.redis=error; docker compose start redis restores readiness.
-- [ ] **A3** `[P0][Credentials]` dotnet/runtime backfill: repo covered_since advances 7→30→120 days, first-stage open sweep timestamp, sync status ok.
+- [ ] **A3** `[P0][Credentials]` bevyengine/bevy backfill: repo covered_since advances 7→30→120 days, first-stage open sweep timestamp, sync status ok.
 - [ ] **A4** `[P0][Credentials]` 7/30/90-day insights200 with headline/efficiency/ledger/bottlenecks/analysis/risks/waste/rework/guardrail/trend/meta; If-None-Match304.
 - [ ] **A5** `[P0]` Unready202 Retry-After/Pending, all reasons never_synced/backfill/open_sweep/rederive/stale in integration; credentialed initial-backfill90-day request confirms.
 - [ ] **A6** `[P0][Credentials]` All nine curl groups in `06` §8 match descriptions.
@@ -4346,13 +4346,13 @@ Choose public Git repository or zip/tarball containing .git. M12 only **prepares
 - [ ] **A8** `[P0]` No Bedrock key: narrative200/template/llm_disabled, persisted model_id=template.
 - [ ] **A9** `[P0][Credentials]` Real30-day narrative llm/passed; spot-check three numbers via evidence refs into snapshot.
 - [ ] **A10** `[P0]` Manual sync202 Location; cooldown repeat429 Retry-After.
-- [ ] **A11** `[P0]` org=dotnet and repo=dotnet/runtime yield identical snapshot ID if only this repo tracked.
+- [ ] **A11** `[P0]` org=dotnet and repo=bevyengine/bevy yield identical snapshot ID if only this repo tracked.
 - [ ] **A12** `[P0]` /docs contains all `06` §1 endpoints/full models.
 
 ### B. Correctness
 
 - [ ] **B1** `[P0]` make test passes all22 timeline cases/golden/determinism including shuffled inputs.
-- [ ] **B2** `[P0][Credentials]` docker compose exec api python -m insights.sync.invariants --repo dotnet/runtime: zero violations.
+- [ ] **B2** `[P0][Credentials]` docker compose exec api python -m insights.sync.invariants --repo bevyengine/bevy: zero violations.
 - [ ] **B3** `[P0][Credentials]` Three merged PRs: compare ready/first-human-review/merge to GitHub within one minute; report numbers/results.
 - [ ] **B4** `[P0][Credentials]` Ledger total equals summed all merged detail ledger_hours, relative rounding error<0.1%. Temporary paginated audit script, not committed.
 - [ ] **B5** `[P0]` Insufficient metrics null/insufficient_sample, unit covered.
@@ -4382,11 +4382,11 @@ Choose public Git repository or zip/tarball containing .git. M12 only **prepares
 
 ### E. Performance
 
-- [ ] **E1** `[P0][Credentials]` dotnet/runtime90-day cold snapshot<3s; worker precompute snapshot_computed log with duration_ms/load_ms/compute_ms/merged_prs.
+- [ ] **E1** `[P0][Credentials]` bevyengine/bevy90-day cold snapshot<3s; worker precompute snapshot_computed log with duration_ms/load_ms/compute_ms/merged_prs.
 - [ ] **E2** `[P0][Credentials]` Cached insight p95<300ms:
 
   ```bash
-  for i in $(seq 50); do curl -s -o /dev/null -w '%{time_total}\n' "$API/v1/insights/delivery?repo=dotnet/runtime&from=$FROM&to=$TO"; done | sort -n | sed -n '48p'
+  for i in $(seq 50); do curl -s -o /dev/null -w '%{time_total}\n' "$API/v1/insights/delivery?repo=bevyengine/bevy&from=$FROM&to=$TO"; done | sort -n | sed -n '48p'
   ```
 
 - [ ] **E3** `[P0]` No request-path GitHub; import isolation test passes.

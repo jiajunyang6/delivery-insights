@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     github_token: SecretStr | None = None
     github_api_url: str = "https://api.github.com"
     github_graphql_url: str = "https://api.github.com/graphql"
-    tracked_repos: str = "dotnet/runtime"
+    tracked_repos: str = "bevyengine/bevy"
     location_dimension: str = "label:area-"
     directory_depth: int = Field(default=2, ge=1, le=3)
     backfill_days: int = Field(default=120, ge=30, le=365)
