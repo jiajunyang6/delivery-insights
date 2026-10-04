@@ -70,8 +70,10 @@ def test_headline_all_efficiency_forms_and_optional_clauses():
     assert headline(s).startswith("Median cycle time rose 100%")
     c.update(change_rel=-0.5, previous=80)
     assert "fell 50%" in headline(s)
-    c["significant"] = False
-    assert "not significant" in headline(s)
+    c.update(significant=False, n=38)
+    assert "-50% vs previous period, within normal variation for 38 merged PRs" in headline(s)
+    c["change_rel"] = -0.05
+    assert "-5% vs previous period, no meaningful change" in headline(s)
     c["previous"] = None
     assert "no previous period" in headline(s)
     c["value"] = None

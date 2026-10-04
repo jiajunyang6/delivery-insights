@@ -281,10 +281,16 @@ def headline(snapshot: dict[str, Any]) -> str:
             f"Median cycle time {direction} {abs(change) * 100:.0f}% "
             f"({previous:.1f}h → {value:.1f}h)"
         )
-    else:
+    elif abs(change) < t.CHANGE_MIN_RELATIVE:
         text = (
             f"Median cycle time is {value:.1f}h "
-            f"({change * 100:+.0f}% vs previous period, not significant)"
+            f"({change * 100:+.0f}% vs previous period, no meaningful change)"
+        )
+    else:
+        # Large but not significant: with few PRs the median can swing this much by chance.
+        text = (
+            f"Median cycle time is {value:.1f}h ({change * 100:+.0f}% vs previous period, "
+            f"within normal variation for {cycle['n']} merged PRs)"
         )
     if snapshot["bottlenecks"]:
         first = snapshot["bottlenecks"][0]

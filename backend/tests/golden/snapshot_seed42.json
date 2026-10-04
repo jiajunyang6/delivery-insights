@@ -1180,7 +1180,7 @@
     "revert_rate_change_pp": 0.8122,
     "verdict": "ok"
   },
-  "headline": "Median cycle time is 40.0h (-2% vs previous period, not significant); the main bottleneck is high rework after review.",
+  "headline": "Median cycle time is 40.0h (-2% vs previous period, no meaningful change); the main bottleneck is high rework after review.",
   "links": {
     "narrative": "/v1/snapshots/s_9e2c040d610903b0/narrative",
     "self": "/v1/snapshots/s_9e2c040d610903b0"
