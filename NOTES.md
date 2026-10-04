@@ -79,7 +79,7 @@ per-decision log: [docs/DECISIONS.md](docs/DECISIONS.md).
 ## 4. How AI was used
 
 - **Claude (Anthropic):** brainstorming, the design document, and the implementation plan in
-  `docs/plan/PLAN.md`, written as instructions for a coding agent. Later it reviewed the implementation
+  `docs/PLAN.md`, written as instructions for a coding agent. Later it reviewed the implementation
   diffs and found issues such as a causal-wording validator loophole, sync stalls on malformed
   PRs and stale pagination after sync. It also implemented the narrative abstention and
   hypothesis-card improvements.
@@ -97,19 +97,3 @@ per-decision log: [docs/DECISIONS.md](docs/DECISIONS.md).
   - Refactor equivalence across golden, ten planted datasets and an ownership fixture;
     synthetic browser checks for both views, presets, Load more, cards and abstentions.
   - Not yet done: a person's numeric review of the golden fixture.
-
-## Refactor structure
-
-Analytics/cache identity is 1.5.0, with sampling seeds frozen at 1.4.0. Unused snapshot
-diagnostics were removed; remaining business values, evidence and template text are equivalent
-to `pre-refactor`. `snapshots/` owns cache, filter and domain-error helpers, so service modules
-do not depend on the API layer. `sync/queue.py` owns the shared job lifecycle;
-`sync/derive.py` includes rederivation. PR drilldown rows live in `analytics/snapshot.py`.
-The narrative hypothesis table preserves distinct card titles and template subjects, and
-generation shares one evidence extraction and one total deadline across both attempts.
-The frontend shares `useAbortable`, `GithubLink`, formatting and chart colors.
-
-Storage now uses one initial migration and removes 16 unused persisted fields.
-Upgrades require an explicitly confirmed
-local reset and resync. The confirmed rebuild and live Bevy acceptance are recorded in
-[storage verification](docs/storage-rebuild-verification.json), including narrative fallbacks.

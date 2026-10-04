@@ -51,7 +51,7 @@ curl -s "http://localhost:8000/v1/insights/delivery?repo=bevyengine/bevy&from=20
 ```
 
 Dates are inclusive UTC dates. Errors use RFC 9457 `application/problem+json`. Current contract: [REFERENCE.md](docs/REFERENCE.md#api) and the strict models in
-`backend/src/insights/api/schemas.py`. The original design is retained in `docs/plan/PLAN.md`.
+`backend/src/insights/api/schemas.py`. The original design is retained in `docs/PLAN.md`.
 
 ## Configuration
 
@@ -110,4 +110,4 @@ strict lint/types/build and all eight offline narrative gates pass.
 | [docs/REFERENCE.md](docs/REFERENCE.md) | Metric definitions, confidence scoring, operations, security, test results, limitations |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Implementation decisions and their reasons |
 | [docs/EVALUATION.md](docs/EVALUATION.md) | Narrative evaluation runs, per case |
-| [docs/plan/PLAN.md](docs/plan/PLAN.md) | Consolidated historical design input; current code and reference take precedence |
+| [docs/plan/PLAN.md](docs/PLAN.md) | Consolidated historical design input; current code and reference take precedence |

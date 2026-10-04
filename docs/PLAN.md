@@ -26,7 +26,7 @@ the implementation-agent instructions are preserved as the final chapter.
 
 ## 00 Overview
 
-This is the implementation plan. User-approved scope and tooling changes are recorded in `docs/DECISIONS.md`; the
+This is the implementation plan. User-approved scope and tooling changes are recorded in `DECISIONS.md`; the
 current behavior and verification status are described in README.
 
 ### 1. Product
@@ -75,7 +75,7 @@ Demo repository: **`dotnet/runtime`** (large, active, with ownership areas ident
 
 Merge-to-release waiting, effects of AI-authored PRs on review, dependency waiting (stacked PRs, blocked labels), cumulative flow diagrams, business-hours calculations, a second source adapter, an expanded hypothesis library, real-time webhooks, and API authentication.
 
-**Deferred** (mentioned in the design but excluded here; record each in `docs/DECISIONS.md` and README "Not done"): chain-level delivery time for supersession and revert / reland chains (links only in this version, `05` §4.5); real-history threshold backtesting and confidence-band calibration (`08` §5).
+**Deferred** (mentioned in the design but excluded here; record each in `DECISIONS.md` and README "Not done"): chain-level delivery time for supersession and revert / reland chains (links only in this version, `05` §4.5); real-history threshold backtesting and confidence-band calibration (`08` §5).
 
 #### Non-goals
 
@@ -203,7 +203,7 @@ delivery-insights/
     └── src/
 ```
 
-Package `eval/` separately as `insights_eval` under `backend/eval/insights_eval/`, alongside `insights` in `pyproject.toml` (see 02).
+Package `eval/` separately as `insights_eval` under `../backend/eval/insights_eval`, alongside `insights` in `pyproject.toml` (see 02).
 
 ### 6. Terminology
 
@@ -261,15 +261,15 @@ Execute in order. Each milestone specifies its goal, tasks, required tests, defi
 
 **Tasks**
 
-1. Create directories per [00-overview.md](#plan-00) §5. Write `backend/pyproject.toml` per [02-config-and-infra.md](#plan-02) §2 and run `cd backend && uv lock`.
+1. Create directories per [00-overview.md](#plan-00) §5. Write `../backend/pyproject.toml` per [02-config-and-infra.md](#plan-02) §2 and run `cd backend && uv lock`.
 2. `insights/config.py`: implement `Settings` (pydantic-settings) per `02` §1 and cached `get_settings()` (`functools.lru_cache`).
 3. `insights/logging.py`: configure structlog JSON logging per `02` §4.
 4. `insights/db/engine.py`: create an async engine and `async_sessionmaker`; `insights/redis.py`: create `redis.asyncio.Redis`. Create both in FastAPI lifespan, dispose on shutdown, and inject into routes. `insights/api/deps.py` provides `get_settings`, `get_session`, `get_redis`, `get_now` (returns `datetime.now(UTC)`, overridden in tests; `00` §7).
 5. `insights/api/errors.py`: problem+json exception hierarchy and handlers ([06-api.md](#plan-06) §2.3); `insights/api/middleware.py`: request ID and access logs (rate limiting added in M6).
 6. `insights/api/routes/health.py`: `GET /healthz` (no dependency checks, returns `{"status": "ok"}`), `GET /readyz` (checks `SELECT 1` and Redis `PING`; either failure returns 503 problem+json).
 7. `insights/main.py`: assemble `create_app()`; expose `app = create_app()` for uvicorn.
-8. Write `backend/Dockerfile`, `docker-compose.yml` (initially `postgres`, `redis`, `api` only), `Makefile`, `.env.example`, `.gitignore`, `.dockerignore`, `.github/workflows/ci.yml` per `02` §5–§8.
-9. Create `docs/DECISIONS.md` with a title and table headers.
+8. Write `../backend/Dockerfile`, `../docker-compose.yml` (initially `postgres`, `redis`, `api` only), `Makefile`, `../.env.example`, `../.gitignore`, `../.dockerignore`, `../.github/workflows/ci.yml` per `02` §5–§8.
+9. Create `DECISIONS.md` with a title and table headers.
 
 **Tests**: `tests/unit/test_health.py` (override dependencies for database/Redis success and failure), `tests/unit/test_logging.py` (JSON format and fields; `02` §4).
 
@@ -339,7 +339,7 @@ cd backend && uv run python -m insights.sources.github.smoke --repo dotnet/runti
 #   Expected: "prs=25 events=... rate_limit_remaining=...", no GraphQL errors
 ```
 
-**Note**: if a live call rejects a field, consult GitHub GraphQL documentation, fix the query, and update fixtures and `docs/DECISIONS.md`.
+**Note**: if a live call rejects a field, consult GitHub GraphQL documentation, fix the query, and update fixtures and `DECISIONS.md`.
 
 ---
 
@@ -517,7 +517,7 @@ make eval                # Meet 08 §6 gates, exit 0
 
 ### M11 (P1) Frontend
 
-**Tasks**: single-page UI, `frontend/Dockerfile`, `frontend/nginx.conf` per [09-frontend.md](#plan-09); add Compose `web` (host port 5173).
+**Tasks**: single-page UI, `../frontend/Dockerfile`, `../frontend/nginx.conf` per [09-frontend.md](#plan-09); add Compose `web` (host port 5173).
 
 **DoD**
 
@@ -537,7 +537,7 @@ Manual check (credentials or synthetic data): date selection, efficiency metrics
 **Tasks**
 
 1. Complete English README/submission notes per [11-readme-and-submission.md](#plan-11), including required "AI assistance" (§7.5) and "With one more day" (§7.6). Draft AI disclosure truthfully: tools, uses, executed verification; mark human finalization required and never claim unperformed checks.
-2. Review `docs/DECISIONS.md`: reasons for every deviation; separate entries for deferred real-data confidence calibration and chain-level delivery time.
+2. Review `DECISIONS.md`: reasons for every deviation; separate entries for deferred real-data confidence calibration and chain-level delivery time.
 3. Security: execute `12` security checks, including token-pattern history scan via `git log -p | grep`.
 4. Performance: execute `12` performance checks.
 5. Complete [12-acceptance-checklist.md](#plan-12) item by item (G6 in step 6).
@@ -552,7 +552,7 @@ Manual check (credentials or synthetic data): date selection, efficiency metrics
 
 ### 1. Configuration (`insights/config.py`)
 
-Use pydantic-settings `BaseSettings`, reading environment variables with `model_config = SettingsConfigDict(case_sensitive=False, env_ignore_empty=True)`. Empty strings count as unset: blank example tokens become `None`, rather than empty `SecretStr` values mistakenly interpreted as present. Docker Compose injects `.env` for local development; application code must not read that file directly.
+Use pydantic-settings `BaseSettings`, reading environment variables with `model_config = SettingsConfigDict(case_sensitive=False, env_ignore_empty=True)`. Empty strings count as unset: blank example tokens become `None`, rather than empty `SecretStr` values mistakenly interpreted as present. Docker Compose injects `../.env` for local development; application code must not read that file directly.
 
 **Store list configuration as strings and parse via properties** to avoid pydantic-settings JSON parsing. Strip whitespace, omit empty entries, validate as below, and reject invalid values at startup.
 
@@ -591,7 +591,7 @@ Derived properties:
 - `backfill_phases: list[int]`.
 - `location_label_prefix: str | None` when `LOCATION_DIMENSION` starts with `label:`.
 
-### 2. `backend/pyproject.toml`
+### 2. `../backend/pyproject.toml`
 
 ```toml
 [project]
@@ -680,7 +680,7 @@ Allow `S311` (non-cryptographic randomness) only in synthetic data and tests; pr
 - Standard-library logging uses structlog `ProcessorFormatter` for the same JSON. Disable `uvicorn.access` (middleware logs requests); set `httpx`, `httpcore`, `botocore`, `urllib3` to `WARNING`.
 - Never log request headers or complete upstream response bodies.
 
-### 5. `backend/Dockerfile`
+### 5. `../backend/Dockerfile`
 
 ```dockerfile
 # syntax=docker/dockerfile:1
@@ -706,9 +706,9 @@ EXPOSE 8000
 CMD ["uvicorn", "insights.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
 ```
 
-`backend/.dockerignore`:`.venv`, `**/__pycache__`, `.mypy_cache`, `.ruff_cache`, `.pytest_cache`, `tests`, `reports`.
+`../backend/.dockerignore`:`.venv`, `**/__pycache__`, `.mypy_cache`, `.ruff_cache`, `.pytest_cache`, `tests`, `reports`.
 
-### 6. `docker-compose.yml` (final form; migrate added in M1, worker in M3, web in M11)
+### 6. `../docker-compose.yml` (final form; migrate added in M1, worker in M3, web in M11)
 
 ```yaml
 name: delivery-insights
@@ -808,11 +808,11 @@ smoke:
 	./scripts/smoke.sh
 ```
 
-`scripts/smoke.sh` (created M6, extended M7/M11): call `/healthz`, `/readyz`, `/v1/repos`, last-seven-day `/v1/insights/delivery` (poll 202 using `Retry-After` for at most five minutes), then snapshot narrative. Print status codes/key fields; exit nonzero on any failure. Use `set -euo pipefail`; dependencies only `curl`, `python3`.
+`../scripts/smoke.sh` (created M6, extended M7/M11): call `/healthz`, `/readyz`, `/v1/repos`, last-seven-day `/v1/insights/delivery` (poll 202 using `Retry-After` for at most five minutes), then snapshot narrative. Print status codes/key fields; exit nonzero on any failure. Use `set -euo pipefail`; dependencies only `curl`, `python3`.
 
 ### 8. Root files
 
-`.env.example`:
+`../.env.example`:
 
 ```dotenv
 # Required for syncing: fine-grained personal access token, Repository access = "Public repositories", no extra permissions
@@ -831,9 +831,9 @@ DATABASE_URL=postgresql+asyncpg://insights:insights@postgres:5432/insights
 REDIS_URL=redis://redis:6379/0
 ```
 
-`.gitignore` includes at least `.env`, `.venv/`, `__pycache__/`, `.mypy_cache/`, `.ruff_cache/`, `.pytest_cache/`, `node_modules/`, `frontend/dist/`, `backend/reports/`, `*.egg-info/`.
+`../.gitignore` includes at least `../.env`, `.venv/`, `__pycache__/`, `.mypy_cache/`, `.ruff_cache/`, `.pytest_cache/`, `node_modules/`, `../frontend/dist`, `../backend/reports`, `*.egg-info/`.
 
-### 9. CI(`.github/workflows/ci.yml`)
+### 9. CI(`../.github/workflows/ci.yml`)
 
 Two jobs, triggered by `push` and `pull_request`:
 
@@ -3916,7 +3916,7 @@ FROM node:20-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
-COPY . .
+COPY plan .
 RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine
