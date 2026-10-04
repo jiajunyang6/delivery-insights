@@ -39,7 +39,7 @@ export default function App() {
     to: initial.get("to") ?? defaults.to,
   });
   const [audience, setAudience] = useState<Audience>(
-    initial.get("audience") === "director" ? "director" : "manager",
+    initial.get("audience") === "manager" ? "manager" : "director",
   );
   const [repos, setRepos] = useState<RepoStatus[]>([]);
   const [dateLimits, setDateLimits] = useState<DateLimits | null>(null);
