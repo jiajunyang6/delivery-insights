@@ -78,7 +78,7 @@ function LookFirst({ snapshot }: { snapshot: Snapshot }) {
         <span className="eyebrow">WHERE TO LOOK FIRST</span>
         <h3>{top.title}</h3>
         <p>
-          <b>{percent(top.impact_share)} of PR time</b> · {top.recommendation}
+          <b>{percent(top.impact_share)} of all PR time</b> · {top.recommendation}
         </p>
         <a href="#bottlenecks">See all bottlenecks ↓</a>
       </aside>

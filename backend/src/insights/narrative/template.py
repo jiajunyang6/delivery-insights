@@ -95,7 +95,7 @@ def build_template(pack: Mapping[str, Any], snapshot: Mapping[str, Any]) -> dict
             name = FINDINGS[finding["type"]]
         share = percent(evidence["E71"]["value"])
         parts["S3"] = sentence(
-            f"The largest time sink is {name}, about {share} of PR time", ["E71"]
+            f"The largest time sink is {name}, about {share} of all PR time", ["E71"]
         )
     elif waits := [i for i in WAITING if evidence.get(i, {}).get("value") is not None]:
         largest = max(waits, key=lambda i: (evidence[i]["value"], -int(i[1:])))

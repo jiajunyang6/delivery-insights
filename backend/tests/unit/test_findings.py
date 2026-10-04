@@ -5,8 +5,12 @@ from tests.analytics_factory import dataset, pr
 from tests.unit.test_bottlenecks import half_unreviewed_dataset
 from tests.unit.test_snapshot import params
 
+from insights.analytics.dataset import closed, hours
 from insights.analytics.findings import build_findings, headline, resolve_pointer
 from insights.analytics.snapshot import build_snapshot
+from insights_eval.generator import generate
+from insights_eval.pipeline import build_snapshot_from_repo, dataset_from_repo
+from insights_eval.scenarios import SCENARIOS
 
 
 def base():
@@ -141,3 +145,19 @@ def test_half_unreviewed_prs_trigger_high_demand_finding():
         "unit": "share",
         "ref": "/bottleneck_analysis/review_queue/net_inflow_share",
     }
+
+
+@pytest.mark.parametrize("seed", [101, 202])
+@pytest.mark.parametrize("name", sorted(SCENARIOS))
+def test_finding_shares_use_all_finished_pr_time_and_never_exceed_one(name, seed):
+    syn = generate(SCENARIOS[name], seed)
+    data = dataset_from_repo(syn)
+    snapshot = build_snapshot_from_repo(syn)
+    finished = snapshot["time_ledger"]["total_pr_hours"] + sum(
+        sum(hours(p, end=data.as_of).values()) for p in closed(data, data.current)
+    )
+    for finding in snapshot["bottlenecks"]:
+        assert 0 <= finding["impact_share"] <= 1
+        assert finding["impact_share"] == pytest.approx(
+            finding["impact_pr_hours"] / finished, abs=1e-3
+        )

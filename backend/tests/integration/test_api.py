@@ -10,6 +10,7 @@ from tests.factories import at
 from tests.integration.test_derive import seed
 from tests.integration.test_sync import NOW
 
+from insights.analytics import ANALYTICS_VERSION
 from insights.api.deps import get_now
 from insights.api.schemas import (
     Pending,
@@ -88,7 +89,7 @@ async def test_analytics_version_isolates_postgres_redis_and_http_cache(api, mon
     assert fresh.status_code == 200
     old_sid, new_sid = old.json()["snapshot_id"], fresh.json()["snapshot_id"]
     assert new_sid != old_sid
-    assert fresh.json()["meta"]["analytics_version"] == "1.5.0"
+    assert fresh.json()["meta"]["analytics_version"] == ANALYTICS_VERSION
     assert fresh.headers["etag"] != old.headers["etag"]
     for sid in (old_sid, new_sid):
         assert await ctx["redis"].exists(snapshot_key(sid))

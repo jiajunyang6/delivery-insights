@@ -2,7 +2,7 @@ from typing import Any
 
 from insights.analytics import thresholds as t
 from insights.analytics.bottlenecks import what_if
-from insights.analytics.dataset import Dataset, hours, merged
+from insights.analytics.dataset import Dataset, closed, hours, merged
 from insights.analytics.pointer import resolve_pointer
 from insights.analytics.stats import ratio
 
@@ -17,6 +17,12 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
         snapshot["efficiency"],
     )
     states = ledger["states"]
+    # Shares use the waiting time of every PR finished this period, merged or not. The
+    # time ledger covers merged PRs only, but waste also counts unmerged PRs; one shared
+    # denominator keeps every finding's share comparable and at most 100%.
+    finished_pr_hours = ledger["total_pr_hours"] + sum(
+        sum(hours(p, end=dataset.as_of).values()) for p in closed(dataset, dataset.current)
+    )
 
     def value(path: str) -> Any:
         resolved = resolve_pointer(snapshot, path)
@@ -46,7 +52,7 @@ def build_findings(snapshot: dict[str, Any], dataset: Dataset) -> list[dict[str,
                 "title": title,
                 "location": location,
                 "impact_pr_hours": impact,
-                "impact_share": ratio(impact, ledger["total_pr_hours"]),
+                "impact_share": ratio(impact, finished_pr_hours),
                 "evidence": [
                     {"label": label, "value": value(ref), "unit": unit, "ref": ref}
                     for label, ref, unit in evidence

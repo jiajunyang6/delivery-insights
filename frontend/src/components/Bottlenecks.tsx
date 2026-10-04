@@ -22,10 +22,11 @@ export function Bottlenecks({
         <summary>How impact and estimates are measured</summary>
         <p>
           PR-hours add time across PRs: two PRs waiting for three hours contribute
-          six PR-hours. Each finding's impact compares its affected time with all
-          merged PRs' post-ready time. Findings can overlap, and wasted work can
-          include unmerged PRs, so these percentages need not add to 100% and can
-          exceed it. Severity reflects configured evidence thresholds.
+          six PR-hours. Each finding's impact compares its affected time with the
+          post-ready time of all PRs finished this period, merged or closed
+          unmerged, so each percentage is at most 100%. Findings can overlap, so
+          the percentages need not add to 100%. Severity reflects configured
+          evidence thresholds.
         </p>
         <p>
           Capping a stage is an illustrative estimate of the median cycle time
@@ -49,7 +50,7 @@ export function Bottlenecks({
               <span className="rank">{String(f.rank).padStart(2, "0")}</span>
               <span className={"badge " + f.severity}>{f.severity}</span>
               <span className="impact">
-                {percent(f.impact_share)} of PR time
+                {percent(f.impact_share)} of all PR time
               </span>
             </div>
             <h3>{f.title}</h3>
