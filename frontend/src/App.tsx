@@ -78,13 +78,16 @@ export default function App() {
         if (!signal.aborted) setError(message(e));
       });
   }, [refresh]);
-  // Re-read setup only (not the report) after a narrative reports a Bedrock failure.
+  // Re-read setup and sync statuses (not the report) after a report loads or a narrative
+  // reports a Bedrock failure, so a sync that has since succeeded clears stale labels.
   useAbortable(
     (signal) => {
       if (!setupCheck) return;
       fetchJson<RepoList>("/v1/repos", signal)
         .then((r) => {
-          if (!signal.aborted) setSetup(r.data.setup);
+          if (signal.aborted) return;
+          setSetup(r.data.setup);
+          setRepos(r.data.items);
         })
         .catch(() => undefined);
     },
