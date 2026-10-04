@@ -31,23 +31,7 @@ individual productivity scores or causal proof. Workflow and timestamp changes a
 
 ## How it works
 
-```mermaid
-flowchart LR
-  GH[GitHub GraphQL and REST] -->|read-only access| W[worker: arq]
-  W -->|raw records and derived facts| PG[(Postgres)]
-  UI[React: nginx] -->|same-origin /api| API[FastAPI]
-  API <-->|local reads and stored reports| PG
-  API <-->|caches, locks, limits and jobs| R[(Redis)]
-  W <--> R
-  API -->|structured evidence| BR[Bedrock Converse]
-  BR --> V{Local validator}
-  V -->|valid| API
-  V -->|invalid: one repair attempt| BR
-  V -->|still invalid| T[Local deterministic template]
-  BR -->|unavailable or timeout| T
-  API -->|LLM disabled or busy| T
-  T --> API
-```
+![Delivery Insights data flow and narrative generation](diagrams/how-it-works.svg)
 
 1. **Sync:** staged backfill, overlapping incremental windows and open-PR sweeps write idempotent batches. Coverage and success checkpoints advance after phase completion; the resumable backfill cursor is saved with each batch.
 2. **Derive:** an event-driven state machine creates non-overlapping intervals and per-PR facts. Reverts, relands and superseded PRs are linked. CODEOWNERS changes trigger rederivation; area-owner changes update the data version and enqueue snapshot precomputation.

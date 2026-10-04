@@ -1,0 +1,187 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1220" viewBox="0 0 1440 1220" role="img" aria-labelledby="title description">
+  <title id="title">How Delivery Insights works</title>
+  <desc id="description">GitHub data is ingested by an arq worker into Postgres. The React dashboard accesses FastAPI through nginx. FastAPI reads and stores local reports in Postgres; FastAPI and the worker use Redis. For narratives, FastAPI sends structured evidence to Bedrock Converse and validates the reply locally. Invalid replies get at most one repair attempt. A local deterministic template handles disabled or busy LLMs, unavailable services, timeouts and replies that remain invalid. Validated replies and template output return through the API.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 Z" fill="#94a8b8"/>
+    </marker>
+    <marker id="success-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 Z" fill="#7bd9bd"/>
+    </marker>
+    <marker id="repair-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 Z" fill="#91baff"/>
+    </marker>
+    <marker id="fallback-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 Z" fill="#e9bd79"/>
+    </marker>
+    <style>
+      text { font-family: "Segoe UI", Arial, sans-serif; }
+      .heading { fill: #f0f5f8; font-size: 34px; font-weight: 650; }
+      .section { fill: #dce8ee; font-size: 21px; font-weight: 600; }
+      .number { fill: #7bd9bd; font-size: 15px; font-weight: 700; letter-spacing: 2px; }
+      .muted { fill: #acbdc8; font-size: 15px; }
+      .node { fill: #26333e; stroke: #587080; stroke-width: 1.5; }
+      .external { fill: #35304c; stroke: #c4adff; stroke-width: 2; }
+      .processing { fill: #253951; stroke: #91baff; stroke-width: 2; }
+      .storage { fill: #203c43; stroke: #64cbd8; stroke-width: 2; }
+      .storage-rim { fill: none; stroke: #64cbd8; stroke-width: 1.5; }
+      .presentation { fill: #223c36; stroke: #7bd9bd; stroke-width: 2; }
+      .validation-fallback { fill: #383327; stroke: #e9bd79; stroke-width: 2; }
+      .node-title { fill: #f0f5f8; font-size: 20px; font-weight: 600; text-anchor: middle; }
+      .node-detail { fill: #b7c8d2; font-size: 14px; text-anchor: middle; }
+      .edge { fill: none; stroke: #94a8b8; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; marker-end: url(#arrow); }
+      .both { marker-start: url(#arrow); }
+      .success { stroke: #7bd9bd; marker-end: url(#success-arrow); }
+      .repair { stroke: #91baff; marker-end: url(#repair-arrow); }
+      .fallback { stroke: #e9bd79; stroke-dasharray: 7 6; marker-end: url(#fallback-arrow); }
+      .label { fill: #c1d0d9; font-size: 14px; text-anchor: middle; }
+      .success-label { fill: #7bd9bd; }
+      .repair-label { fill: #91baff; }
+      .fallback-label { fill: #e9bd79; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="1220" rx="18" fill="#161e25"/>
+  <text class="heading" x="40" y="56">How it works</text>
+  <text class="muted" x="40" y="84">Local data powers the dashboard. Structured evidence powers the narrative.</text>
+
+  <rect x="30" y="106" width="1380" height="400" rx="16" fill="#1e2932" stroke="#344653"/>
+  <text class="number" x="60" y="148">01</text>
+  <text class="section" x="105" y="148">Data sync and local reporting</text>
+
+  <g id="github-worker">
+    <path class="edge" d="M 340 250 H 510"/>
+    <text class="label" x="425" y="235">Read-only access</text>
+  </g>
+  <g id="worker-postgres">
+    <path class="edge" d="M 770 250 H 1120"/>
+    <text class="label" x="945" y="233">Raw records and derived facts</text>
+  </g>
+  <g id="worker-redis">
+    <path class="edge both" d="M 640 210 V 190 H 1390 V 440 H 1360"/>
+    <text class="label" x="1050" y="181">Jobs and worker locks</text>
+  </g>
+  <g id="web-api">
+    <path class="edge" d="M 340 435 H 510"/>
+    <text class="label" x="425" y="420">Same-origin /api</text>
+  </g>
+  <g id="api-postgres">
+    <path class="edge both" d="M 770 415 H 810 V 330 H 1240 V 296"/>
+    <text class="label" x="1025" y="318">Local reads and stored reports</text>
+  </g>
+  <g id="api-redis">
+    <path class="edge both" d="M 770 455 H 1120"/>
+    <text class="label" x="950" y="443">Caches, locks, limits and jobs</text>
+  </g>
+
+  <g id="github">
+    <rect class="node external" x="60" y="210" width="280" height="80" rx="12"/>
+    <text class="node-title" x="200" y="245">GitHub</text>
+    <text class="node-detail" x="200" y="270">GraphQL and REST</text>
+  </g>
+  <g id="worker">
+    <rect class="node processing" x="510" y="210" width="260" height="80" rx="12"/>
+    <text class="node-title" x="640" y="245">Worker · arq</text>
+    <text class="node-detail" x="640" y="270">Sync and derive</text>
+  </g>
+  <g id="postgres">
+    <path class="node storage" d="M 1120 220 C 1120 200 1360 200 1360 220 V 280 C 1360 300 1120 300 1120 280 Z"/>
+    <path class="storage-rim" d="M 1120 220 C 1120 240 1360 240 1360 220"/>
+    <text class="node-title" x="1240" y="260">Postgres</text>
+    <text class="node-detail" x="1240" y="282">Raw data, facts and reports</text>
+  </g>
+  <g id="web">
+    <rect class="node presentation" x="60" y="400" width="280" height="80" rx="12"/>
+    <text class="node-title" x="200" y="435">React · nginx</text>
+    <text class="node-detail" x="200" y="460">Dashboard</text>
+  </g>
+  <g id="api">
+    <rect class="node processing" x="510" y="400" width="260" height="80" rx="12"/>
+    <text class="node-title" x="640" y="435">FastAPI</text>
+    <text class="node-detail" x="640" y="460">Local queries and reports</text>
+  </g>
+  <g id="redis">
+    <path class="node storage" d="M 1120 410 C 1120 390 1360 390 1360 410 V 470 C 1360 490 1120 490 1120 470 Z"/>
+    <path class="storage-rim" d="M 1120 410 C 1120 430 1360 430 1360 410"/>
+    <text class="node-title" x="1240" y="449">Redis</text>
+    <text class="node-detail" x="1240" y="473">Caches, locks, limits and jobs</text>
+  </g>
+
+  <rect x="30" y="526" width="1380" height="558" rx="16" fill="#1e2932" stroke="#344653"/>
+  <text class="number" x="60" y="568">02</text>
+  <text class="section" x="105" y="568">Narrative generation</text>
+  <text class="muted" x="60" y="596">Evidence, validation and fallback run inside FastAPI; Bedrock is an external service.</text>
+
+  <g id="evidence-bedrock">
+    <path class="edge" d="M 330 745 H 435"/>
+    <text class="label" x="382" y="716"><tspan x="382">Structured</tspan><tspan x="382" dy="19">evidence</tspan></text>
+  </g>
+  <g id="bedrock-validator">
+    <path class="edge" d="M 695 745 H 800"/>
+    <text class="label" x="747" y="716"><tspan x="747">Generated</tspan><tspan x="747" dy="19">text</tspan></text>
+  </g>
+  <g id="validator-response">
+    <path class="edge success" d="M 1060 745 H 1160"/>
+    <text class="label success-label" x="1110" y="730">Valid</text>
+  </g>
+  <g id="validator-repair">
+    <path class="edge repair" d="M 930 700 V 637 H 565 V 700"/>
+    <text class="label repair-label" x="747" y="625">Invalid: one repair attempt</text>
+  </g>
+  <g id="validator-template">
+    <path class="edge fallback" d="M 930 790 V 935"/>
+    <text class="label fallback-label" x="1000" y="866">Still invalid</text>
+  </g>
+  <g id="bedrock-template">
+    <path class="edge fallback" d="M 565 790 V 977 H 800"/>
+    <text class="label fallback-label" x="682" y="962">Unavailable / timeout</text>
+  </g>
+  <g id="evidence-template">
+    <path class="edge fallback" d="M 195 790 V 1046 H 850 V 1020"/>
+    <text class="label fallback-label" x="460" y="1033">LLM disabled or busy</text>
+  </g>
+  <g id="template-response">
+    <path class="edge success" d="M 1060 977 H 1110 V 819 H 1270 V 790"/>
+    <text class="label success-label" x="1190" y="883"><tspan x="1190">Template</tspan><tspan x="1190" dy="19">result</tspan></text>
+  </g>
+
+  <g id="evidence">
+    <rect class="node processing" x="60" y="700" width="270" height="90" rx="12"/>
+    <text class="node-title" x="195" y="738">FastAPI</text>
+    <text class="node-detail" x="195" y="763">Select and score evidence</text>
+  </g>
+  <g id="bedrock">
+    <rect class="node external" x="435" y="700" width="260" height="90" rx="12"/>
+    <text class="node-title" x="565" y="738">AWS Bedrock</text>
+    <text class="node-detail" x="565" y="763">Converse API · External LLM</text>
+  </g>
+  <g id="validator">
+    <rect class="node validation-fallback" x="800" y="700" width="260" height="90" rx="12"/>
+    <text class="node-title" x="930" y="738">Local validator</text>
+    <text class="node-detail" x="930" y="763">Check the LLM reply</text>
+  </g>
+  <g id="response">
+    <rect class="node processing" x="1160" y="700" width="220" height="90" rx="12"/>
+    <text class="node-title" x="1270" y="738">FastAPI response</text>
+    <text class="node-detail" x="1270" y="763">Narrative to the dashboard</text>
+  </g>
+  <g id="template">
+    <rect class="node validation-fallback" x="800" y="935" width="260" height="85" rx="12"/>
+    <text class="node-title" x="930" y="965">Local deterministic</text>
+    <text class="node-title" x="930" y="998">template</text>
+  </g>
+  <text class="muted" x="40" y="1115">At most one repair. Template output returns directly to the API without passing through the LLM validator.</text>
+  <g id="module-legend" aria-label="Module colors grouped by responsibility">
+    <text class="muted" x="40" y="1150">Module groups</text>
+    <rect class="external" x="60" y="1164" width="18" height="18" rx="4"/>
+    <text class="muted" x="90" y="1179">External services</text>
+    <rect class="processing" x="320" y="1164" width="18" height="18" rx="4"/>
+    <text class="muted" x="350" y="1179">Processing</text>
+    <rect class="storage" x="560" y="1164" width="18" height="18" rx="4"/>
+    <text class="muted" x="590" y="1179">Data and queues</text>
+    <rect class="validation-fallback" x="810" y="1164" width="18" height="18" rx="4"/>
+    <text class="muted" x="840" y="1179">Validation and fallback</text>
+    <rect class="presentation" x="1150" y="1164" width="18" height="18" rx="4"/>
+    <text class="muted" x="1180" y="1179">Presentation</text>
+  </g>
+</svg>
