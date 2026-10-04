@@ -109,8 +109,7 @@ The narrative hypothesis table preserves distinct card titles and template subje
 generation shares one evidence extraction and one total deadline across both attempts.
 The frontend shares `useAbortable`, `GithubLink`, formatting and chart colors.
 
-[Refactor verification](docs/REFACTOR_VERIFICATION.md) separates automatic equivalence checks,
-synthetic browser verification and the live storage gates. Storage now uses one initial
-migration and removes 16 unused persisted fields. Upgrades require an explicitly confirmed
+Storage now uses one initial migration and removes 16 unused persisted fields.
+Upgrades require an explicitly confirmed
 local reset and resync. The confirmed rebuild and live Bevy acceptance are recorded in
 [storage verification](docs/storage-rebuild-verification.json), including narrative fallbacks.

@@ -98,7 +98,6 @@
     "load_more_rows": [5, 50, 64],
     "stale_report_recovery": true,
     "console_warnings_errors": [],
-    "screenshots": ["screenshots/storage-rebuild-overview.png", "screenshots/storage-rebuild.png"],
     "final_period_end": "2026-10-03",
     "final_load_more_rows": [5, 50, 63]
   },

@@ -82,7 +82,7 @@ cd frontend && npm ci && npm test && npm run typecheck && npm run build
 
 Analytics version **1.5.0** trims unused snapshot diagnostics while retaining dashboard,
 narrative and drilldown fields. Snapshot/cache identities use 1.5.0; statistical sampling
-keeps the original 1.4.0 seed parameters. See [refactor verification](docs/REFACTOR_VERIFICATION.md).
+keeps the original 1.4.0 seed parameters.
 
 The unreleased application's migrations are now consolidated into `0001_initial`.
 Upgrading from the earlier three-migration schema requires deleting the local database
