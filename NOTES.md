@@ -55,37 +55,33 @@ and `cd frontend && npm ci && npm test && npm run build`.
 
 ## 2. Architecture and main decisions
 
-The service has five containers. An **arq worker** is the only part that talks to GitHub. It
-runs staged backfills, overlapping incremental syncs and open-PR sweeps over GraphQL/REST, writes
-idempotent batches to **Postgres**, and derives a per-PR timeline. A state machine splits each
-PR's life into non-overlapping intervals by whose turn it is: coding, waiting on a reviewer,
-the author, CI, or merge. It also links reverts, relands and code owners. The **FastAPI** service
-never calls GitHub on a request. It reads one consistent database view, runs pure analytics code
-(no I/O imports), and returns an immutable snapshot. The snapshot ID hashes the parameters, data
-watermark and code versions, which gives free ETags and caching. **Redis** holds jobs, locks,
-caches and rate limits. A **React** dashboard is served by nginx on the same origin.
+![How Delivery Insights works](docs/diagrams/how-it-works.svg)
 
-The narrative is built so the LLM cannot invent facts. Code selects numbered evidence (E1, E2…)
-and scores four library hypotheses: review capacity, CI, PR size, and quality trade-off. Each
-needs a symptom (something got worse than last period) and a mechanism, combined by a fixed
-formula into an evidence-strength band. Claude Sonnet 4.6 only writes the wording, through a
-tool call. A validator checks every number, citation and hedge word against the band. It allows
-one repair, then falls back to a deterministic template. The model never sees PR titles,
-comments or user names. If nothing slowed down, or evidence is weak, the narrative says so and
-points to where PR time goes now.
+**01 — Local data and reporting:** the arq worker syncs GitHub history into Postgres and derives
+PR timelines. FastAPI serves snapshots from local data; Redis supports jobs, caches, locks and
+rate limits. The React dashboard accesses FastAPI through nginx.
+
+**02 — Narrative generation:** code computes metrics, selects evidence and scores hypotheses.
+Bedrock writes the wording; local validation checks numbers, citations and uncertainty language,
+with at most one repair. A deterministic template handles disabled, busy or failed LLM calls
+and replies that remain invalid. Validation and fallback run inside FastAPI; PR titles,
+comments and user names are never sent to the LLM.
 
 Main decisions:
 
-- **Metric:** PR cycle time and *where it waits*. It answers "slower, and why", unlike DORA-style counts.
-- **Scope:** all sections use PRs opened or with human activity in the period, so a sprint view
-  stays focused. The cost is that idle old PRs need a longer period to appear.
-- **Confidence:** deterministic and testable, not model self-rated. It is synthetic-calibrated
-  only (20-case eval: 14/16 root-cause hits, 4/4 correct abstentions).
-- **Sync:** background sync rather than request-time fetching, for GitHub rate limits and fast reads.
-- **Time:** UTC wall-clock, English only, public repos only.
+- **Metric:** cycle time and where PRs wait, measured in UTC elapsed time. PR-hours describe
+  waiting; finding ranks do not establish a cause or measure engineering effort.
+- **Scope:** every section uses PRs opened or with human activity in the selected period.
+  Older idle PRs may require a longer window to appear.
+- **Reproducibility:** background sync keeps GitHub I/O off the request path. Pure analytics
+  and snapshots identified by parameters, versions and watermarks support repeatable reports.
+- **Evidence strength:** fixed rules score hypotheses, calibrated on synthetic scenarios only.
+  Weak evidence or no slowdown leads to abstention; the score is not a probability.
+- **Constraints:** English narratives and public repositories only.
 
-Full trade-offs: [docs/REFERENCE.md](docs/REFERENCE.md#trade-offs-and-limitations);
-per-decision log: [docs/DECISIONS.md](docs/DECISIONS.md).
+Details: [technical reference](docs/REFERENCE.md#how-it-works),
+[trade-offs](docs/REFERENCE.md#trade-offs-and-limitations),
+[evaluation](docs/EVALUATION.md) and [decision log](docs/DECISIONS.md).
 
 ## 3. With one more day
 

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1220" viewBox="0 0 1440 1220" role="img" aria-labelledby="title description">
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1174" viewBox="0 46 1440 1174" role="img" aria-labelledby="title description">
   <title id="title">How Delivery Insights works</title>
   <desc id="description">GitHub data is ingested by an arq worker into Postgres. The React dashboard accesses FastAPI through nginx. FastAPI reads and stores local reports in Postgres; FastAPI and the worker use Redis. For narratives, FastAPI sends structured evidence to Bedrock Converse and validates the reply locally. Invalid replies get at most one repair attempt. A local deterministic template handles disabled or busy LLMs, unavailable services, timeouts and replies that remain invalid. Validated replies and template output return through the API.</desc>
   <defs>
@@ -16,7 +16,6 @@
     </marker>
     <style>
       text { font-family: "Segoe UI", Arial, sans-serif; }
-      .heading { fill: #f0f5f8; font-size: 34px; font-weight: 650; }
       .section { fill: #dce8ee; font-size: 21px; font-weight: 600; }
       .number { fill: #7bd9bd; font-size: 15px; font-weight: 700; letter-spacing: 2px; }
       .muted { fill: #acbdc8; font-size: 15px; }
@@ -41,8 +40,7 @@
     </style>
   </defs>
 
-  <rect width="1440" height="1220" rx="18" fill="#161e25"/>
-  <text class="heading" x="40" y="56">How it works</text>
+  <rect y="46" width="1440" height="1174" rx="18" fill="#161e25"/>
   <text class="muted" x="40" y="84">Local data powers the dashboard. Structured evidence powers the narrative.</text>
 
   <rect x="30" y="106" width="1380" height="400" rx="16" fill="#1e2932" stroke="#344653"/>
