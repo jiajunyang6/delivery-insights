@@ -127,48 +127,67 @@ def build_timeline(
     decisions: dict[str, tuple[str, str | None]] = {}
     last_feedback: datetime | None = None
     last_update: datetime | None = None
-    draft = False
-    paused = False
+    flags = {"draft": False, "paused": False}
+
+    def review(event: Event) -> bool:
+        nonlocal last_feedback
+        person = event.actor.login.lower() if event.actor.login else None
+        if not person or not human_event(event, pr.author_login):
+            return False
+        state = event.payload["state"]
+        if state in {"APPROVED", "CHANGES_REQUESTED"}:
+            decisions[person] = (state, event.payload.get("review_id"))
+        if state in {"CHANGES_REQUESTED", "COMMENTED"}:
+            last_feedback = event.occurred_at
+            return True
+        return False
+
+    def dismiss(event: Event) -> bool:
+        review_id = event.payload.get("review_id")
+        reviewer = (event.payload.get("review_author") or "").lower()
+        for login, (_, recorded_id) in list(decisions.items()):
+            if (review_id is not None and recorded_id == review_id) or (
+                review_id is None and reviewer == login
+            ):
+                del decisions[login]
+        return False
+
+    def toggle(event: Event) -> bool:
+        flag, value = {
+            EventKind.CONVERT_TO_DRAFT: ("draft", True),
+            EventKind.READY_FOR_REVIEW: ("draft", False),
+            EventKind.CLOSED: ("paused", True),
+            EventKind.REOPENED: ("paused", False),
+        }[event.kind]
+        if event.kind != EventKind.CLOSED or event.dedup_key in paired_closes:
+            flags[flag] = value
+        return False
+
+    handlers = {
+        EventKind.REVIEW: review,
+        EventKind.REVIEW_DISMISSED: dismiss,
+        EventKind.CONVERT_TO_DRAFT: toggle,
+        EventKind.READY_FOR_REVIEW: toggle,
+        EventKind.CLOSED: toggle,
+        EventKind.REOPENED: toggle,
+    }
 
     def apply(event: Event) -> bool:
-        nonlocal last_feedback, last_update, draft, paused
-        kind = event.kind
+        nonlocal last_update
+        handler = handlers.get(event.kind)
+        feedback = handler(event) if handler else False
         person = event.actor.login.lower() if event.actor.login else None
         own = bool(person and pr.author_login and person == pr.author_login.lower())
-        human = human_event(event, pr.author_login)
-        feedback = False
-        if kind == EventKind.REVIEW and human and person:
-            state = event.payload["state"]
-            if state in {"APPROVED", "CHANGES_REQUESTED"}:
-                decisions[person] = (state, event.payload.get("review_id"))
-            if state in {"CHANGES_REQUESTED", "COMMENTED"}:
-                last_feedback, feedback = event.occurred_at, True
-        elif kind == EventKind.REVIEW_DISMISSED:
-            review_id = event.payload.get("review_id")
-            reviewer = (event.payload.get("review_author") or "").lower()
-            for login, (_, recorded_id) in list(decisions.items()):
-                if (review_id is not None and recorded_id == review_id) or (
-                    review_id is None and reviewer == login
-                ):
-                    del decisions[login]
-        elif kind == EventKind.CONVERT_TO_DRAFT:
-            draft = True
-        elif kind == EventKind.READY_FOR_REVIEW:
-            draft = False
-        elif kind == EventKind.CLOSED and event.dedup_key in paired_closes:
-            paused = True
-        elif kind == EventKind.REOPENED:
-            paused = False
-        if kind in {EventKind.COMMIT, EventKind.FORCE_PUSH} or (
-            own and kind in {EventKind.COMMENT, EventKind.REVIEW, EventKind.REVIEW_REQUESTED}
+        if event.kind in {EventKind.COMMIT, EventKind.FORCE_PUSH} or (
+            own and event.kind in {EventKind.COMMENT, EventKind.REVIEW, EventKind.REVIEW_REQUESTED}
         ):
             last_update = event.occurred_at
         return feedback
 
     def evaluate(at: datetime) -> str:
-        if paused:
+        if flags["paused"]:
             return "closed"
-        if draft:
+        if flags["draft"]:
             return "waiting_author"
         states = {decision[0] for decision in decisions.values()}
         if "APPROVED" in states and "CHANGES_REQUESTED" not in states:
@@ -185,7 +204,7 @@ def build_timeline(
             apply(event)
         elif event.occurred_at < horizon:
             grouped[event.occurred_at].append(event)
-    draft = False
+    flags["draft"] = False
     boundaries = set(grouped)
     boundaries.update(
         point for pair in ci_intervals for point in pair if ready_at < point < horizon
@@ -196,7 +215,7 @@ def build_timeline(
         for event in grouped[at]:
             feedback = apply(event) or feedback
         new = evaluate(at)
-        if new == "waiting_author" and current != new and not draft and feedback:
+        if new == "waiting_author" and current != new and not flags["draft"] and feedback:
             rounds += 1
         if new != current:
             if segment_start < at:

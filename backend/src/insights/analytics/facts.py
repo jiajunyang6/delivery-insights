@@ -12,6 +12,22 @@ def hours_between(start: datetime | None, end: datetime | None) -> float | None:
     return (end - start).total_seconds() / 3600 if start is not None and end is not None else None
 
 
+def count_events(
+    events: Sequence[Event],
+    kinds: set[EventKind],
+    *,
+    after: datetime | None,
+    before: datetime | None = None,
+) -> int:
+    return sum(
+        e.kind in kinds
+        and after is not None
+        and e.occurred_at > after
+        and (before is None or e.occurred_at < before)
+        for e in events
+    )
+
+
 def compute_facts(
     pr: PullRequestRecord,
     events: Sequence[Event],
@@ -81,21 +97,15 @@ def compute_facts(
             and (first_approval is None or e.occurred_at < first_approval)
             for e in reviews
         ),
-        commits_after_first_review=sum(
-            e.kind == EventKind.COMMIT and first_review is not None and e.occurred_at > first_review
-            for e in events
+        commits_after_first_review=count_events(events, {EventKind.COMMIT}, after=first_review),
+        force_pushes_after_first_review=count_events(
+            events, {EventKind.FORCE_PUSH}, after=first_review
         ),
-        force_pushes_after_first_review=sum(
-            e.kind == EventKind.FORCE_PUSH
-            and first_review is not None
-            and e.occurred_at > first_review
-            for e in events
-        ),
-        updates_after_approval=sum(
-            e.kind in {EventKind.COMMIT, EventKind.FORCE_PUSH}
-            and timeline.approved_at is not None
-            and timeline.approved_at < e.occurred_at < (end or now)
-            for e in events
+        updates_after_approval=count_events(
+            events,
+            {EventKind.COMMIT, EventKind.FORCE_PUSH},
+            after=timeline.approved_at,
+            before=end or now,
         ),
         distinct_approvers=len(approvers),
         second_approval_wait_hours=hours_between(approval_times[0], approval_times[1])

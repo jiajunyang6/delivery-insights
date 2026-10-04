@@ -117,26 +117,18 @@ class HeadIndex:
         return result
 
 
-def link_prs(
-    prs: Sequence[LinkInput], *, repo_full_name: str, default_branch: str
-) -> dict[int, PrFacts]:
-    by_number = {item.record.number: item for item in prs}
-    by_id = {item.pr_id: item for item in prs}
-    output = {
-        p.pr_id: replace(
-            p.facts,
-            is_revert=False,
-            reverts_pr_id=None,
-            reverted_by_pr_id=None,
-            reverted_at=None,
-            is_reland=False,
-            reland_of_pr_id=None,
-            superseded_by_pr_id=None,
-            close_class=None,
-            late_rejection=False,
-        )
-        for p in prs
-    }
+@dataclass(frozen=True, slots=True)
+class LinkIndexes:
+    by_number: dict[int, LinkInput]
+    by_id: dict[int, LinkInput]
+    merged_titles: dict[str, list[LinkInput]]
+    sha_index: dict[str, list[LinkInput]]
+    head_indexes: dict[tuple[str, str], HeadIndex]
+    sha_dates: dict[str, list[datetime]]
+    title_dates: dict[str, list[datetime]]
+
+
+def build_link_indexes(prs: Sequence[LinkInput], default_branch: str) -> LinkIndexes:
     merged_titles: dict[str, list[LinkInput]] = defaultdict(list)
     sha_index: dict[str, list[LinkInput]] = defaultdict(list)
     heads: dict[tuple[str, str], list[LinkInput]] = defaultdict(list)
@@ -162,6 +154,23 @@ def link_prs(
         title: [p.record.merged_at for p in items if p.record.merged_at is not None]
         for title, items in merged_titles.items()
     }
+    return LinkIndexes(
+        {p.record.number: p for p in prs},
+        {p.pr_id: p for p in prs},
+        dict(merged_titles),
+        dict(sha_index),
+        head_indexes,
+        sha_dates,
+        title_dates,
+    )
+
+
+def link_reverts(
+    prs: Sequence[LinkInput],
+    output: dict[int, PrFacts],
+    indexes: LinkIndexes,
+    repo_full_name: str,
+) -> None:
     for item in sorted(prs, key=lambda p: (p.record.created_at, p.pr_id)):
         pr, facts = item.record, output[item.pr_id]
         title = re.match(r'^Revert\s+"(?P<title>.+)"\s*$', pr.title, re.I)
@@ -175,12 +184,12 @@ def link_prs(
         is_revert = bool(title or body or (pr.title.lower().startswith("revert") and reverts))
         original: LinkInput | None = None
         if body and body[1].lower() == repo_full_name.lower():
-            original = by_number.get(int(body[2]))
+            original = indexes.by_number.get(int(body[2]))
         if original is None:
             candidates = []
             for sha in reverts:
-                entries = sha_index.get(sha, [])
-                index = bisect_left(sha_dates.get(sha, []), pr.created_at) - 1
+                entries = indexes.sha_index.get(sha, [])
+                index = bisect_left(indexes.sha_dates.get(sha, []), pr.created_at) - 1
                 if index >= 0:
                     candidates.append(entries[index])
             original = max(
@@ -188,9 +197,9 @@ def link_prs(
                 key=lambda p: (p.record.merged_at or p.record.created_at, p.pr_id),
                 default=None,
             )
-        if original is None and title and title[1] in merged_titles:
-            entries = merged_titles[title[1]]
-            index = bisect_left(title_dates[title[1]], pr.created_at) - 1
+        if original is None and title and title[1] in indexes.merged_titles:
+            entries = indexes.merged_titles[title[1]]
+            index = bisect_left(indexes.title_dates[title[1]], pr.created_at) - 1
             if index >= 0:
                 original = entries[index]
         if is_revert:
@@ -211,17 +220,25 @@ def link_prs(
                             old, reverted_by_pr_id=item.pr_id, reverted_at=pr.merged_at
                         )
         output[item.pr_id] = facts
+
+
+def link_relands_and_closes(
+    prs: Sequence[LinkInput],
+    output: dict[int, PrFacts],
+    indexes: LinkIndexes,
+    repo_full_name: str,
+) -> None:
     reverted = {identifier: facts for identifier, facts in output.items() if facts.reverted_at}
     reverted_by_title = {
-        by_id[identifier].record.title: identifier for identifier in sorted(reverted)
+        indexes.by_id[identifier].record.title: identifier for identifier in sorted(reverted)
     }
     for item in prs:
         pr, facts = item.record, output[item.pr_id]
         if re.match(r"^(Reland|Re-land|Reapply|Re-apply)\b", pr.title, re.I):
             reference = re.search(r"#(\d+)", pr.title + "\n" + pr.body_excerpt)
             original_id = None
-            if reference and int(reference[1]) in by_number:
-                candidate_id = by_number[int(reference[1])].pr_id
+            if reference and int(reference[1]) in indexes.by_number:
+                candidate_id = indexes.by_number[int(reference[1])].pr_id
                 if candidate_id in reverted:
                     original_id = candidate_id
             quoted = re.search(r'"(.+)"', pr.title)
@@ -240,7 +257,7 @@ def link_prs(
                 payload = event.payload
                 if payload["source_repo"].lower() != repo_full_name.lower():
                     continue
-                source = by_number.get(payload["source_number"])
+                source = indexes.by_number.get(payload["source_number"])
                 source_author = (
                     source.record.author.login if source else payload.get("source_author")
                 )
@@ -266,8 +283,8 @@ def link_prs(
                 ):
                     superseded.append((merged_at, source.pr_id if source else None))
             key = (author or "", pr.head_ref)
-            if author and key in head_indexes:
-                successor_candidate = head_indexes[key].earliest(
+            if author and key in indexes.head_indexes:
+                successor_candidate = indexes.head_indexes[key].earliest(
                     pr.closed_at, pr.closed_at + timedelta(days=SUPERSEDE_WINDOW_DAYS)
                 )
                 if successor_candidate:
@@ -296,6 +313,32 @@ def link_prs(
                 facts, close_class=close_class, superseded_by_pr_id=successor, late_rejection=late
             )
         output[item.pr_id] = facts
+
+
+def link_prs(
+    prs: Sequence[LinkInput],
+    *,
+    repo_full_name: str,
+    default_branch: str,
+) -> dict[int, PrFacts]:
+    output = {
+        p.pr_id: replace(
+            p.facts,
+            is_revert=False,
+            reverts_pr_id=None,
+            reverted_by_pr_id=None,
+            reverted_at=None,
+            is_reland=False,
+            reland_of_pr_id=None,
+            superseded_by_pr_id=None,
+            close_class=None,
+            late_rejection=False,
+        )
+        for p in prs
+    }
+    indexes = build_link_indexes(prs, default_branch)
+    link_reverts(prs, output, indexes, repo_full_name)
+    link_relands_and_closes(prs, output, indexes, repo_full_name)
     return output
 
 
