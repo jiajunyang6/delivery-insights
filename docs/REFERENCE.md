@@ -88,8 +88,8 @@ curl -s "$API/v1/snapshots/$SID"
 curl -s "$API/v1/snapshots/$SID/narrative?audience=manager&lang=en"
 ```
 
-The conditional request returns `304` with no body. Insights have a 60-second private
-HTTP cache; snapshots by ID have a one-day immutable cache. Successful narratives and
+The conditional request returns `304` with no body. Insights and PR rows use `private, no-cache`,
+so browsers revalidate with the ETag and see new coverage as soon as a sync lands; snapshots by ID have a one-day immutable cache. Successful narratives and
 disabled-LLM templates have `private, max-age=3600`; failure fallbacks use `no-store`.
 Internal Redis TTLs are separate from HTTP cache directives.
 

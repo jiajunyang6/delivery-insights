@@ -370,4 +370,5 @@ class SnapshotService:
         page = page_rows(
             cast(list[dict[str, Any]], rows), sid, metadata.as_of, filters, limit, cursor
         )
-        return Reply(canonical(rounded(page)), 200, {"Cache-Control": "private, max-age=60"})
+        # Param-addressed like the delivery reply, so the browser must not reuse it after a sync.
+        return Reply(canonical(rounded(page)), 200, {"Cache-Control": "private, no-cache"})

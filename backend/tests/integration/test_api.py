@@ -64,7 +64,7 @@ async def test_snapshot_caches_etags_and_schema(api, monkeypatch):
     first = await client.get(DELIVERY, headers={"X-Request-ID": "api-check"})
     assert first.status_code == 200, first.text
     SnapshotSchema.model_validate(first.json())
-    assert first.headers["cache-control"] == "private, max-age=60"
+    assert first.headers["cache-control"] == "private, no-cache"
     assert first.headers["x-request-id"] == "api-check"
     assert first.headers["content-location"].endswith(first.json()["snapshot_id"])
     assert first.headers["x-snapshot-id"] == first.json()["snapshot_id"]
