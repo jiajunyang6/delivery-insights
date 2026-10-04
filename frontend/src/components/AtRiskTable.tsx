@@ -105,6 +105,12 @@ export function AtRiskTable({
         </div>
         <span>{s.at_risk_summary.critical} critical</span>
       </div>
+      <p className="footnote">
+        Age is time spent in the current waiting state; threshold is the
+        repository's historical limit for that state. Critical means the PR also
+        exceeds the higher critical threshold. These are waiting signals, not
+        individual performance scores.
+      </p>
       {dataChanged ? null : !rows.length ? (
         <p className="empty">
           No PRs opened or active this period exceed the waiting-time threshold.

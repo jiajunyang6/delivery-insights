@@ -21,6 +21,11 @@ The headline connects the outcome, the largest bottleneck and an illustrative ac
 
 Waiting share uses coding plus active post-ready time as its denominator.
 The time ledger uses only post-ready waiting states; its shares have a different denominator.
+Dashboard cards state their sample units: merged PRs, eligible ready-for-review PRs, closed or
+merged PRs, or review events. Review rounds counts feedback transitions back to the author,
+not individual reviews; averages display up to two decimal places. Relative changes use
+unrounded values, so recomputing them from displayed values can differ slightly. In-page
+guides explain sample sizes, statistical status, table columns and impact denominators.
 These are PR-flow signals, not deployment lead time, DORA change failure rate,
 individual productivity scores or causal proof. Workflow and timestamp changes affect them.
 
@@ -294,7 +299,7 @@ Latest refactor checks: 2026-10-04 UTC, analytics 1.5.0, prompt v8.
 | Ruff check/format and strict mypy | Pass |
 | Unit suite | 333 cases in the passing full suite |
 | Full suite | 402 passed, including 69 integration tests |
-| Frontend tests, typecheck and build | 8 tests passed; typecheck/build pass with Node 24 |
+| Frontend tests, typecheck and build | 9 tests passed; typecheck/build pass with Node 24 |
 | Real sync / browser recovery | 50 rows → stale cursor 422 → rows cleared → refresh → 50 matching rows |
 | Refactor equivalence | Remaining snapshot values, evidence, scoring, templates, assembly, validator codes match `pre-refactor`; only allowlisted deletions and recomputed identity fields differ. Prompt messages matched through stage 7; stage 8 changes only prompt wording/format |
 | Refactored UI (synthetic fixtures) | Both views; 7/30/60 days; 5 → 12 risk rows; ownership counts; card/citation focus; three abstentions; pending sync; no console errors |

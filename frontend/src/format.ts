@@ -32,6 +32,7 @@ export function hours(value: number | null | undefined): string {
 export function format(value: number | null | undefined, unit: string): string {
   if (unit === "share" || unit === "change") return percent(value);
   if (unit === "hours") return hours(value);
+  if (unit === "rounds") return number(value, 2);
   return (
     number(value) +
     (value == null

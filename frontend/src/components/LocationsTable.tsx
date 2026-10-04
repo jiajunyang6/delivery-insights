@@ -6,9 +6,33 @@ export function LocationsTable({ locations }: { locations: Location[] }) {
       <div className="section-heading">
         <div>
           <h2>Where waits concentrate</h2>
-          <p>By area, owner rule or directory</p>
+          <p>Where reviewer waiting is concentrated, by area, owner rule or directory.</p>
         </div>
       </div>
+      <details className="metric-guide">
+        <summary>Column definitions</summary>
+        <dl>
+          <dt>Merged</dt>
+          <dd>PRs in this group merged during the selected period.</dd>
+          <dt>Pickup p50 / vs rest</dt>
+          <dd>
+            Median time from ready-for-review to first review, and its ratio to
+            the median for PRs outside this group. 2× means twice as long.
+          </dd>
+          <dt>Reviewer-wait share</dt>
+          <dd>
+            This group's share of all reviewer-wait PR-hours for merged PRs.
+            Time is split across a PR's groups; PR counts can overlap.
+          </dd>
+          <dt>In / out</dt>
+          <dd>PRs becoming ready for review / receiving their first review this period.</dd>
+          <dt>At risk / Owners</dt>
+          <dd>
+            Open PRs above their waiting-time threshold / distinct owners from
+            available ownership rules. “—” means unavailable, not zero.
+          </dd>
+        </dl>
+      </details>
       <div className="table-scroll">
         <table>
           <thead>

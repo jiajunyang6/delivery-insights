@@ -334,6 +334,7 @@ export function NarrativePanel({
         <div>
           <span className="eyebrow">FROM METRICS TO A WORKING EXPLANATION</span>
           <h2 id="narrative-heading">The evidence, in words</h2>
+          <p>Possible explanations grounded in this report; select a citation to inspect its metric.</p>
         </div>
         <span className="badge neutral">{viewLabels[audience]}</span>
       </div>

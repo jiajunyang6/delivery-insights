@@ -12,9 +12,27 @@ export function Bottlenecks({
   return (
     <section id="bottlenecks">
       <div className="section-heading">
-        <h2>What to work on next</h2>
+        <div>
+          <h2>What to work on next</h2>
+          <p>Prioritized waiting patterns and suggested actions, supported by measured evidence.</p>
+        </div>
         <span>Ranked by impact on PR time</span>
       </div>
+      <details className="metric-guide">
+        <summary>How impact and estimates are measured</summary>
+        <p>
+          PR-hours add time across PRs: two PRs waiting for three hours contribute
+          six PR-hours. Each finding's impact compares its affected time with all
+          merged PRs' post-ready time. Findings can overlap, and wasted work can
+          include unmerged PRs, so these percentages need not add to 100% and can
+          exceed it. Severity reflects configured evidence thresholds.
+        </p>
+        <p>
+          Capping a stage is an illustrative estimate of the median cycle time
+          if waits above the displayed target were shortened. It is not a
+          guaranteed improvement or proof of a root cause.
+        </p>
+      </details>
       {!findings.length && (
         <div className="panel empty">
           {s.meta.sample.merged_prs < 20

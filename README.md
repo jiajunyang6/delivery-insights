@@ -99,7 +99,7 @@ checkpoints under the default configuration. Wait for repository `last_sync_stat
 and full coverage before checking the dashboard. Keep `BACKFILL_DAYS=120` for the 60-day
 view and its comparison period.
 
-Local checks: **402 backend tests** (333 unit, 69 integration), **8 frontend tests**,
+Local checks: **402 backend tests** (333 unit, 69 integration), **9 frontend tests**,
 strict lint/types/build and all eight offline narrative gates pass.
 
 ## Documentation
