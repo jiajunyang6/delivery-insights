@@ -280,7 +280,7 @@ make eval
 make smoke
 ```
 
-Latest refactor checks: 2026-10-04 UTC, analytics 1.5.0, prompt v7.
+Latest refactor checks: 2026-10-04 UTC, analytics 1.5.0, prompt v8.
 
 | Check | Observed result |
 |---|---|
@@ -289,7 +289,7 @@ Latest refactor checks: 2026-10-04 UTC, analytics 1.5.0, prompt v7.
 | Full suite | 402 passed, including 71 integration tests |
 | Frontend tests, typecheck and build | 8 tests passed; typecheck/build pass with Node 24 |
 | Real sync / browser recovery | 50 rows → stale cursor 422 → rows cleared → refresh → 50 matching rows |
-| Refactor equivalence | Remaining snapshot values, evidence, scoring, templates, assembly, validator codes and prompt messages match `pre-refactor`; only allowlisted deletions and recomputed identity fields differ |
+| Refactor equivalence | Remaining snapshot values, evidence, scoring, templates, assembly, validator codes match `pre-refactor`; only allowlisted deletions and recomputed identity fields differ. Prompt messages matched through stage 7; stage 8 changes only prompt wording/format |
 | Refactored UI (synthetic fixtures) | Both views; 7/30/60 days; 5 → 12 risk rows; ownership counts; card/citation focus; three abstentions; pending sync; no console errors |
 
 Earlier acceptance measured 3,541 PRs with no invariant violations, three matching PR pages, 533 merged PRs with ledger rounding error 0.0000004833, cold compute 1,376.95 ms and warm HTTP p95 32.32 ms.
@@ -297,11 +297,11 @@ Those analytics 1.2/1.3 measurements and npm ci/audit checks were not repeated h
 The original 90-day performance gate remains excluded; nine upstream deprecation warnings remain.
 
 The harness runs five planted scenarios × two seeds × two English audience variants.
-The offline suite was re-run on analytics 1.5.0 and prompt v7 with unchanged results; the real Bedrock Sonnet 4.6 column below is from prompt v6 and analytics 1.4.0.
+Both offline and real Bedrock Sonnet 4.6 suites were run on analytics 1.5.0 and final prompt v8. The rejected v8 candidates are retained in the evaluation records.
 [Evaluation records](EVALUATION.md) retain every current and historical per-case outcome.
 Numeric/citation/hedge denominators include final LLM outputs, excluding fallback.
 
-| Metric | Offline (v7) | Real Bedrock (v6) | Required |
+| Metric | Offline (v8) | Real Bedrock (v8) | Required |
 |---|---|---|---|
 | First-attempt validity | 20/20 (1.00) | 20/20 (1.00) | ≥ 0.90 |
 | Numeric / citation / hedge consistency | 20/20 each | 20/20 each | 1.00 each |
@@ -310,10 +310,10 @@ Numeric/citation/hedge denominators include final LLM outputs, excluding fallbac
 | High-confidence precision | 14/14 (1.00) | 14/14 (1.00) | ≥ 0.80 |
 | Fallback rate | 0/20 (0.00) | 0/20 (0.00) | ≤ 0.10 |
 
-The current offline suite and the historical real-Bedrock v6 run pass all gates. Quality-tradeoff seed 101 abstains because its
+The final v8 offline and real-Bedrock suites pass all gates. Quality-tradeoff seed 101 abstains because its
 previous-period baseline fails the five-event gate; thresholds are unchanged.
 Medium/low precision is undefined. Failed v1/v2 and English v4/v5 trials remain
-recorded. The rebuilt local API also passed the English-only real-manager HTTP smoke.
+recorded, together with rejected stage-8 candidates A/B. Earlier rebuilt-API English-only real-manager HTTP smoke is historical; the refactor UI check used synthetic fixtures.
 This small synthetic suite was used during prompt development; it is not a held-out
 benchmark or real-world causal calibration. Missing-key evaluation exits 2.
 

@@ -122,7 +122,7 @@ async def test_only_english_default_and_explicit_language_match(api, audience):
     assert default.content == explicit.content
     assert default.headers["etag"] == explicit.headers["etag"]
     payload = default.json()
-    assert payload["lang"] == "en" and payload["meta"]["prompt_version"] == "v7"
+    assert payload["lang"] == "en" and payload["meta"]["prompt_version"] == PROMPT_VERSION
     NarrativeSchema.model_validate(payload)
     contract = (await client.get("/openapi.json")).json()
     parameters = contract["paths"]["/v1/snapshots/{snapshot_id}/narrative"]["get"]["parameters"]
@@ -130,13 +130,13 @@ async def test_only_english_default_and_explicit_language_match(api, audience):
     assert language.get("const") == "en" or language.get("enum") == ["en"]
 
 
-async def test_v7_never_reuses_legacy_language_or_prompt_caches(api):
+async def test_current_prompt_never_reuses_legacy_language_or_prompt_caches(api):
     client, app, clock, ctx = api
     snapshot, _, url = await prepare(api, enabled=True)
     pack, _ = build_evidence_pack(snapshot, "director", False)
     pack_hash = digest(pack)[:16]
     model = ctx["settings"].bedrock_model_id
-    for language, version in (("en", "v3"), ("zh", "v3"), ("en", "v4"), ("en", "v6")):
+    for language, version in (("en", "v3"), ("zh", "v3"), ("en", "v4"), ("en", "v6"), ("en", "v7")):
         key = narrative_key(
             snapshot["snapshot_id"], "director", language, version, model, pack_hash
         )
@@ -161,9 +161,11 @@ async def test_v7_never_reuses_legacy_language_or_prompt_caches(api):
     rejected = await client.get(url.replace("lang=en", "lang=zh"))
     assert rejected.status_code == 422 and not app.state.llm.calls
     fresh = await client.get(url)
-    assert fresh.status_code == 200 and fresh.json()["meta"]["prompt_version"] == "v7"
+    assert fresh.status_code == 200 and fresh.json()["meta"]["prompt_version"] == PROMPT_VERSION
     assert fresh.json()["narrative"] != "legacy" and len(app.state.llm.calls) == 1
-    current_key = narrative_key(snapshot["snapshot_id"], "director", "en", "v7", model, pack_hash)
+    current_key = narrative_key(
+        snapshot["snapshot_id"], "director", "en", PROMPT_VERSION, model, pack_hash
+    )
     await ctx["redis"].delete(current_key)
     restored = await client.get(url)
     assert restored.content == fresh.content and len(app.state.llm.calls) == 1

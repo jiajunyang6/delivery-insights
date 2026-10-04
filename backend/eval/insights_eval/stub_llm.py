@@ -13,7 +13,8 @@ class StubLLMClient:
         self, *, system: str, messages: list[dict[str, Any]], tool_spec: dict[str, Any]
     ) -> LLMReply:
         text = messages[0]["content"][0]["text"]
-        pack = orjson.loads(text.split("Evidence pack (JSON):\n", 1)[1])
+        pack_json = text.split("Evidence pack (JSON):\n", 1)[1].split("\n", 1)[0]
+        pack = orjson.loads(pack_json)
         evidence = {e["id"]: e for e in pack["evidence"]}
         # This is the same code-owned revert-rate guardrail, using only the supplied pack.
         revert = evidence.get("E10", {})

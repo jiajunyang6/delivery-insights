@@ -92,7 +92,7 @@ per-decision log: [docs/DECISIONS.md](docs/DECISIONS.md).
 - **How the output was checked:**
   - 402 automated tests, 71 of them on real Postgres 16 and Redis 7.
   - Strict ruff/mypy and the frontend typecheck and build.
-  - The 20-case narrative evaluation (stub on prompt v7, real Bedrock on prompt v6).
+  - The 20-case narrative evaluation (stub and real Bedrock on final prompt v8; rejected v8 trials retained).
   - Real GitHub sync and browser checks.
   - Refactor equivalence across golden, ten planted datasets and an ownership fixture;
     synthetic browser checks for both views, presets, Load more, cards and abstentions.

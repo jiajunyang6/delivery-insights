@@ -32,10 +32,20 @@ frontend tests/typecheck/build and the external baseline comparison pass.
   and all eight offline gates pass. Offline first-valid/numeric/citation/hedge/abstention/
   high-precision rates are 1.00, root-cause hit rate 0.875, fallback rate 0.00.
 
-## Separate remaining gates
+## Stage 8
 
-Prompt v8 requires real Bedrock evaluation with unchanged validators/tool schema and all
-eight gates. Its result is recorded in EVALUATION.md; failed candidates are rolled back.
+Final prompt v8 passes all eight real Bedrock and offline gates with unchanged validators
+and tool schema. First-valid/numeric/citation/hedge/abstention/high-precision rates are
+1.00, root-cause hit rate is 0.875, and fallback is 0.00. The final real run has 20/20
+first-valid responses; rejected candidates A/B and the pre-alignment candidate C run
+are retained in [EVALUATION.md](EVALUATION.md). These same synthetic cases were used
+for prompt refinement, not held-out validation. The stage-8 baseline comparison excludes
+only changed prompt messages; business values, evidence, templates and validator codes
+remain equal. All 402 backend and 8 frontend tests, lint/type checks and build pass.
+
+Final backend source: 71 Python files, 10,249 lines (273 fewer than baseline).
+
+## Remaining stage 9 prerequisite
 
 Storage stage 9 requires stages 0–8 merged into main and explicit confirmation at the time
 of `docker compose down -v`. Existing migrations, storage columns and collected volumes
