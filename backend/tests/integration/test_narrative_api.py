@@ -12,9 +12,10 @@ from insights.analytics.snapshot import digest
 from insights.api.schemas import Narrative as NarrativeSchema
 from insights.db.models import Narrative, Snapshot
 from insights.narrative.evidence import build_evidence_pack
+from insights.narrative.llm import LLMUnavailable
 from insights.narrative.prompt import PROMPT_VERSION
 from insights.narrative.template import build_template
-from insights.redis import narrative_key, narrative_lock_key
+from insights.redis import llm_error_key, narrative_key, narrative_lock_key
 
 pytestmark = pytest.mark.integration
 
@@ -274,3 +275,18 @@ async def test_repair_uses_remaining_deadline_and_extracts_evidence_once(api, mo
     assert response.json()["meta"]["attempts"] == 2
     assert response.json()["meta"]["fallback_reason"] == "llm_error"
     assert len(extracted) == 1
+
+
+async def test_bedrock_failures_are_recorded_for_setup_and_cleared_on_success(api):
+    client, app, _, ctx = api
+    _, valid, url = await prepare(api, enabled=True)
+    app.state.llm = FakeLLMClient([LLMUnavailable("AccessDeniedException")])
+    failed = await client.get(url)
+    assert failed.json()["meta"]["fallback_reason"] == "llm_error"
+    setup = (await client.get("/v1/repos")).json()["setup"]["llm"]
+    assert setup["last_error"] == "AccessDeniedException" and setup["last_error_at"]
+    for key in await ctx["redis"].keys("di:narr:*"):
+        await ctx["redis"].delete(key)
+    app.state.llm = FakeLLMClient([valid])
+    assert (await client.get(url)).json()["meta"]["generated_by"] == "llm"
+    assert not await ctx["redis"].exists(llm_error_key())

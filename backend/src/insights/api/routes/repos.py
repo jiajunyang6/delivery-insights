@@ -1,8 +1,10 @@
 """Tracked repository status, selectable date limits and manual sync requests."""
 
+from contextlib import suppress
 from datetime import datetime, timedelta
 from typing import Annotated
 
+import orjson
 from arq.connections import ArqRedis
 from fastapi import APIRouter, Depends, Response
 from redis.asyncio import Redis
@@ -15,10 +17,19 @@ from insights.api.deps import get_arq, get_now, get_redis, get_session, get_sett
 from insights.api.errors import ProblemError, unavailable
 from insights.api.params import parse_repo_path
 from insights.api.responses import job_response
-from insights.api.schemas import DateLimits, RepoList, RepoStatus, SyncJobResponse
+from insights.api.schemas import (
+    DateLimits,
+    GithubProblem,
+    GithubSetup,
+    LlmSetup,
+    RepoList,
+    RepoStatus,
+    SetupStatus,
+    SyncJobResponse,
+)
 from insights.config import MAX_PERIOD_DAYS, Settings
 from insights.db.models import Repository, SyncJob
-from insights.redis import sync_cooldown_key
+from insights.redis import llm_error_key, sync_cooldown_key
 from insights.sync.queue import enqueue_sync
 
 router = APIRouter(prefix="/v1/repos", tags=["Repositories"])
@@ -28,9 +39,10 @@ router = APIRouter(prefix="/v1/repos", tags=["Repositories"])
 async def repositories(
     session: Annotated[AsyncSession, Depends(get_session)],
     settings: Annotated[Settings, Depends(get_settings)],
+    redis: Annotated[Redis, Depends(get_redis)],
     now: Annotated[datetime, Depends(get_now)],
 ) -> RepoList:
-    """Report configured repositories, latest persisted jobs and allowed reporting dates."""
+    """Report configured repositories, latest jobs, allowed dates and configuration health."""
     configured = settings.tracked_repo_list
     repos = {
         r.full_name_lower: r
@@ -79,6 +91,37 @@ async def repositories(
             earliest_from=now.date() - timedelta(days=settings.backfill_days),
             latest_to=now.date(),
             max_days=MAX_PERIOD_DAYS,
+        ),
+        setup=await setup_status(settings, redis, items),
+    )
+
+
+SETUP_SYNC_PROBLEMS = {"missing_token", "auth_error", "not_found"}
+
+
+async def setup_status(settings: Settings, redis: Redis, items: list[RepoStatus]) -> SetupStatus:
+    """Summarize `.env` problems the user can fix; secrets are reported as present or absent."""
+    last_error = None
+    # Best effort: a Redis outage hides the last Bedrock error but must not fail this endpoint.
+    with suppress(RedisError, OSError, TimeoutError, orjson.JSONDecodeError, TypeError):
+        raw = await redis.get(llm_error_key())
+        last_error = orjson.loads(raw) if raw else None
+    token = settings.github_token
+    return SetupStatus(
+        github=GithubSetup(
+            token_configured=bool(token and token.get_secret_value()),
+            problems=[
+                GithubProblem(repo=item.repo, status=item.last_sync_status)
+                for item in items
+                if item.last_sync_status in SETUP_SYNC_PROBLEMS
+            ],
+        ),
+        llm=LlmSetup(
+            key_configured=settings.llm_enabled,
+            region=settings.aws_region,
+            model_id=settings.bedrock_model_id,
+            last_error=last_error["code"] if last_error else None,
+            last_error_at=last_error["at"] if last_error else None,
         ),
     )
 

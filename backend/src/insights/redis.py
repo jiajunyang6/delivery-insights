@@ -33,6 +33,11 @@ def narrative_key(
     return f"di:narr:{snapshot_id}:{audience}:{lang}:{prompt_version}:{model_id}:{pack_hash}"
 
 
+def llm_error_key() -> str:
+    """Latest Bedrock failure code and time, shown as a setup hint until an LLM call succeeds."""
+    return "di:setup:llm_error"
+
+
 def sync_lock_key(repo: str) -> str:
     """Repository-level sync mutex key, with case-insensitive repository identity."""
     return f"di:lock:sync:{repo.lower()}"

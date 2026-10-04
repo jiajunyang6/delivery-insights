@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import httpx
 import pytest
+from pydantic import SecretStr
 from redis.exceptions import ConnectionError as RedisConnectionError
 from sqlalchemy import func, select, update
 from tests.factories import at
@@ -23,7 +24,7 @@ from insights.api.schemas import (
 )
 from insights.db.models import PrFact, PrInterval, PullRequest, Repository, Snapshot, SyncJob
 from insights.main import create_app
-from insights.redis import snapshot_key, sync_cooldown_key
+from insights.redis import llm_error_key, snapshot_key, sync_cooldown_key
 from insights.sync.derive import current_key
 from insights.sync.queue import enqueue_sync
 
@@ -318,3 +319,32 @@ async def test_org_alias_and_complete_openapi_models(api):
     ):
         assert paths[path]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
     assert "post" in paths["/v1/repos/{owner}/{name}/sync"]
+
+
+async def test_repos_report_setup_problems_without_secret_values(api):
+    client, _, _, ctx = api
+    ctx["settings"].github_token = SecretStr("github-secret-value")
+    ctx["settings"].aws_bearer_token_bedrock = None
+    ctx["settings"].tracked_repos = "a/b,c/d"
+    setup = (await client.get("/v1/repos")).json()["setup"]
+    assert setup["github"] == {"token_configured": True, "problems": []}
+    assert setup["llm"]["key_configured"] is False and setup["llm"]["last_error"] is None
+    assert setup["llm"]["region"] == ctx["settings"].aws_region
+    async with ctx["session_factory"]() as session, session.begin():
+        await session.execute(update(Repository).values(last_sync_status="auth_error"))
+    ctx["settings"].github_token = None
+    ctx["settings"].aws_bearer_token_bedrock = SecretStr("bedrock-secret-value")
+    await ctx["redis"].set(
+        llm_error_key(), b'{"code": "AccessDeniedException", "at": "2026-01-02T03:04:05Z"}'
+    )
+    response = await client.get("/v1/repos")
+    RepoList.model_validate(response.json())
+    setup = response.json()["setup"]
+    assert setup["github"] == {
+        "token_configured": False,
+        "problems": [{"repo": "a/b", "status": "auth_error"}],
+    }
+    assert setup["llm"]["key_configured"] is True
+    assert setup["llm"]["last_error"] == "AccessDeniedException"
+    assert setup["llm"]["last_error_at"] == "2026-01-02T03:04:05Z"
+    assert "secret-value" not in response.text

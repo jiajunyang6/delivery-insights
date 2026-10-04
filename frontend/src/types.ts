@@ -7,9 +7,23 @@ export interface DateLimits {
   latest_to: string;
   max_days: number;
 }
+export interface SetupStatus {
+  github: {
+    token_configured: boolean;
+    problems: { repo: string; status: "missing_token" | "auth_error" | "not_found" }[];
+  };
+  llm: {
+    key_configured: boolean;
+    region: string;
+    model_id: string;
+    last_error: string | null;
+    last_error_at: string | null;
+  };
+}
 export interface RepoList {
   items: RepoStatus[];
   date_limits: DateLimits;
+  setup: SetupStatus;
 }
 export interface Metric {
   value: number | null;

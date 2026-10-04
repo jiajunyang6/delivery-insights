@@ -63,7 +63,7 @@ OpenAPI is available at `/openapi.json` and `/docs`; the historical design is
 | GET | `/v1/insights/delivery/prs` | Filtered and paginated PR detail |
 | GET | `/v1/snapshots/{snapshot_id}` | Read a retained immutable snapshot |
 | GET | `/v1/snapshots/{snapshot_id}/narrative` | `audience=director\|manager`, `lang=en` only (default) |
-| GET | `/v1/repos` | Whitelist, freshness and sync status |
+| GET | `/v1/repos` | Whitelist, freshness, sync status and configuration health (`setup`) |
 | POST | `/v1/repos/{owner}/{name}/sync` | Enqueue a manual sync |
 | GET | `/v1/sync-jobs/{job_id}` | Inspect sync progress |
 | GET | `/healthz` | Process liveness |
@@ -213,6 +213,8 @@ Model availability and Bedrock access/billing must be verified in your AWS accou
 Set `CI_COMPLETE=true` only if Actions telemetry covers the CI you intend to measure.
 
 ## Operations
+
+`/v1/repos` also returns `setup`: whether `GITHUB_TOKEN` and `AWS_BEARER_TOKEN_BEDROCK` are set (never their values), sync statuses that point to configuration (`missing_token`, `auth_error`, `not_found`), the Bedrock region and model ID, and the latest Bedrock error code, cleared after the next successful call. The dashboard turns these into a Configuration notice that names the `.env` variable to fix.
 
 Use `/healthz` for liveness and `/readyz` for dependency readiness. Read `/v1/repos`
 before judging missing data. Snapshots/narratives are retained for seven days and sync-job

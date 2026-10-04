@@ -27,7 +27,7 @@ from insights.narrative.llm import LLMClient, LLMUnavailable, LLMUsage
 from insights.narrative.prompt import PROMPT_VERSION, SYSTEM_PROMPT, TOOL_SPEC, user_message
 from insights.narrative.template import build_template
 from insights.narrative.validator import citations, validate
-from insights.redis import narrative_key, narrative_lock_key
+from insights.redis import llm_error_key, narrative_key, narrative_lock_key
 from insights.snapshots.caching import Reply, cache_ttl, matches_etag
 from insights.snapshots.service import SnapshotService, not_found
 
@@ -47,6 +47,9 @@ logger = structlog.get_logger(__name__)
 class NarrativeResult:
     payload: dict[str, Any]
     persist: bool
+    # Bedrock error code when a call failed; llm_reached means Bedrock returned an answer.
+    llm_error: str | None = None
+    llm_reached: bool = False
 
 
 def assemble(
@@ -186,6 +189,8 @@ async def generate(
     }
     output = build_template(pack, snapshot)
     persist = llm is None and fallback_reason is None
+    llm_error = "client_unavailable" if fallback_reason == "llm_error" else None
+    llm_reached = False
     usage = LLMUsage()
     if llm is not None:
         messages = [user_message(pack)]
@@ -199,11 +204,14 @@ async def generate(
                 )
             except TimeoutError:
                 meta.update(fallback_reason="llm_error", validation="not_run")
+                llm_error = "timeout"
                 break
             except LLMUnavailable as exc:
                 meta.update(fallback_reason="llm_error", validation="not_run")
                 logger.warning("llm_unavailable", reason=exc.reason)
+                llm_error = exc.reason
                 break
+            llm_reached = True
             usage.record(reply)
             violations = validate(reply.tool_input, pack, snapshot, audience=audience)
             if not violations and reply.tool_input is not None:
@@ -262,7 +270,7 @@ async def generate(
         output_tokens=usage.output_tokens,
         duration_ms=round((perf_counter() - started) * 1000, 2),
     )
-    return NarrativeResult(payload, persist)
+    return NarrativeResult(payload, persist, llm_error, llm_reached)
 
 
 def narrative_reply(body: bytes, tag: str, conditional: str | None, persist: bool) -> Reply:
@@ -282,6 +290,15 @@ class NarrativeService:
     def __init__(self, snapshots: SnapshotService, llm: LLMClient | None) -> None:
         """Bind snapshot/cache access and an optional LLM client for narrative orchestration."""
         self.snapshots, self.llm = snapshots, llm
+
+    async def record_llm_status(self, result: NarrativeResult) -> None:
+        """Remember the latest Bedrock failure for the setup hint; clear it after a success."""
+        redis = self.snapshots.redis
+        if result.llm_error:
+            value = orjson.dumps({"code": result.llm_error, "at": iso(self.snapshots.now)})
+            await self.snapshots.cache(redis.set(llm_error_key(), value, ex=7 * 86400))
+        elif result.llm_reached:
+            await self.snapshots.cache(redis.delete(llm_error_key()))
 
     async def cached(self, key: str, conditional: str | None) -> Reply | None:
         """Return a complete cached conditional reply, or None on a miss/cache failure."""
@@ -386,6 +403,7 @@ class NarrativeService:
                 prepared=prepared,
                 fallback_reason="llm_error" if settings.llm_enabled and self.llm is None else None,
             )
+            await self.record_llm_status(result)
             body = canonical(result.payload)
             tag = etag(body)
             if result.persist:

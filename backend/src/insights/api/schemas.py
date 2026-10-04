@@ -460,9 +460,35 @@ class DateLimits(Contract):
     max_days: int
 
 
+class GithubProblem(Contract):
+    repo: str
+    status: Literal["missing_token", "auth_error", "not_found"]
+
+
+class GithubSetup(Contract):
+    token_configured: bool
+    problems: list[GithubProblem]
+
+
+class LlmSetup(Contract):
+    key_configured: bool
+    region: str
+    model_id: str
+    last_error: str | None
+    last_error_at: datetime | None
+
+
+class SetupStatus(Contract):
+    """Configuration health for the dashboard; reports presence only, never secret values."""
+
+    github: GithubSetup
+    llm: LlmSetup
+
+
 class RepoList(Contract):
     items: list[RepoStatus]
     date_limits: DateLimits
+    setup: SetupStatus
 
 
 class RiskDetails(Contract):

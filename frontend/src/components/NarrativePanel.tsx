@@ -239,12 +239,21 @@ function EvidenceList({ evidence, highlight }: { evidence: Evidence[]; highlight
   );
 }
 
+const fallbackText: Record<string, string> = {
+  llm_disabled: "LLM narratives are off; set AWS_BEARER_TOKEN_BEDROCK in .env to enable them",
+  llm_error: "the Bedrock request failed; see the Configuration notice above",
+  validation_failed: "the LLM answer failed validation",
+  llm_busy: "another request is generating this narrative",
+};
+
 export function NarrativePanel({
   snapshot,
   audience,
+  onLlmError,
 }: {
   snapshot: Snapshot;
   audience: Audience;
+  onLlmError?: () => void;
 }) {
   const snapshotId = snapshot.snapshot_id;
   const [data, setData] = useState<Narrative | null>(null);
@@ -259,7 +268,9 @@ export function NarrativePanel({
       signal,
     )
       .then((r) => {
-        if (!signal.aborted) setData(r.data);
+        if (signal.aborted) return;
+        setData(r.data);
+        if (r.data.meta.fallback_reason === "llm_error") onLlmError?.();
       })
       .catch((e) => {
         if (!signal.aborted) {
@@ -371,7 +382,9 @@ export function NarrativePanel({
                 data.meta.prompt_version +
                 " · validation " +
                 data.meta.validation
-              : "Template narrative (" + data.meta.fallback_reason + ")"}
+              : "Template narrative: " +
+                (fallbackText[data.meta.fallback_reason ?? ""] ??
+                  data.meta.fallback_reason)}
           </footer>
         </>
       )}
