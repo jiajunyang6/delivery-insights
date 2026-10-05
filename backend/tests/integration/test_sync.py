@@ -1,3 +1,5 @@
+"""End-to-end sync: backfill, idempotency, cursors and bad input."""
+
 from copy import deepcopy
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta

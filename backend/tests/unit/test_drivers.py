@@ -1,3 +1,5 @@
+"""Slowest-decile PR size ratio and its sample gates."""
+
 from tests.analytics_factory import dataset, pr
 
 from insights.analytics.efficiency import slowest_decile_size_ratio

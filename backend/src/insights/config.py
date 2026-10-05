@@ -20,6 +20,8 @@ def split_list(value: str) -> list[str]:
 
 
 class Settings(BaseSettings):
+    """Environment-driven settings, validated once at startup."""
+
     model_config = SettingsConfigDict(case_sensitive=False, env_ignore_empty=True)
     github_token: SecretStr | None = None
     github_graphql_url: str = "https://api.github.com/graphql"

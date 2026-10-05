@@ -47,6 +47,8 @@ logger = structlog.get_logger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class NarrativeResult:
+    """A generated payload and whether it may be stored and cached long-term."""
+
     payload: dict[str, Any]
     persist: bool
     # Bedrock error code when a call failed; llm_reached means Bedrock returned an answer.
@@ -184,6 +186,7 @@ async def generate(
         "pack_hash": digest(pack)[:16],
         "generated_at": iso(now),
     }
+    # Start from the template so every exit path below has valid output to return.
     output = build_template(pack)
     persist = llm is None and fallback_reason is None
     llm_error = "client_unavailable" if fallback_reason == "llm_error" else None
@@ -210,6 +213,7 @@ async def generate(
                 break
             llm_reached = True
             usage.record(reply)
+            # The LLM never decides what is shown: only output that passes every check is used.
             violations = validate(reply.tool_input, pack)
             if not violations and reply.tool_input is not None:
                 output = reply.tool_input
@@ -320,6 +324,8 @@ async def check_llm(llm: LLMClient, redis: Redis, settings: Settings, now: datet
 
 
 class NarrativeService:
+    """Serves narratives from cache, storage or fresh generation."""
+
     def __init__(self, snapshots: SnapshotService, llm: LLMClient | None) -> None:
         """Bind snapshot/cache access and an optional LLM client for narrative orchestration."""
         self.snapshots, self.llm = snapshots, llm
@@ -367,6 +373,7 @@ class NarrativeService:
         """
         snapshot = orjson.loads(await self.snapshots.by_id(sid))
         settings, redis = self.snapshots.settings, self.snapshots.redis
+        # The pack is built before any lookup because its hash is part of the cache identity.
         evidence = extract_evidence(snapshot)
         pack, candidates = build_evidence_pack(snapshot, evidence=evidence)
         prepared = (pack, candidates, evidence)
@@ -391,6 +398,7 @@ class NarrativeService:
         if created is None:
             raise not_found()
         ttl = cache_ttl(created, self.snapshots.now)
+        # A stored narrative is reused as is and re-cached for the snapshot's remaining life.
         if existing:
             body = canonical(existing.payload)
             await self.put_cache(key, body, existing.etag, True, ttl)

@@ -35,6 +35,8 @@ EVENT_ORDER = {
 
 @dataclass(frozen=True, slots=True)
 class PrInput:
+    """The PR lifecycle fields the timeline builder needs."""
+
     author_login: str | None
     created_at: datetime
     is_draft: bool
@@ -45,6 +47,8 @@ class PrInput:
 
 @dataclass(frozen=True, slots=True)
 class Interval:
+    """One contiguous state span; end_at is None while the PR is still open."""
+
     state: str
     start_at: datetime
     end_at: datetime | None
@@ -52,6 +56,8 @@ class Interval:
 
 @dataclass(frozen=True, slots=True)
 class TimelineResult:
+    """A PR's readiness time, state intervals and review-round count."""
+
     ready_at: datetime | None
     intervals: tuple[Interval, ...]
     approved_at: datetime | None
@@ -123,6 +129,7 @@ def build_timeline(
     horizon = end_at or now
     first_commit = first_commit_at(events)
     coding_start = min(first_commit, ready_at or horizon) if first_commit else pr.created_at
+    # A PR never marked ready has only a coding interval and no waiting time to account for.
     if ready_at is None:
         intervals = (
             (Interval("coding", coding_start, end_at),)
@@ -163,8 +170,8 @@ def build_timeline(
         return False
 
     def dismiss(event: Event) -> bool:
-        # Dismissing an old review must not remove the reviewer's newer decisive review.
         """Remove the matching standing review decision; dismissal itself adds no feedback."""
+        # Dismissing an old review must not remove the reviewer's newer decisive review.
         review_id = event.payload.get("review_id")
         reviewer = (event.payload.get("review_author") or "").lower()
         for login, (_, recorded_id) in list(decisions.items()):
@@ -223,12 +230,15 @@ def build_timeline(
             return "waiting_author"
         return "waiting_reviewer"
 
+    # Replay events up to ready_at to establish the starting state (decisions, feedback,
+    # author updates); later events are grouped by timestamp and walked in order below.
     grouped: dict[datetime, list[Event]] = defaultdict(list)
     for event in ordered:
         if event.occurred_at <= ready_at:
             apply(event)
         elif event.occurred_at < horizon:
             grouped[event.occurred_at].append(event)
+    # The PR is by definition not a draft at ready_at, whatever pre-ready toggles said.
     flags["draft"] = False
     boundaries = set(grouped)
     current, segment_start, rounds = evaluate(ready_at), ready_at, 0
@@ -238,6 +248,8 @@ def build_timeline(
         for event in grouped[at]:
             feedback = apply(event) or feedback
         new = evaluate(at)
+        # A review round starts when reviewer feedback hands the PR back to its author; a
+        # draft conversion or an already author-owned state is not a new round.
         if new == "waiting_author" and current != new and not flags["draft"] and feedback:
             rounds += 1
         if new != current:

@@ -1,3 +1,5 @@
+"""Readiness probes and sanitized error responses."""
+
 from unittest.mock import AsyncMock
 
 import httpx

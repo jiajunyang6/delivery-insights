@@ -53,6 +53,8 @@ SUFFIXES = (
 
 
 class ToolModel(BaseModel):
+    """Strict base for the submit_narrative input: no extra or null fields."""
+
     model_config = ConfigDict(extra="forbid", strict=True)
 
     @model_validator(mode="before")
@@ -65,17 +67,23 @@ class ToolModel(BaseModel):
 
 
 class Downgrade(ToolModel):
+    """An LLM-proposed lower band with a cited reason."""
+
     level: Literal["medium", "low"]
     reason: str = Field(min_length=1, max_length=300)
 
 
 class HypothesisOutput(ToolModel):
+    """Wording for one library hypothesis."""
+
     id: str
     statement: str = Field(min_length=1, max_length=400)
     downgrade: Downgrade | None = None
 
 
 class OutsideHypothesis(ToolModel):
+    """An optional extra explanation outside the hypothesis library."""
+
     statement: str = Field(min_length=1, max_length=400)
     evidence_ids: list[Annotated[str, Field(pattern=r"^E[0-9]+$")]] = Field(
         min_length=2, max_length=8
@@ -83,6 +91,8 @@ class OutsideHypothesis(ToolModel):
 
 
 class ToolOutput(ToolModel):
+    """The full submit_narrative tool input."""
+
     narrative: str = Field(min_length=1, max_length=1200)
     hypotheses: list[HypothesisOutput] = Field(max_length=3)
     llm_hypothesis: OutsideHypothesis | None = None
@@ -90,6 +100,8 @@ class ToolOutput(ToolModel):
 
 @dataclass(frozen=True, slots=True)
 class Violation:
+    """One validation failure; the message doubles as repair feedback."""
+
     code: str
     message: str
 
@@ -140,6 +152,8 @@ def unit(suffix: str) -> str:
 
 @dataclass(frozen=True, slots=True)
 class AllowedNumber:
+    """A number a sentence may quote, in one unit, and where it comes from."""
+
     value: float
     category: str
     evidence: str = ""
@@ -404,6 +418,7 @@ def validate(output: dict[str, Any] | None, pack: Mapping[str, Any]) -> list[Vio
     candidates = {c["id"]: c for c in pack["hypotheses"]}
     evidence = {e["id"]: e for e in pack["evidence"]}
     body_sentences = sentences(body)
+    # Shape checks: length, sentence count, language, and a citation in every body sentence.
     low, high = (2 if candidates else 1), 4
     if len(body) > 1200:
         fail("V2:length", "Narrative exceeds 1200 characters.")
@@ -432,7 +447,11 @@ def validate(output: dict[str, Any] | None, pack: Mapping[str, Any]) -> list[Vio
             fail("V7b:overclaim", "Definite causal language is not supported.")
         if re.search(r"@[A-Za-z0-9]", text):
             fail("V10:personal_name", "Personal login names must not appear.")
+    # Hypothesis checks return the final band of each statement; the body's causal wording
+    # may not be stronger than the strongest of them.
     levels = validate_hypotheses(hypotheses, candidates, evidence, body, errors)
+    # An outside hypothesis must rest on significant evidence from both metric families
+    # (efficiency and bottleneck) and is always worded at the low band.
     if outside:
         ids = outside.get("evidence_ids", [])
         ids = set(ids) if isinstance(ids, list) and all(isinstance(i, str) for i in ids) else set()
@@ -465,6 +484,7 @@ def validate(output: dict[str, Any] | None, pack: Mapping[str, Any]) -> list[Vio
             hedges = hedge_levels(sentence)
             if not levels or not hedges or max(hedges) > max(levels):
                 fail("V7b:overclaim", "Body causal language exceeds the supported level.")
+    # Without candidates the narrative must abstain: state the reason and name no cause.
     if not candidates:
         pattern = ABSTAIN_REQUIRED.get(abstention(pack)[0], ABSTAIN_REQUIRED["insufficient_signal"])
         required = pattern.search(body)

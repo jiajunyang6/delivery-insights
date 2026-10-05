@@ -1,3 +1,5 @@
+"""Query parameter parsing, horizon limits and ETag matching."""
+
 from datetime import UTC, datetime
 
 import pytest

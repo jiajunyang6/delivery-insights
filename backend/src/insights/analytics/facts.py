@@ -15,6 +15,8 @@ from insights.domain import Event, EventKind, PullRequestRecord
 
 @dataclass(frozen=True, slots=True)
 class PrFacts:
+    """Per-PR facts derived during sync; durations are hours, None when unknown."""
+
     number: int = 0
     is_bot_author: bool = False
     is_backport: bool = False
@@ -33,7 +35,6 @@ class PrFacts:
 
 
 def is_flow(facts: PrFacts) -> bool:
-    # Flow metrics cover human, ready-for-review PRs; bot and backport PRs are excluded.
     """Return whether the PR is ready and eligible for human, non-backport flow metrics."""
     return not facts.is_bot_author and not facts.is_backport and facts.ready_at is not None
 

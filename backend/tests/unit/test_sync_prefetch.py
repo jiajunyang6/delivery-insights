@@ -1,3 +1,5 @@
+"""Page prefetch during sync: overlap, cancellation and cursors."""
+
 import asyncio
 from contextlib import aclosing
 from datetime import UTC, datetime, timedelta

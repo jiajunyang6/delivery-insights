@@ -1,3 +1,5 @@
+"""Period-active cohort selection and its caches."""
+
 from dataclasses import replace
 from datetime import date
 

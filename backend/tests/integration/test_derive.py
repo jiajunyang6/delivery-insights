@@ -1,3 +1,5 @@
+"""Transactional derivation, rederive batches and checkpoints."""
+
 from unittest.mock import AsyncMock
 
 import pytest

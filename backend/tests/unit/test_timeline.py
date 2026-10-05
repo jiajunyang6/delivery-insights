@@ -1,3 +1,5 @@
+"""Timeline state machine: specified cases, clipping and invariants."""
+
 import random
 from dataclasses import replace
 

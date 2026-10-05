@@ -1,3 +1,5 @@
+"""Alembic upgrade and downgrade of the initial schema."""
+
 import asyncio
 
 import pytest

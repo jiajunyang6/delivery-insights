@@ -20,6 +20,8 @@ from insights.analytics.stats import Statistic, bootstrap_diff, percentile, seed
 
 @dataclass(frozen=True, slots=True)
 class Measure:
+    """A metric value with its sample size and raw samples for bootstrap tests."""
+
     value: float | int | None
     n: int
     samples: tuple[float, ...] = ()

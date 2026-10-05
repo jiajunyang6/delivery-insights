@@ -1,3 +1,5 @@
+"""Housekeeping and snapshot precomputation jobs."""
+
 from datetime import timedelta
 
 import pytest

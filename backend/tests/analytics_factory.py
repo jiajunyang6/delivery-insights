@@ -1,3 +1,5 @@
+"""Builders for analytics inputs: PrData with fixed intervals and Datasets."""
+
 from dataclasses import replace
 from datetime import date
 
@@ -8,6 +10,7 @@ from tests.factories import at
 
 
 def pr(identifier, *, offset=24, reviewer=20, author=5, merge=5, locations=("area-A",), **facts):
+    """Build a merged flow PR whose intervals follow reviewer, author and merge hours."""
     ready = at(offset + 10)
     reviewed = at(offset + 10 + reviewer)
     approved = at(offset + 10 + reviewer + author)
@@ -51,6 +54,7 @@ def pr(identifier, *, offset=24, reviewer=20, author=5, merge=5, locations=("are
 
 
 def dataset(prs, *, repos=None, reviews=None, **changes):
+    """Build a one-repo Dataset for 2026-01-03, with one review per reviewed PR."""
     base = Dataset(
         repos or (RepoData("a/b", 1, at(-5000), at(72)),),
         tuple(prs),

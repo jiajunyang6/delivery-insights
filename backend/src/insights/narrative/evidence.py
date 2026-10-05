@@ -203,6 +203,8 @@ def extract_evidence(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
             "extra": {},
             "ref": ref,
         }
+        # Snapshot values come in two shapes: ledger states (share/previous_share/change_pp)
+        # and efficiency comparisons (value/previous/change_*); map both onto one entry.
         if isinstance(raw, dict):
             if "share" in raw:
                 entry.update(
@@ -246,6 +248,8 @@ def extract_evidence(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
 
     for identifier, key, label, ref, unit, side in CATALOG:
         add(identifier, key, label, ref, unit, side)
+    # Locations get IDs by rank (E51, E55, ...); the pooled "other" bucket is not a place to
+    # point a reader at, so it gets none.
     locations = [
         (i, loc)
         for i, loc in enumerate(snapshot["bottleneck_analysis"]["locations"])
@@ -368,6 +372,7 @@ def build_evidence_pack(
         if e["location"]:
             safe["label"] = safe["label"].replace(e["location"], safe["location"])
         safe_evidence.append(safe)
+    # Data gaps let the LLM say why a conclusion is limited without guessing.
     gaps = []
     if not snapshot["meta"]["comparison_available"]:
         gaps.append("no_comparison")

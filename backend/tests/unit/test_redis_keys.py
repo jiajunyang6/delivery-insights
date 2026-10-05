@@ -1,3 +1,5 @@
+"""Redis key namespace and cache identity."""
+
 from insights.redis import (
     narrative_key,
     narrative_lock_key,

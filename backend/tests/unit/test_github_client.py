@@ -1,3 +1,5 @@
+"""GitHub client and adapter: retries, timeouts, paging, bad PRs."""
+
 from copy import deepcopy
 from unittest.mock import AsyncMock
 

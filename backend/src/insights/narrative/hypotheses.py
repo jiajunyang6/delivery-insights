@@ -17,6 +17,8 @@ from insights.analytics import (
 
 @dataclass(frozen=True, slots=True)
 class ConfidenceLevel:
+    """Score threshold of one band and the cap applied after a downgrade."""
+
     minimum: float
     exclusive: bool
     downgrade_cap: float
@@ -139,6 +141,8 @@ def effect_size(entry: Mapping[str, Any], snapshot: Mapping[str, Any]) -> tuple[
 
 @dataclass(frozen=True, slots=True)
 class Signal:
+    """One symptom or mechanism check: its evidence IDs and whether it holds."""
+
     role: str
     evidence: tuple[str, ...]
     present: bool
@@ -146,6 +150,8 @@ class Signal:
 
 
 class SignalContext:
+    """Shared evidence lookups and predicates for building hypotheses."""
+
     def __init__(self, snapshot: Mapping[str, Any], evidence: Mapping[str, dict[str, Any]]) -> None:
         """Prepare reusable source availability, localization and counter-evidence predicates."""
         self.evidence = evidence
@@ -287,6 +293,8 @@ def review_actions(location: str | None) -> tuple[str, str]:
 
 @dataclass(frozen=True, slots=True)
 class Hypothesis:
+    """A library hypothesis: wording, main metric, action and signal builder."""
+
     title: str
     subject: str
     main: str

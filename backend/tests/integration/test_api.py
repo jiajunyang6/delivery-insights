@@ -1,3 +1,5 @@
+"""API against Postgres and Redis: caching, ETags, pending and 503s."""
+
 from datetime import timedelta
 from unittest.mock import AsyncMock
 

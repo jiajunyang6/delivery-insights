@@ -1,3 +1,5 @@
+"""Builders for domain records and events on a fixed UTC hour grid."""
+
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
@@ -7,10 +9,12 @@ ORIGIN = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 def at(hours):
+    """Return ORIGIN plus the given number of hours."""
     return ORIGIN + timedelta(hours=hours)
 
 
 def event(kind, hour, actor="reviewer", *, state=None, review_id=None, **payload):
+    """Build an Event with the payload fields its kind needs; logins ending [bot] are bots."""
     kind = EventKind(kind)
     if kind == EventKind.REVIEW:
         payload.update(
@@ -35,6 +39,7 @@ def event(kind, hour, actor="reviewer", *, state=None, review_id=None, **payload
 
 
 def record(**changes):
+    """Build a merged PullRequestRecord, overriding any field."""
     base = PullRequestRecord(
         number=1,
         title="Change",

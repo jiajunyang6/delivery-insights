@@ -1,3 +1,5 @@
+"""Evidence pack, hypothesis scoring, observations and sanitizing."""
+
 from copy import deepcopy
 
 from tests.narrative_factory import entry, golden, scoring_fixture

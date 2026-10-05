@@ -69,6 +69,7 @@ async def load_dataset(
             .where(
                 PrFact.repo_id.in_(names),
                 or_(
+                    # Human activity in either period (the cohort rule's activity half).
                     select(PrEvent.id)
                     .where(
                         PrEvent.pr_id == PrFact.pr_id,
@@ -78,10 +79,13 @@ async def load_dataset(
                         PrEvent.occurred_at < as_of,
                     )
                     .exists(),
+                    # Ready PRs whose lifetime overlaps the two periods (covers creation too).
                     and_(
                         PrFact.ready_at < end,
                         or_(PrFact.end_at.is_(None), PrFact.end_at >= previous_start),
                     ),
+                    # Excluded PRs that ended in the current period, kept so the loaded set is a
+                    # superset; flow_in drops them.
                     and_(
                         PrFact.end_at >= start,
                         PrFact.end_at < as_of,
@@ -103,6 +107,7 @@ async def load_dataset(
             )
         ).all():
             intervals[pr_id].append(Interval(state, began, ended))
+    # Human-activity timestamps decide cohort membership in Dataset.flow_in.
     activity: dict[int, list[datetime]] = defaultdict(list)
     if ids:
         for pr_id, at in (
@@ -137,6 +142,8 @@ async def load_dataset(
         ~PrFact.is_backport,
         PrFact.ready_at.is_not(None),
     )
+    # Human reviews on flow PRs for review concentration; authors reviewing their own PR
+    # are not review capacity, so they are excluded.
     reviews = tuple(
         Review(login.lower(), at, pr_id)
         for login, at, pr_id in (

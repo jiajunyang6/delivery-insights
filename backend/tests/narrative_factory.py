@@ -1,3 +1,5 @@
+"""Fixtures for narrative tests: golden snapshot, evidence entries, packs."""
+
 from copy import deepcopy
 from pathlib import Path
 
@@ -5,10 +7,12 @@ import orjson
 
 
 def golden():
+    """Load the golden snapshot."""
     return orjson.loads((Path(__file__).parent / "golden/snapshot_seed42.json").read_bytes())
 
 
 def entry(identifier, value, previous=None, *, unit="hours", n=100, significant=True, **extra):
+    """Build one evidence entry with derived change fields."""
     delta = value - previous if previous is not None else None
     return {
         "id": identifier,
@@ -32,6 +36,7 @@ def entry(identifier, value, previous=None, *, unit="hours", n=100, significant=
 
 
 def validation_fixture():
+    """Return a pack and an LLM output that passes validation."""
     evidence = [
         entry("E1", 41.25, 35.1, n=512),
         entry("E15", 29, 20),
@@ -80,6 +85,7 @@ def validation_fixture():
 
 
 def scoring_fixture():
+    """Return the golden snapshot with test series and an evidence map."""
     snapshot = golden()
     snapshot["series"] = {
         "previous": [{"pickup_p50_hours": v} for v in (16, 16, 24, 24)],

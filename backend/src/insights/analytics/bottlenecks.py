@@ -99,6 +99,8 @@ def locations(dataset: Dataset) -> list[dict[str, Any]]:
                 allocated[name] += hours(pr, end=dataset.as_of)["waiting_reviewer"] / len(names)
             if pr.pr_id in previous:
                 old_allocated[name] += hours(pr, end=dataset.start)["waiting_reviewer"] / len(names)
+    # Name only locations with enough merged PRs to compare, ranked by reviewer wait; the
+    # rest are pooled so their hours still count in the totals.
     large = sorted(
         (
             name
@@ -178,6 +180,7 @@ def attribution(
     current, previous = merged(dataset, dataset.current), merged(dataset, dataset.previous)
     if not dataset.comparison_available or min(len(current), len(previous)) < MIN_SAMPLES_P50:
         return None
+    # Mean hours per merged PR, so periods with different PR counts stay comparable.
     components = {}
     for name in ("coding", *WAITING_STATES):
         new = (
@@ -206,6 +209,8 @@ def attribution(
         }
         for p in locations_
     ]
+    # A location's share is its part of the reviewer-wait increase, scaled by reviewer wait's
+    # own share, so location shares sum to at most that state's share of the increase.
     gross = sum(max(0, p["change"]) for p in locs)
     for p in locs:
         share = ratio(max(0, p["change"]), gross)

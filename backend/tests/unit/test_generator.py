@@ -1,3 +1,5 @@
+"""Synthetic repository generator used by the evaluation harness."""
+
 from insights.analytics.timeline import build_timeline, check_invariants, pr_input
 from insights_eval.generator import AS_OF, ScenarioSpec, generate
 from insights_eval.scenarios import SCENARIOS

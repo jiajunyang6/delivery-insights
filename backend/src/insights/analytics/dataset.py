@@ -13,6 +13,8 @@ from insights.analytics.timeline import Interval, ledger_hours
 
 @dataclass(frozen=True, slots=True)
 class SnapshotParams:
+    """Request parameters that, with versions, identify a snapshot."""
+
     repos: tuple[str, ...]
     period_from: date
     period_to: date
@@ -36,6 +38,8 @@ class SnapshotParams:
 
 @dataclass(frozen=True, slots=True)
 class RepoData:
+    """Sync state of one repository as seen when the snapshot was computed."""
+
     repo: str
     data_version: int
     covered_since: datetime
@@ -46,6 +50,8 @@ class RepoData:
 
 @dataclass(frozen=True, slots=True)
 class PrData:
+    """One PR's facts, intervals and human-activity times for cohort selection."""
+
     pr_id: int
     repo: str
     facts: PrFacts
@@ -61,6 +67,8 @@ class PrData:
 
 @dataclass(frozen=True, slots=True)
 class Review:
+    """One human review event on a flow PR, for review-concentration metrics."""
+
     reviewer: str
     occurred_at: datetime
     pr_id: int
@@ -68,17 +76,21 @@ class Review:
 
 @dataclass(frozen=True, slots=True)
 class Window:
+    """A half-open UTC time window [start, end)."""
+
     start: datetime
     end: datetime
 
     def contains(self, at: datetime | None) -> bool:
-        # Half-open [start, end): adjacent periods and weeks never both count a boundary event.
         """Test membership in [start, end); None never belongs to a window."""
+        # Half-open [start, end): adjacent periods and weeks never both count a boundary event.
         return at is not None and self.start <= at < self.end
 
 
 @dataclass(frozen=True, slots=True)
 class Dataset:
+    """Everything one snapshot reads, loaded in one consistent database view."""
+
     repos: tuple[RepoData, ...]
     prs: tuple[PrData, ...]
     reviews: tuple[Review, ...]
@@ -101,8 +113,8 @@ class Dataset:
 
     @property
     def as_of(self) -> datetime:
-        # Clamp to the least recently synced repo so no repo is read past its synced data.
         """Observation cutoff: the earlier of report end and the least-recent repository sync."""
+        # Clamp to the least recently synced repo so no repo is read past its synced data.
         return min(self.to_excl, min(r.last_synced_at for r in self.repos))
 
     @property

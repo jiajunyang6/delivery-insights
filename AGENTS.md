@@ -93,9 +93,15 @@ Without Make (Windows), run the equivalent `uv run` commands from the Makefile.
 ## Comments
 
 - Every module starts with a one- or two-line docstring: responsibility and boundary.
-- Docstrings go on cross-layer entry points and contracts: one summary line, then only
+- Every package, class and function has a docstring (ruff `D1` enforces this; test functions
+  are exempt because their names state what they check). One summary line, then only
   non-obvious details (units, window semantics, when `None` is returned, determinism).
-- Inline comments explain why, not what; do not restate names or types.
+- Frontend: every file starts with a `/** ... */` header, and every component and function
+  has a JSDoc comment.
+- Important code blocks (multi-step flows, retry and fallback branches, SQL filters, cache
+  and lock handling) get a short comment on why they work that way.
+- Inline comments explain why, not what; do not restate names or types. A comment goes
+  after a docstring, never above it.
 - No change history, ticket numbers, authorship or commented-out code. Lines stay within 100
   characters. Update comments when behavior changes; long explanations belong in
   `docs/TECHNICAL_DETAILS.md`.

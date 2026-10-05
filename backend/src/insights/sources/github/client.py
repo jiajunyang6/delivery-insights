@@ -44,6 +44,8 @@ logger = structlog.get_logger(__name__)
 
 
 class GitHubClient:
+    """GraphQL client with retries, rate-limit waits and sanitized errors."""
+
     def __init__(
         self,
         settings: Settings,
@@ -106,12 +108,16 @@ class GitHubClient:
                 raise GitHubAuthError("authentication_failed")
             if response.status_code == 404:
                 raise GitHubNotFoundError("repository_not_found")
+            # GitHub signals secondary rate limits with 403 as well as 429, so both are retried
+            # as rate limits; 502-504 are short upstream outages.
             if response.status_code in {403, 429, 502, 503, 504}:
                 limited = response.status_code in {403, 429}
                 if attempt == 3:
                     if limited:
                         raise GitHubRateLimited("rate_limit_retries_exhausted")
                     raise GitHubTransientError("upstream_unavailable")
+                # Prefer the server's own hint: Retry-After, then the primary-limit reset time,
+                # else exponential backoff (minutes for rate limits, seconds for outages).
                 if response.headers.get("retry-after"):
                     delay = float(response.headers["retry-after"])
                     reason = "retry_after"
@@ -181,6 +187,8 @@ class GitHubClient:
 
 
 class GitHubAdapter:
+    """SourceAdapter for GitHub: pages PRs and completes their timelines."""
+
     def __init__(self, client: GitHubClient) -> None:
         """Bind the shared GitHub client and initialize adaptive pagination state."""
         self.client = client
@@ -224,6 +232,8 @@ class GitHubAdapter:
         if not REPO_RE.fullmatch(repo.full_name):
             raise ValueError("Invalid repository")
         size = min(page_size, self.page_size)
+        # Large pages with full timelines can time out on GitHub's side; halve the page size on
+        # each transient failure and give up only at the floor of five PRs.
         while True:
             try:
                 data = await self.client.graphql(
@@ -275,6 +285,8 @@ class GitHubAdapter:
                     timeline["nodes"].extend(page["nodes"])
                     timeline["pageInfo"] = page["pageInfo"]
                 prs.append(normalize_pr(node, extra_bots))
+            # One malformed PR is counted and logged instead of failing the whole page; upstream
+            # errors (GitHubError) still propagate so a partial history is never stored.
             except (KeyError, TypeError, ValueError, AttributeError) as exc:
                 number = node.get("number") if isinstance(node, dict) else None
                 logger.warning(

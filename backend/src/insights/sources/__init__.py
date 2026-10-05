@@ -6,6 +6,8 @@ from insights.domain import PageResult, RepoRef
 
 
 class SourceAdapter(Protocol):
+    """Contract a source must meet to feed the sync pipeline."""
+
     def reset(self) -> None:
         """Reset adaptive source state before starting a new repository sync."""
         ...

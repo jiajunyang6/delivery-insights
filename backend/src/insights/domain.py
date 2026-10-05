@@ -7,6 +7,8 @@ from typing import Any
 
 
 class EventKind(StrEnum):
+    """Timeline event kinds kept from GitHub; values are stored in pr_events.kind."""
+
     READY_FOR_REVIEW = "ready_for_review"
     CONVERT_TO_DRAFT = "convert_to_draft"
     REVIEW_REQUESTED = "review_requested"
@@ -26,6 +28,8 @@ class EventKind(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class RepoRef:
+    """Owner/name pair identifying a repository at the source."""
+
     owner: str
     name: str
 
@@ -37,18 +41,24 @@ class RepoRef:
 
 @dataclass(frozen=True, slots=True)
 class RepositoryInfo:
+    """Repository metadata returned with each page, used to detect backports."""
+
     full_name: str
     default_branch: str
 
 
 @dataclass(frozen=True, slots=True)
 class Actor:
+    """Who performed an event; login is None for commits and deleted accounts."""
+
     login: str | None
     is_bot: bool
 
 
 @dataclass(frozen=True, slots=True)
 class Event:
+    """One normalized timeline event; dedup_key is stable across re-reads."""
+
     kind: EventKind
     occurred_at: datetime
     actor: Actor
@@ -58,6 +68,8 @@ class Event:
 
 @dataclass(frozen=True, slots=True)
 class PullRequestRecord:
+    """Immutable source view of one PR with its labels, files and events."""
+
     number: int
     title: str
     url: str
@@ -78,6 +90,8 @@ class PullRequestRecord:
 
 @dataclass(frozen=True, slots=True)
 class PageResult:
+    """One fetched page of PRs plus the cursor and update bounds sync needs."""
+
     repository: RepositoryInfo
     prs: tuple[PullRequestRecord, ...]
     end_cursor: str | None
@@ -93,20 +107,20 @@ class GitHubError(Exception):
 
 
 class GitHubAuthError(GitHubError):
-    pass
+    """GitHub rejected the token (HTTP 401)."""
 
 
 class GitHubNotFoundError(GitHubError):
-    pass
+    """The repository or PR node does not exist or is not visible."""
 
 
 class GitHubRateLimited(GitHubError):  # noqa: N818
-    pass
+    """Rate-limit waits exceeded the retry or 15-minute wait budget."""
 
 
 class GitHubQueryError(GitHubError):
-    pass
+    """A non-retryable GraphQL or HTTP error, or a malformed response."""
 
 
 class GitHubTransientError(GitHubError):
-    pass
+    """A retryable network, upstream or pagination failure."""

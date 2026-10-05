@@ -32,7 +32,7 @@ from insights.config import Settings
 
 
 class Base(DeclarativeBase):
-    pass
+    """Declarative base for every table."""
 
 
 class Repository(Base):
@@ -71,6 +71,8 @@ class Repository(Base):
 
 
 class PullRequest(Base):
+    """Source fields of one PR; content_hash skips unchanged re-reads."""
+
     __tablename__ = "pull_requests"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -101,6 +103,8 @@ class PullRequest(Base):
 
 
 class PrEvent(Base):
+    """One normalized timeline event; unique per PR by dedup_key."""
+
     __tablename__ = "pr_events"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -121,6 +125,8 @@ class PrEvent(Base):
 
 
 class PrFile(Base):
+    """One path changed by a PR, used for directory locations."""
+
     __tablename__ = "pr_files"
 
     pr_id: Mapped[int] = mapped_column(
@@ -130,6 +136,8 @@ class PrFile(Base):
 
 
 class PrFact(Base):
+    """Derived per-PR facts; derive_key records which derivation produced them."""
+
     __tablename__ = "pr_facts"
 
     pr_id: Mapped[int] = mapped_column(
@@ -160,6 +168,8 @@ class PrFact(Base):
 
 
 class PrInterval(Base):
+    """One derived state interval, ordered by seq within its PR."""
+
     __tablename__ = "pr_intervals"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -178,6 +188,8 @@ class PrInterval(Base):
 
 
 class Snapshot(Base):
+    """An immutable computed snapshot, kept for the retention period."""
+
     __tablename__ = "snapshots"
 
     snapshot_id: Mapped[str] = mapped_column(Text, primary_key=True)
@@ -195,6 +207,8 @@ class Snapshot(Base):
 
 
 class Narrative(Base):
+    """A stored narrative, unique per snapshot, prompt, model and evidence pack."""
+
     __tablename__ = "narratives"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -214,6 +228,8 @@ class Narrative(Base):
 
 
 class SyncJob(Base):
+    """Ledger row for one queued, running or finished worker job."""
+
     __tablename__ = "sync_jobs"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)

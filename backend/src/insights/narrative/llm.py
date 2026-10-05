@@ -19,6 +19,8 @@ from insights.config import Settings
 
 @dataclass(frozen=True, slots=True)
 class LLMReply:
+    """The tool input from one Converse reply plus what a repair turn needs."""
+
     tool_input: dict[str, Any] | None
     tool_use_id: str | None
     assistant_message: dict[str, Any]
@@ -28,6 +30,8 @@ class LLMReply:
 
 @dataclass(slots=True)
 class LLMUsage:
+    """Attempts and token totals across a narrative's first call and repair."""
+
     attempts: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
@@ -61,7 +65,9 @@ class LLMClient(Protocol):
         ...
 
 
-class LLMUnavailable(Exception):  # noqa: N818 - public name required by the plan
+class LLMUnavailable(Exception):  # noqa: N818 - reads as a state, like GitHubRateLimited
+    """Bedrock or transport failure; carries only a sanitized error code."""
+
     def __init__(self, reason: str) -> None:
         """Carry a sanitized transport/service failure reason into narrative fallback handling."""
         self.reason = reason
@@ -69,6 +75,8 @@ class LLMUnavailable(Exception):  # noqa: N818 - public name required by the pla
 
 
 class BedrockClient:
+    """LLMClient backed by the Bedrock Converse API."""
+
     def __init__(self, settings: Settings) -> None:
         """Create the configured regional Bedrock client with bounded network waits and retries."""
         self.model_id = settings.bedrock_model_id

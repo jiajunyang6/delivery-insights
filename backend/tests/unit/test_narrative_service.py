@@ -1,3 +1,5 @@
+"""Narrative generation: repair, fallback, downgrades and assembly."""
+
 from copy import deepcopy
 from datetime import UTC, datetime
 

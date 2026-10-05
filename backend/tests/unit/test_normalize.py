@@ -1,3 +1,5 @@
+"""GraphQL normalization: bots, dismissals, cross-references, hashing."""
+
 from dataclasses import asdict, replace
 
 import pytest

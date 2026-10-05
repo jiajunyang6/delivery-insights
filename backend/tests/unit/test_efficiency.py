@@ -1,3 +1,5 @@
+"""Efficiency metrics: units, sample gates, significance and cutoffs."""
+
 from dataclasses import replace
 
 import pytest

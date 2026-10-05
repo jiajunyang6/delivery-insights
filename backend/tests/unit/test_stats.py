@@ -1,3 +1,5 @@
+"""Percentiles and the seeded bootstrap."""
+
 import pytest
 
 from insights.analytics.stats import bootstrap_diff, percentile, seed_for

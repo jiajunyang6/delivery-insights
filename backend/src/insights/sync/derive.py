@@ -168,6 +168,8 @@ async def rederive_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job
                     .where(Repository.id == repo.id)
                     .values(derived_key=None if repo.derived_key == key else repo.derived_key)
                 )
+            # Keyset batches by PR id, each in its own short transaction, so a large repository
+            # never holds one long write transaction and a crash resumes where it stopped.
             after = 0
             while True:
                 async with sessions_for(ctx)() as session, session.begin():
@@ -187,6 +189,8 @@ async def rederive_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job
                     after = ids[-1]
                     processed += len(ids)
                     job.stats.update(prs_derived=processed, invariant_violations=violations)
+            # Mark the repository ready only after re-checking that nothing is pending; a sync
+            # that ran concurrently may have added PRs. The data_version bump retires old IDs.
             async with sessions_for(ctx)() as session, session.begin():
                 if not await derivation_complete(session, repo.id, key):
                     raise RuntimeError("Repository derivation is incomplete")

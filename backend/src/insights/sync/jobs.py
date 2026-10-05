@@ -193,6 +193,8 @@ class SyncRun:
         A phase is checkpointed as `covered_since` only once a stored page reaches past its
         threshold or the listing ends, so coverage never includes a range still downloading.
         """
+        # Only phases not yet covered remain (7, 30, then BACKFILL_DAYS); thresholds are rounded
+        # to the minute so a resumed run computes the same boundaries.
         phases = [
             days
             for days in self.settings.backfill_phases
@@ -228,6 +230,8 @@ class SyncRun:
                 if self.repo.sync_watermark is None and page.newest_updated_at:
                     self.repo.sync_watermark = page.newest_updated_at
                     await set_repo(self.ctx, self.repo.id, sync_watermark=self.repo.sync_watermark)
+                # One page can complete several short phases at once, so claim each phase whose
+                # threshold this page has reached before reading the next page.
                 while index < len(phases):
                     threshold = (self.started - timedelta(days=phases[index])).replace(
                         second=0, microsecond=0
@@ -251,10 +255,12 @@ class SyncRun:
 
         Completing incremental pagination alone does not establish historical period coverage.
         """
+        # Recent changes first, so already covered periods stay fresh while backfill continues.
         if self.repo.sync_watermark:
             await set_job(self.ctx, self.job_id, phase="incremental")
             await self.incremental(self.repo.sync_watermark)
         await self.backfill()
+        # Open PRs that nobody touched never show up in the updated-at walk; sweep them hourly.
         if self.repo.last_open_sweep_at is None or self.repo.last_open_sweep_at < (
             now_for(self.ctx) - timedelta(minutes=self.settings.open_sweep_minutes)
         ):

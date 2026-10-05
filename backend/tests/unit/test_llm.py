@@ -1,3 +1,5 @@
+"""Bedrock client: forced tool use, usage parsing and error codes."""
+
 from unittest.mock import Mock
 
 import boto3

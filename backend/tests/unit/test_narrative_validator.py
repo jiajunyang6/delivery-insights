@@ -1,3 +1,5 @@
+"""Validator rules for numbers, citations, hedges and abstention."""
+
 from copy import deepcopy
 
 import pytest

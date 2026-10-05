@@ -1,3 +1,5 @@
+"""Location assignment and flow eligibility of PR facts."""
+
 from dataclasses import replace
 
 from tests.factories import at, record

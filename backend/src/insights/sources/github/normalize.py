@@ -95,11 +95,14 @@ def normalize_events(
     event and is dropped without one. Cross-references are kept only from pull requests.
     """
     nodes = remove_nulls(nodes)
+    # A dismissed review reports state DISMISSED; its dismissal event remembers what the
+    # review originally was (approval or change request), which the timeline needs.
     dismissed = {
         n["review"]["id"]: n
         for n in nodes
         if n and n.get("__typename") == "ReviewDismissedEvent" and n.get("review")
     }
+    # Keyed by dedup_key, so an event repeated across timeline pages is kept once.
     output: dict[str, Event] = {}
     for node in nodes:
         if not node:
@@ -168,6 +171,7 @@ def normalize_events(
         timestamp = parse_time(occurred)
         key = dedup_key(kind, timestamp, person.login, node["id"])
         output[key] = Event(kind, timestamp, person, payload, key)
+    # A total order independent of GitHub's page order keeps content hashes and timelines stable.
     return tuple(sorted(output.values(), key=lambda e: (e.occurred_at, e.kind, e.dedup_key)))
 
 

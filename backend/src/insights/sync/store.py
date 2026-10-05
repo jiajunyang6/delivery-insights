@@ -18,6 +18,8 @@ from insights.sync.derive import derive_prs
 
 @dataclass(frozen=True, slots=True)
 class SaveResult:
+    """What one saved page changed: PR and event counts and derived PR IDs."""
+
     prs_changed: int
     events: int
     pr_ids: tuple[int, ...]
@@ -111,6 +113,7 @@ async def save_page(
         return SaveResult(0, 0, ())
     created = sum(p.number not in existing for p in records)
     pr_ids = tuple(ids[pr.number] for pr in records)
+    # Each fetch carries a PR's complete timeline, so child rows are replaced, not merged.
     await session.execute(delete(PrEvent).where(PrEvent.pr_id.in_(pr_ids)))
     await session.execute(delete(PrFile).where(PrFile.pr_id.in_(pr_ids)))
     events = [
@@ -131,11 +134,14 @@ async def save_page(
         await session.execute(insert(PrEvent), events)
     if files:
         await session.execute(insert(PrFile), files)
+    # data_version is part of the snapshot ID: bumping it makes the next request compute a new
+    # snapshot instead of serving one built from the old rows.
     await session.execute(
         update(Repository)
         .where(Repository.id == repo_id)
         .values(data_version=Repository.data_version + 1)
     )
+    # Derive in the same transaction, so readers never see new events with old facts.
     violations = await derive_prs(session, pr_ids, settings=settings, now=now)
     return SaveResult(len(records), len(events), pr_ids, violations, created)
 

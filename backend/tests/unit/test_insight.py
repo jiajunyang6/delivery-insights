@@ -1,3 +1,5 @@
+"""Public insight view and its factual statement."""
+
 from copy import deepcopy
 
 import pytest

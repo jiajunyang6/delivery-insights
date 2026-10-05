@@ -1,3 +1,5 @@
+"""Evaluation harness: stub LLM, rechecks, metrics, gates and reports."""
+
 from copy import deepcopy
 
 import orjson

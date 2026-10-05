@@ -1,3 +1,5 @@
+"""Bootstrap seed identity and significance boundaries."""
+
 from dataclasses import replace
 
 import pytest

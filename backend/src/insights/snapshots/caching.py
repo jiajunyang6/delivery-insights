@@ -25,6 +25,8 @@ def cache_ttl(created_at: datetime, now: datetime, maximum: int = 86400) -> int:
 
 @dataclass(frozen=True, slots=True)
 class Reply:
+    """A transport-neutral HTTP reply that API routes turn into a Response."""
+
     body: bytes
     status: int
     headers: dict[str, str]

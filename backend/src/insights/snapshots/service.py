@@ -48,6 +48,8 @@ async def consistent_read(
 
 
 class SnapshotService:
+    """Serves snapshots for one request or job at a fixed observation time."""
+
     def __init__(
         self,
         sessions: async_sessionmaker[AsyncSession],
@@ -93,6 +95,7 @@ class SnapshotService:
         repo_data = []
         for name in params.repos:
             repo = repositories.get(name.lower())
+            # The first unmet condition is the reason shown to the user; order matters.
             reason = None
             if repo is None or repo.covered_since is None or repo.last_synced_at is None:
                 reason = "never_synced"
@@ -288,6 +291,7 @@ class SnapshotService:
             metadata = await self.metadata(session, params)
             if isinstance(metadata, Reply):
                 return metadata
+            # Cheapest source first: Redis, then the snapshots table, then a full computation.
             sid, _, _ = identifiers(metadata, params)
             cached = await self.cached_reply(sid, conditional)
             if cached is not None:
@@ -296,6 +300,7 @@ class SnapshotService:
             if stored is not None:
                 _, view, tag = stored
                 return snapshot_reply(sid, view, tag, conditional)
+            # Load in the same REPEATABLE READ view that produced the ID, so the data matches it.
             load_started = perf_counter()
             dataset = await load_dataset(session, params, metadata=metadata)
             load_ms = (perf_counter() - load_started) * 1000

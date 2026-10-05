@@ -1,3 +1,5 @@
+"""Template narratives pass the validator and name what they explain."""
+
 from datetime import UTC, datetime
 from functools import lru_cache
 

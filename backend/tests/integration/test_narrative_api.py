@@ -1,3 +1,5 @@
+"""Narrative route: persistence, caching, expiry and fallbacks."""
+
 import asyncio
 from datetime import timedelta
 

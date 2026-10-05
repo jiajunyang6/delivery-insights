@@ -25,17 +25,23 @@ class Contract(BaseModel):
 
 
 class DateRange(Contract):
+    """Inclusive UTC date range; serialized with a `from` key."""
+
     start: date = Field(alias="from")
     to: date
 
 
 class Period(DateRange):
+    """The requested period and the equal-length period it is compared with."""
+
     days: int
     complete: bool
     compared_to: DateRange
 
 
 class StateLedger(Contract):
+    """PR-hours and share for one waiting state, current and previous."""
+
     pr_hours: float
     previous_pr_hours: float | None
     share: float
@@ -44,22 +50,30 @@ class StateLedger(Contract):
 
 
 class TimeLedger(Contract):
+    """Post-ready waiting time of merged PRs, split by waiting state."""
+
     total_pr_hours: float
     states: dict[State, StateLedger]
 
 
 class LargestWait(Contract):
+    """The waiting state with the largest share of PR time."""
+
     state: State
     share: float
     previous_share: float | None
 
 
 class LargestChange(Contract):
+    """The waiting state whose share moved most, in percentage points."""
+
     state: State
     change_pp: float
 
 
 class CycleTime(Contract):
+    """Median cycle time with its previous value and significance."""
+
     value: float | None
     previous: float | None
     change_rel: float | None
@@ -68,11 +82,15 @@ class CycleTime(Contract):
 
 
 class MergedPrs(Contract):
+    """Merged PR counts for the current and previous periods."""
+
     value: int
     previous: int | None
 
 
 class InsightSummary(Contract):
+    """The headline: a factual statement plus the numbers it is built from."""
+
     statement: str
     largest_wait: LargestWait | None
     largest_change: LargestChange | None
@@ -81,6 +99,8 @@ class InsightSummary(Contract):
 
 
 class InsightLinks(Contract):
+    """Related resources for this insight."""
+
     narrative: str
 
 
@@ -98,11 +118,15 @@ class Insight(Contract):
 
 
 class PendingJob(Contract):
+    """Status and phase of the sync job that will make the data ready."""
+
     status: str
     phase: str | None
 
 
 class PendingRepo(Contract):
+    """Why one repository is not ready yet and how far sync has progressed."""
+
     repo: str
     covered_since: datetime | None
     required_since: datetime
@@ -113,6 +137,8 @@ class PendingRepo(Contract):
 
 
 class Pending(Contract):
+    """202 body while the requested period is still syncing."""
+
     status: Literal["pending"]
     detail: str
     retry_after_seconds: int
@@ -120,28 +146,38 @@ class Pending(Contract):
 
 
 class RepoStatus(Contract):
+    """A tracked repository and the status of its last finished sync."""
+
     repo: str
     last_sync_status: str
 
 
 class DateLimits(Contract):
+    """Dates the API accepts, derived from the backfill horizon."""
+
     earliest_from: date
     latest_to: date
     max_days: int
 
 
 class GithubProblem(Contract):
+    """A sync status that a `.env` change can fix."""
+
     repo: str
     status: Literal["missing_token", "auth_error", "not_found"]
     syncing: bool
 
 
 class GithubSetup(Contract):
+    """Whether a GitHub token is set, and repositories it failed for."""
+
     token_configured: bool
     problems: list[GithubProblem]
 
 
 class LlmSetup(Contract):
+    """Bedrock target and its latest error code, if any."""
+
     key_configured: bool
     region: str
     model_id: str
@@ -157,18 +193,24 @@ class SetupStatus(Contract):
 
 
 class RepoList(Contract):
+    """Response of /v1/repos."""
+
     items: list[RepoStatus]
     date_limits: DateLimits
     setup: SetupStatus
 
 
 class LlmDowngrade(Contract):
+    """A band lowered by the LLM, with its cited reason."""
+
     original: str = Field(alias="from")
     to: str
     reason: str
 
 
 class ConfidenceBasis(Contract):
+    """The scoring inputs behind a hypothesis's evidence strength."""
+
     signal_agreement: float | None
     signals_present: int | None
     signals_total: int | None
@@ -187,21 +229,29 @@ class ConfidenceBasis(Contract):
 
 
 class EvidenceStep(Contract):
+    """One step of an evidence chain and the evidence IDs supporting it."""
+
     step: Literal["symptom", "stage", "location", "mechanism", "cited"]
     evidence: list[str]
 
 
 class RuledOut(Contract):
+    """Another hypothesis ruled out, with the evidence that rules it out."""
+
     hypothesis: str
     evidence: list[str]
 
 
 class OpenAlternative(Contract):
+    """Another hypothesis that could not be assessed, with the reason."""
+
     hypothesis: str
     reason: Literal["no_data", "insufficient_sample", "below_threshold"]
 
 
 class NarrativeHypothesis(Contract):
+    """One scored hypothesis with its wording, evidence chain and action."""
+
     id: str
     source: Literal["library", "llm"]
     title: str
@@ -219,6 +269,8 @@ class NarrativeHypothesis(Contract):
 
 
 class EvidenceEntry(Contract):
+    """One numbered evidence item; `ref` points into the internal snapshot."""
+
     id: str
     key: str
     label: str
@@ -238,6 +290,8 @@ class EvidenceEntry(Contract):
 
 
 class NarrativeMeta(Contract):
+    """How the narrative was produced: LLM or template, validation, fallback."""
+
     generated_by: Literal["llm", "template"]
     model: str
     prompt_version: str
@@ -251,6 +305,8 @@ class NarrativeMeta(Contract):
 
 
 class Narrative(Contract):
+    """Cited narrative for one snapshot."""
+
     snapshot_id: str
     narrative: str
     abstained: bool

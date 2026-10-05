@@ -1,3 +1,5 @@
+"""Snapshot determinism (golden file), identity and rounding."""
+
 import os
 from dataclasses import replace
 from pathlib import Path

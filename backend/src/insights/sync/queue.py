@@ -83,6 +83,8 @@ async def enqueue_sync(
         raise
     if enqueued is not None:
         return job, True
+    # arq refused the fixed job ID because the same job is already queued: drop the duplicate
+    # ledger row and report the job that already covers this request.
     await session.delete(job)
     await session.commit()
     related = [key for key, value in JOB_ROUTES.items() if value[1] == prefix]
@@ -187,6 +189,8 @@ async def enqueue_precompute(ctx: dict[str, Any], repo: Repository) -> None:
 
 @dataclass
 class JobRun:
+    """One running job: its repository, ledger row and stats to persist."""
+
     ctx: dict[str, Any]
     repo: Repository
     job_id: str
@@ -241,24 +245,21 @@ async def run_job(
             if run.result != "running":
                 raise
             sync = kind != "rederive"
+            # GitHubError messages are sanitized codes and safe to store; any other exception
+            # is recorded by type only, so its text cannot leak into the ledger or the UI.
+            error = (
+                f"{type(exc).__name__}: {exc}"
+                if sync and isinstance(exc, GitHubError)
+                else type(exc).__name__
+            )
             if sync:
+                # Auth and not-found statuses drive the dashboard's configuration notice.
                 status = (
                     "auth_error"
                     if isinstance(exc, GitHubAuthError)
                     else ("not_found" if isinstance(exc, GitHubNotFoundError) else "failed")
                 )
-                error = (
-                    f"{type(exc).__name__}: {exc}"
-                    if isinstance(exc, GitHubError)
-                    else type(exc).__name__
-                )
                 await set_repo(ctx, repo.id, last_sync_status=status, last_sync_error=error[:500])
-            else:
-                error = (
-                    str(exc)
-                    if kind != "rederive" and isinstance(exc, GitHubError)
-                    else type(exc).__name__
-                )
             await run.finish("failed", error)
             event = "sync_failed" if sync else "rederive_failed"
             logger.error(event, repo=repo_full_name, job=job_id, error=error[:500])

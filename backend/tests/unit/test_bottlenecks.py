@@ -1,3 +1,5 @@
+"""Time ledger, locations, attribution, weekly clipping and review queue."""
+
 from dataclasses import replace
 from datetime import date
 

@@ -24,9 +24,9 @@ def parameters(
     from_date: Annotated[str | None, Query(alias="from")] = None,
     to: str | None = None,
 ) -> SnapshotParams:
+    """Parse the raw snapshot query and collect validation errors into one 422 response."""
     # The query arguments above only document the API in OpenAPI; parse_params reads the raw
     # query so every invalid field is reported together in one 422 problem.
-    """Parse the raw snapshot query and collect validation errors into one 422 response."""
     return parse_params(request.query_params, service.settings, service.now)
 
 

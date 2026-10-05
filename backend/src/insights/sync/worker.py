@@ -55,6 +55,7 @@ async def housekeeping(ctx: dict[str, Any]) -> None:
     Cached snapshot rows and narratives are removed best effort; Redis errors are only logged.
     """
     now = now_for(ctx)
+    # Narratives cascade with their snapshot rows; only queued/running jobs survive by age.
     async with sessions_for(ctx)() as session, session.begin():
         expired = (
             await session.scalars(
@@ -64,6 +65,7 @@ async def housekeeping(ctx: dict[str, Any]) -> None:
             )
         ).all()
         await session.execute(delete(SyncJob).where(SyncJob.finished_at < now - timedelta(days=30)))
+    # Narrative cache keys embed the prompt, model and pack hash, so find them by prefix.
     for sid in expired:
         try:
             keys = [snapshot_key(sid)]
@@ -100,6 +102,8 @@ async def shutdown(ctx: dict[str, Any]) -> None:
 
 
 class WorkerSettings:
+    """arq worker configuration: jobs, cron schedule and limits."""
+
     functions: ClassVar[list[Any]] = [
         sync_repo,
         rederive_repo,
@@ -112,7 +116,10 @@ class WorkerSettings:
     ]
     on_startup = startup
     on_shutdown = shutdown
+    # One job at a time: all jobs share one GitHub client and its rate-limit budget.
     max_jobs = 1
+    # A first 120-day backfill of a large repository can run for hours.
     job_timeout = 3 * 3600
+    # Discard results at once so a finished job's fixed ID can be enqueued again.
     keep_result = 0
     redis_settings = RedisSettings.from_dsn(Settings().redis_url)

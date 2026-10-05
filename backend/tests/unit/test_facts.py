@@ -1,3 +1,5 @@
+"""Per-PR fact derivation: milestones, counts, scope and readiness."""
+
 from tests.factories import at, event, record
 
 from insights.analytics.facts import compute_facts

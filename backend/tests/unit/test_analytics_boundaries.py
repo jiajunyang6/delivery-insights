@@ -1,3 +1,5 @@
+"""Cohort edge cases: excluded PRs, multi-location PRs, paused PRs."""
+
 from dataclasses import replace
 
 from tests.analytics_factory import dataset, pr
