@@ -18,9 +18,9 @@ describes the product and submission, `docs/REFERENCE.md` holds the current cont
 
 | Path | Responsibility |
 |---|---|
-| `backend/src/insights/sources/github/` | GraphQL client, queries and normalization (the only GitHub I/O) |
-| `backend/src/insights/sync/` | arq jobs: `queue.py` job lifecycle and locks, `jobs.py` sync runs, `store.py` writes, `derive.py` timelines/facts and rederivation |
-| `backend/src/insights/db/` | SQLAlchemy models and loaders that turn rows into immutable records |
+| `backend/src/insights/sources/` | `SourceAdapter` protocol; `github/` holds the GraphQL client and adapter (`client.py`), queries and normalization (the only GitHub I/O) |
+| `backend/src/insights/sync/` | arq jobs: `queue.py` job lifecycle and locks, `jobs.py` sync runs, `store.py` writes, `derive.py` timelines/facts and rederivation, `worker.py` entry point, precompute and housekeeping |
+| `backend/src/insights/db/` | SQLAlchemy models and engine factory (`models.py`), and loaders that turn rows into immutable records |
 | `backend/src/insights/analytics/` | Pure computation of the snapshot: timeline, facts, efficiency, time ledger, attribution |
 | `backend/src/insights/snapshots/` | Snapshot orchestration, readiness (202 Pending), caching and domain errors |
 | `backend/src/insights/narrative/` | Evidence pack, hypothesis scoring, prompt, validator, template fallback, LLM client |
@@ -29,7 +29,7 @@ describes the product and submission, `docs/REFERENCE.md` holds the current cont
 | `backend/tests/` | Unit and integration tests, factories, golden snapshot (`tests/golden/`) |
 | `backend/eval/` | Synthetic scenarios and the narrative evaluation harness |
 | `frontend/src/` | React dashboard: components, `format.ts`, `api.ts` request cancellation |
-| `docs/` | `REFERENCE.md` contracts, evaluation results and trade-offs; the architecture diagram |
+| `docs/` | `REFERENCE.md` contracts, evaluation results and trade-offs; `diagrams/how-it-works.svg` architecture diagram |
 
 ## Commands
 
@@ -110,5 +110,12 @@ Without Make (Windows), run the equivalent `uv run` commands from the Makefile.
   and numeric, citation and hedge consistency 1.00. Record results in the `docs/REFERENCE.md` testing section.
 - UI changes: check 7/30/60-day and custom periods, the pending state, the configuration
   notice, the narrative panel and the time ledger in a browser.
-- Update the docs your change affects: README (run and submission notes) and REFERENCE
-  (contracts, results and trade-offs).
+- Update the docs your change affects, keeping each fact in one place:
+  - README: sections 1–4 are the submission notes the assignment brief requires (run it,
+    architecture and decisions, one more day, AI use). Sections 3 and 4 are the owner's own
+    account; change them only when asked. Later sections summarize checks, product,
+    configuration and development; keep test counts in "How the output was checked" current.
+  - REFERENCE: contracts, metric semantics, scoring, operations, security, results and
+    trade-offs. Do not repeat what the README already says; link to it instead.
+  - `docs/diagrams/how-it-works.svg`: update it when components, data flow or the narrative
+    flow change, and render it to check that labels do not overlap.
