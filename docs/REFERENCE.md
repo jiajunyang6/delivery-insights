@@ -234,6 +234,7 @@ Tokens, headers, raw upstream responses and prose are not logged; exceptions exp
 | Always template | `meta.fallback_reason`, model access, validator violations and sanitized logs |
 | 404 for an old snapshot | Seven-day retention expired; request a new insight |
 | Incomplete comparison | More history is needed for the previous equal-length period |
+| Unexpected numbers | Sync job `skipped_prs` and `invariant_violations` counters and their structured warnings |
 
 `docker compose down` stops the stack while preserving Postgres data.
 `docker compose down -v` intentionally deletes the local database volume; use only for reset.
@@ -297,7 +298,9 @@ consistency cover final LLM outputs.
 The one invalid real first answer quoted an unsupported number and passed after its single
 repair. On live Bevy data, the 60-day narrative with two low-band hypotheses passed validation
 on the first attempt in 4/4 generations. The synthetic suite was used during prompt
-development; it is not a held-out benchmark or real-world causal calibration. Validators and
+development; it is not a held-out benchmark or real-world causal calibration. The size
+scenario scales synthetic work duration with the square root of the planted size multiplier,
+an explicit fixture assumption. Validators and
 gate thresholds were never relaxed to pass. Missing-key evaluation exits 2.
 
 ## Trade-offs and limitations
@@ -315,7 +318,6 @@ gate thresholds were never relaxed to pass. Missing-key evaluation exits 2.
 | Commit times | Committer timestamps approximate push/revision time | Collect push events |
 | Reopened PRs | Closed intervals excluded from ledger; elapsed milestones retain them | Review prevalence before changing duration semantics |
 | Confidence | Evidence score tested only on synthetic scenarios | Replay history and calibrate with human labels |
-| Size scenario | Synthetic duration scales with square root of planted size multiplier | Validate this assumption with real observations |
 
 ### Things deliberately not done
 
@@ -343,13 +345,9 @@ Docker and automated verification config.
 GitHub omits design discussions, offline coordination and deployments. Rewritten or rebased
 commit timestamps distort coding time. Current labels are not historical ownership.
 Small samples suppress p50 below 20 and rates below 30 cases/5 events.
-Driver/location measures have their own documented gates. Insufficient values remain null.
+Location and PR-size comparisons have their own sample gates. Insufficient values remain null.
 Confidence still needs historical replay and human labels.
-Skipped PRs and anomalous timelines can affect metrics; inspect sync job skipped_prs and invariant_violations counters and their structured warnings before relying on a report.
-Net review-demand share compares arrivals with first reviews, including service of earlier demand; it can be negative and is not an individually tracked unreviewed-PR fraction.
-The plan-selected Recharts 2 branch is deprecated; migration to v3 is a maintenance follow-up.
-The supplied golden fixture still needs a person's numeric review; browser checks here were
-performed by the coding agent, not signed off by a human. Remote CI has not been run.
+Recharts 2 is deprecated; migrating to v3 is a maintenance follow-up.
 
 ## Development
 

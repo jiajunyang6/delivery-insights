@@ -99,6 +99,22 @@ Main decisions:
   focused on the required path and add extensions only where their value justified the added
   complexity.
 
+Trade-offs and what I chose not to do (full list in
+[REFERENCE.md](docs/REFERENCE.md#trade-offs-and-limitations)):
+
+- **Stable reads over freshness:** reports read only local data synced every 15 minutes, so
+  they can lag GitHub, and the first sync takes a few minutes before every period is ready.
+- **Numbers in code, wording by the LLM:** the LLM never computes or scores. If its reply
+  still fails validation after one repair, the page shows a deterministic template instead.
+- **Locations:** current labels, otherwise the most-touched directories; historical labels and
+  code ownership are not modelled.
+- **Not done:** individual productivity rankings, request-time GitHub fetching,
+  authentication, webhooks, a second source adapter and deployment or release timing.
+- **Beyond the brief:** a background worker with staged backfill, Postgres storage with
+  Redis and ETag caching, deterministic hypothesis scoring with a validator, repair and
+  template fallback, an offline and real-Bedrock evaluation harness, a React dashboard and
+  Docker Compose.
+
 ## 3. With one more day
 I would do one of the followings if I had one more day: 
 1. **Add a "Sync now" button** for tracked repositories in the dashboard, backed by a
