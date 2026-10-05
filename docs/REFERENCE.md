@@ -276,7 +276,8 @@ Ruff/strict mypy, typecheck/build and all eight offline narrative gates pass. Br
 verification uses synthetic data on the newly built UI, including 7/30/60 days, a custom
 period, pending, configuration notice, narrative and the three-state ledger. After the user's
 database rebuild, the Bevy worker completed the 120-day backfill and precomputed the
-7/30/60-day reports; current real Bedrock evaluation is pending. The golden
+7/30/60-day reports. The current real Bedrock run passes all eight gates: first validity
+14/15, numeric/citation/hedge consistency 14/14 each and fallback 1/15. The golden
 comparison removes only CI fields and changes version/identity; retained values match.
 
 Historical scope-reduction checks (before CI removal):
@@ -296,7 +297,9 @@ The original 90-day performance gate remains excluded; three upstream deprecatio
 
 The current harness runs three planted scenarios (review capacity, PR size growth and
 no signal) with five seeds: 15 English narratives. CI slowdown is retired. Current offline
-results are in [EVALUATION.md](EVALUATION.md); a new real evaluation is required.
+and real Bedrock results are in [EVALUATION.md](EVALUATION.md). The real run still falls
+back on pr_size_growth seed 303 with `V8:invalid_downgrade`; its low-band candidate does
+not demonstrate successful real-model low-band wording.
 The following offline and Bedrock results are historical runs with CI analysis enabled.
 Numeric/citation/hedge denominators include final LLM outputs, excluding fallback.
 

@@ -127,8 +127,10 @@ and full coverage before checking the dashboard. Keep `BACKFILL_DAYS=120` for th
 view and its comparison period.
 
 Local checks: **316 backend tests** (253 unit, 63 integration), **15 frontend tests**,
-strict lint/types/build and all eight offline narrative gates pass. The current prompt
-requires a new real Bedrock evaluation; previous real results are historical.
+strict lint/types/build and all eight offline and real Bedrock narrative gates pass. The
+current real run is first-valid in 14/15 cases; one invalid downgrade causes template
+fallback. Numeric, citation and hedge consistency are 14/14 each for final LLM outputs.
+See [evaluation records](docs/EVALUATION.md) for the remaining low-band limitation.
 
 The module cleanup preserves the OpenAPI contract and computed/narrative outputs. Request
 cancellation now lives in `frontend/src/api.ts`; frontend type checking also rejects unused

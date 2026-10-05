@@ -124,8 +124,9 @@ I would do one of the followings if I had one more day:
 - **How the output was checked:**
   - 316 backend tests, 63 of them on real Postgres 16 and Redis 7, plus 15 frontend tests.
   - Strict ruff/mypy and the frontend typecheck and build.
-  - The current 15-case offline narrative evaluation passes all eight gates. Real Bedrock
-    evaluation of the revised low-confidence wording is pending; earlier runs are historical.
+  - The current 15-case offline and real Bedrock evaluations pass all eight gates. The real
+    run is first-valid in 14/15 cases; one invalid downgrade still causes template fallback.
+    Numeric, citation and hedge consistency are 14/14 each for final LLM outputs.
   - Real GitHub sync and browser checks.
   - CI removal checked field by field: every retained golden snapshot value is unchanged;
     synthetic browser checks cover presets, a custom period, pending, configuration, narrative
