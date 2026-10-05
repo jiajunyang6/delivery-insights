@@ -7,11 +7,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { Snapshot, State } from "../types";
+import type { Insight, State } from "../types";
 import { hours, percent, stateColors, stateLabels, states } from "../format";
-export function TimeLedgerChart({ snapshot: s }: { snapshot: Snapshot }) {
+export function TimeLedgerChart({ insight: s }: { insight: Insight }) {
   const data = (
-    s.meta.comparison_available ? ["Previous", "Current"] : ["Current"]
+    s.comparison_available ? ["Previous", "Current"] : ["Current"]
   ).map((period) => ({
     period,
     ...Object.fromEntries(

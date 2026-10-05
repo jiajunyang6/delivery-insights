@@ -7,7 +7,7 @@ import type {
   Evidence,
   Hypothesis,
   Narrative,
-  Snapshot,
+  Insight,
   State,
 } from "../types";
 
@@ -94,8 +94,8 @@ function evidenceDetail(e: Evidence): string | null {
   return null;
 }
 
-function LookFirst({ snapshot }: { snapshot: Snapshot }) {
-  const ledger = snapshot.time_ledger.states;
+function LookFirst({ insight }: { insight: Insight }) {
+  const ledger = insight.time_ledger.states;
   const largest = states
     .filter((s) => ledger[s])
     .sort((a, b) => ledger[b].share - ledger[a].share)[0];
@@ -211,7 +211,7 @@ function EvidenceList({ evidence, highlight }: { evidence: Evidence[]; highlight
     <div className="evidence-list">
       <h3>Trace every claim</h3>
       <p className="muted">
-        Select a citation to find its value in the snapshot.
+        Select a citation to see the metric behind it.
       </p>
       {evidence.map((e) => (
         <article
@@ -236,7 +236,6 @@ function EvidenceList({ evidence, highlight }: { evidence: Evidence[]; highlight
               )}
             </p>
             {evidenceDetail(e) && <p className="footnote">{evidenceDetail(e)}</p>}
-            <code>{e.ref}</code>
           </div>
         </article>
       ))}
@@ -252,13 +251,13 @@ const fallbackText: Record<string, string> = {
 };
 
 export function NarrativePanel({
-  snapshot,
+  insight,
   onLlmError,
 }: {
-  snapshot: Snapshot;
+  insight: Insight;
   onLlmError?: () => void;
 }) {
-  const snapshotId = snapshot.snapshot_id;
+  const snapshotId = insight.snapshot_id;
   const [data, setData] = useState<Narrative | null>(null);
   const [error, setError] = useState("");
   const [highlight, setHighlight] = useState("");
@@ -366,7 +365,7 @@ export function NarrativePanel({
               {abstainText[reason].detail}
             </p>
           )}
-          {data.abstained && <LookFirst snapshot={snapshot} />}
+          {data.abstained && <LookFirst insight={insight} />}
           <div className="hypotheses">
             {data.hypotheses.map((h) => (
               <HypothesisCard key={h.id} h={h} text={text} chip={chip} />

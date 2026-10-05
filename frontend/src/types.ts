@@ -43,8 +43,9 @@ export interface Pending {
   status: "pending";
   repos: PendingRepo[];
 }
-export interface Snapshot {
+export interface Insight {
   snapshot_id: string;
+  comparison_available: boolean;
   time_ledger: {
     total_pr_hours: number;
     states: Record<
@@ -57,9 +58,6 @@ export interface Snapshot {
       }
     >;
   };
-  meta: {
-    comparison_available: boolean;
-  };
 }
 export interface Evidence {
   id: string;
@@ -69,7 +67,6 @@ export interface Evidence {
   unit: string;
   change_rel: number | null;
   change_pp: number | null;
-  ref: string;
   extra?: Record<string, number>;
 }
 export interface Hypothesis {

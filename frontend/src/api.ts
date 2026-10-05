@@ -1,5 +1,5 @@
 import { useEffect, type DependencyList } from "react";
-import type { Params, Pending, Snapshot } from "./types";
+import type { Insight, Params, Pending } from "./types";
 
 /** Abort superseded requests and the current request on unmount. */
 export function useAbortable(
@@ -104,12 +104,12 @@ export async function loadInsights(
 ) {
   const deadline = Date.now() + 300_000;
   while (!signal.aborted) {
-    const result = await fetchJson<Snapshot | Pending>(
+    const result = await fetchJson<Insight | Pending>(
       "/v1/insights/delivery?" + query(params),
       signal,
       cache,
     );
-    if (result.status === 200) return result.data as Snapshot;
+    if (result.status === 200) return result.data as Insight;
     if (result.status !== 202)
       throw new ApiProblem(
         "Unexpected response",

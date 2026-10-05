@@ -15,7 +15,7 @@ import type {
   RepoStatus,
   RepoList,
   SetupStatus,
-  Snapshot,
+  Insight,
 } from "./types";
 import { Controls } from "./components/Controls";
 import { TimeLedgerChart } from "./components/TimeLedgerChart";
@@ -32,7 +32,7 @@ export default function App() {
   });
   const [repos, setRepos] = useState<RepoStatus[]>([]);
   const [dateLimits, setDateLimits] = useState<DateLimits | null>(null);
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [insight, setInsight] = useState<Insight | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<ApiProblem | null>(null);
   const [loading, setLoading] = useState(false);
@@ -86,7 +86,7 @@ export default function App() {
     window.history.replaceState(null, "", "?" + new URLSearchParams(params));
   }, [params]);
   useAbortable((signal) => {
-    setSnapshot(null);
+    setInsight(null);
     setPending(null);
     if (!params.repo || invalid || !dateLimits) {
       if (params.repo && invalid) setError(null);
@@ -105,7 +105,7 @@ export default function App() {
     )
       .then((s) => {
         if (!signal.aborted) {
-          setSnapshot(s);
+          setInsight(s);
           setPending(null);
           // A finished sync may have resolved configuration problems shown earlier.
           setSetupCheck((n) => n + 1);
@@ -183,7 +183,7 @@ export default function App() {
             </p>
           </section>
         )}
-        {!snapshot && !pending && !error && (
+        {!insight && !pending && !error && (
           <div className="panel loading" role="status">
             <span className="spinner" />
             {loading
@@ -193,16 +193,16 @@ export default function App() {
                 : "Connecting to repositories…"}
           </div>
         )}
-        {snapshot && (
+        {insight && (
           <div className="report">
             <NarrativePanel
-              snapshot={snapshot}
+              insight={insight}
               onLlmError={() => setSetupCheck((n) => n + 1)}
             />
-            <TimeLedgerChart snapshot={snapshot} />
+            <TimeLedgerChart insight={insight} />
             <footer className="report-footer">
               <span>Delivery Insights · Evidence before conclusions.</span>
-              <code>{snapshot.snapshot_id}</code>
+              <code>{insight.snapshot_id}</code>
             </footer>
           </div>
         )}
