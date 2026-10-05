@@ -6,7 +6,6 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
-from insights.analytics.pointer import resolve_pointer
 from insights.narrative.hypotheses import (
     changed,
     effect_size,
@@ -144,6 +143,15 @@ WEIGHTS = {
     "E21": 0.6,
     "E24": 0.5,
 }
+
+
+def resolve_pointer(payload: Any, pointer: str) -> Any:
+    """Resolve an RFC 6901 JSON pointer with ~0/~1 decoding; propagate missing keys or indexes."""
+    current = payload
+    for part in pointer.lstrip("/").split("/") if pointer else []:
+        key = part.replace("~1", "/").replace("~0", "~")
+        current = current[int(key)] if isinstance(current, list) else current[key]
+    return current
 
 
 def read(snapshot: Mapping[str, Any], pointer: str) -> Any:

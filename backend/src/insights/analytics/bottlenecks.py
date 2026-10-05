@@ -3,7 +3,14 @@
 from collections import defaultdict
 from typing import Any
 
-from insights.analytics import thresholds as t
+from insights.analytics import (
+    LARGE_PR_LINES,
+    MAX_LOCATIONS_IN_SNAPSHOT,
+    MIN_LOCATION_PRS,
+    MIN_SAMPLES_LOCATION_P50,
+    MIN_SAMPLES_P50,
+    MIN_SAMPLES_WEEKLY_P50,
+)
 from insights.analytics.dataset import (
     Dataset,
     PrData,
@@ -96,10 +103,10 @@ def locations(dataset: Dataset) -> list[dict[str, Any]]:
         (
             name
             for name, ids in memberships.items()
-            if len(ids & current.keys()) >= t.MIN_LOCATION_PRS
+            if len(ids & current.keys()) >= MIN_LOCATION_PRS
         ),
         key=lambda name: (-allocated[name], name),
-    )[: t.MAX_LOCATIONS_IN_SNAPSHOT]
+    )[:MAX_LOCATIONS_IN_SNAPSHOT]
     other = set(memberships) - set(large)
     groups = [(name, {name}) for name in large]
     if other:
@@ -109,8 +116,8 @@ def locations(dataset: Dataset) -> list[dict[str, Any]]:
         ids = set().union(*(memberships[n] for n in grouped))
         group = [current[i] for i in sorted(ids & current.keys())]
         rest = [pr for i, pr in current.items() if i not in ids]
-        pickup = percentile(values(group, "pickup_hours"), 50, t.MIN_SAMPLES_LOCATION_P50)
-        rest_pickup = percentile(values(rest, "pickup_hours"), 50, t.MIN_SAMPLES_LOCATION_P50)
+        pickup = percentile(values(group, "pickup_hours"), 50, MIN_SAMPLES_LOCATION_P50)
+        rest_pickup = percentile(values(rest, "pickup_hours"), 50, MIN_SAMPLES_LOCATION_P50)
         result.append(
             {
                 "location": name,
@@ -144,13 +151,13 @@ def series(dataset: Dataset, window: Window) -> list[dict[str, Any]]:
                 "week_start": week.start.date().isoformat(),
                 "merged": len(prs),
                 "cycle_p50_hours": percentile(
-                    values(prs, "cycle_hours"), 50, t.MIN_SAMPLES_WEEKLY_P50
+                    values(prs, "cycle_hours"), 50, MIN_SAMPLES_WEEKLY_P50
                 ),
                 "pickup_p50_hours": percentile(
-                    values(prs, "pickup_hours"), 50, t.MIN_SAMPLES_WEEKLY_P50
+                    values(prs, "pickup_hours"), 50, MIN_SAMPLES_WEEKLY_P50
                 ),
                 "pr_size_p50_lines": percentile(
-                    values(prs, "size_lines"), 50, t.MIN_SAMPLES_WEEKLY_P50
+                    values(prs, "size_lines"), 50, MIN_SAMPLES_WEEKLY_P50
                 ),
                 "waiting_reviewer_share": ratio(totals["waiting_reviewer"], sum(totals.values()))
                 if prs
@@ -169,7 +176,7 @@ def attribution(
     net cycle-time change, which could be small or cancelled by other components.
     """
     current, previous = merged(dataset, dataset.current), merged(dataset, dataset.previous)
-    if not dataset.comparison_available or min(len(current), len(previous)) < t.MIN_SAMPLES_P50:
+    if not dataset.comparison_available or min(len(current), len(previous)) < MIN_SAMPLES_P50:
         return None
     components = {}
     for name in ("coding", *WAITING_STATES):
@@ -214,10 +221,10 @@ def attribution(
         ratio(sum(previous_cycles), len(previous_cycles)),
     )
     large_current = sum(
-        p.facts.cycle_hours or 0 for p in current if p.facts.size_lines >= t.LARGE_PR_LINES
+        p.facts.cycle_hours or 0 for p in current if p.facts.size_lines >= LARGE_PR_LINES
     ) / len(current)
     large_previous = sum(
-        p.facts.cycle_hours or 0 for p in previous if p.facts.size_lines >= t.LARGE_PR_LINES
+        p.facts.cycle_hours or 0 for p in previous if p.facts.size_lines >= LARGE_PR_LINES
     ) / len(previous)
     cycle_delta = cycle_current - cycle_previous
     return {

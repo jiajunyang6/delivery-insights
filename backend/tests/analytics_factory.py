@@ -2,8 +2,8 @@ from dataclasses import replace
 from datetime import date
 
 from insights.analytics.dataset import Dataset, PrData, RepoData, Review
+from insights.analytics.facts import PrFacts
 from insights.analytics.timeline import Interval
-from insights.analytics.types import PrFacts
 from tests.factories import at
 
 

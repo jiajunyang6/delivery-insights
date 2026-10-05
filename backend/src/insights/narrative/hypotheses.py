@@ -9,7 +9,7 @@ from typing import Any
 
 import numpy as np
 
-from insights.analytics.thresholds import (
+from insights.analytics import (
     MIN_SAMPLES_P50,
     REVIEW_CAPACITY_MIN_WAIT_SHARE,
 )

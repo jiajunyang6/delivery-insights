@@ -7,9 +7,8 @@ from typing import Any
 
 import orjson
 
-from insights.analytics import ANALYTICS_VERSION
+from insights.analytics import ANALYTICS_VERSION, THRESHOLDS_VERSION
 from insights.analytics import bottlenecks as b
-from insights.analytics import thresholds as t
 from insights.analytics.dataset import Dataset, SnapshotParams, merged
 from insights.analytics.efficiency import build_efficiency, slowest_decile_size_ratio
 from insights.analytics.stats import SAMPLING_SEED_VERSION
@@ -157,7 +156,7 @@ def build_snapshot(dataset: Dataset, *, params: SnapshotParams) -> dict[str, Any
         },
         "meta": {
             "analytics_version": ANALYTICS_VERSION,
-            "thresholds_version": t.THRESHOLDS_VERSION,
+            "thresholds_version": THRESHOLDS_VERSION,
             "location_dimension": params.location_dimension,
             "comparison_available": dataset.comparison_available,
             "sample": {"merged_prs": len(merged(dataset, dataset.current))},

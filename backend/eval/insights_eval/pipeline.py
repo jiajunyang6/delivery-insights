@@ -3,9 +3,8 @@
 from datetime import datetime
 from typing import Any
 
-from insights.analytics.classify import is_flow
 from insights.analytics.dataset import Dataset, PrData, RepoData, Review, SnapshotParams
-from insights.analytics.facts import compute_facts
+from insights.analytics.facts import compute_facts, is_flow
 from insights.analytics.snapshot import build_snapshot
 from insights.analytics.timeline import build_timeline, human_event, pr_input
 from insights.domain import EventKind

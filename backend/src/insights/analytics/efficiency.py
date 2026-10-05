@@ -6,7 +6,14 @@ from dataclasses import dataclass
 from math import ceil
 from typing import Any
 
-from insights.analytics import thresholds as t
+from insights.analytics import (
+    CHANGE_MIN_RELATIVE,
+    LARGE_PR_LINES,
+    MIN_RATE_DENOMINATOR,
+    MIN_RATE_EVENTS,
+    MIN_SAMPLES_P50,
+    REVIEW_CONCENTRATION_TOP_K,
+)
 from insights.analytics.dataset import Dataset, PrData, Window, merged
 from insights.analytics.stats import Statistic, bootstrap_diff, percentile, seed_for
 
@@ -42,7 +49,7 @@ def compare(
             current.samples, previous.samples, statistic, seed_for(params_hash, name)
         )
         # The CI rules out sampling noise; the minimum relative change rules out trivial shifts.
-        significant = bool((low > 0 or high < 0) and abs(relative) >= t.CHANGE_MIN_RELATIVE)
+        significant = bool((low > 0 or high < 0) and abs(relative) >= CHANGE_MIN_RELATIVE)
     return {
         "value": current.value,
         "unit": unit,
@@ -57,12 +64,12 @@ def compare(
     }
 
 
-def quantile(values: Sequence[float], q: float = 50, minimum: int = t.MIN_SAMPLES_P50) -> Measure:
+def quantile(values: Sequence[float], q: float = 50, minimum: int = MIN_SAMPLES_P50) -> Measure:
     """Wrap a percentile with its sample count and raw values; too few samples yield None."""
     return Measure(percentile(values, q, minimum), len(values), tuple(values))
 
 
-def mean(values: Sequence[float], minimum: int = t.MIN_SAMPLES_P50) -> Measure:
+def mean(values: Sequence[float], minimum: int = MIN_SAMPLES_P50) -> Measure:
     """Wrap the arithmetic mean and raw samples; return a missing value below minimum."""
     return Measure(
         sum(values) / len(values) if len(values) >= minimum else None, len(values), tuple(values)
@@ -73,7 +80,7 @@ def rate(values: Sequence[float], *, extra: dict[str, Any] | None = None) -> Mea
     """Compute a binary-event share only when denominator and event-count thresholds are met."""
     count, events = len(values), int(sum(values))
     return Measure(
-        events / count if count >= t.MIN_RATE_DENOMINATOR and events >= t.MIN_RATE_EVENTS else None,
+        events / count if count >= MIN_RATE_DENOMINATOR and events >= MIN_RATE_EVENTS else None,
         count,
         tuple(values),
         {"events": events, "denominator": count, **(extra or {})},
@@ -104,14 +111,14 @@ def measures(dataset: Dataset, window: Window) -> dict[str, Measure]:
             [float(p.facts.commits_after_first_review > 0) for p in prs]
         ),
         "review_concentration_top_k": Measure(
-            sum(v for _, v in counts.most_common(t.REVIEW_CONCENTRATION_TOP_K)) / review_count
-            if review_count >= t.MIN_RATE_DENOMINATOR
+            sum(v for _, v in counts.most_common(REVIEW_CONCENTRATION_TOP_K)) / review_count
+            if review_count >= MIN_RATE_DENOMINATOR
             else None,
             review_count,
-            extra={"k": t.REVIEW_CONCENTRATION_TOP_K},
+            extra={"k": REVIEW_CONCENTRATION_TOP_K},
         ),
         "pr_size_p50_lines": quantile(values(prs, "size_lines")),
-        "large_pr_share": rate([float(p.facts.size_lines >= t.LARGE_PR_LINES) for p in prs]),
+        "large_pr_share": rate([float(p.facts.size_lines >= LARGE_PR_LINES) for p in prs]),
     }
 
 

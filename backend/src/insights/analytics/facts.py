@@ -1,12 +1,65 @@
-"""Per-PR delivery facts computed from one PR's events and timeline; no I/O."""
+"""Per-PR delivery facts, flow eligibility and locations; derived during sync, no I/O.
 
+PrFacts are persisted and read back as analytics input.
+"""
+
+from collections import Counter
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime
 
-from insights.analytics.classify import locations_for
+from insights.analytics import DIRECTORY_LOCATIONS_PER_PR
 from insights.analytics.timeline import TimelineResult, first_commit_at, human_event
-from insights.analytics.types import PrFacts
 from insights.domain import Event, EventKind, PullRequestRecord
+
+
+@dataclass(frozen=True, slots=True)
+class PrFacts:
+    number: int = 0
+    is_bot_author: bool = False
+    is_backport: bool = False
+    ready_at: datetime | None = None
+    first_review_at: datetime | None = None
+    merged_at: datetime | None = None
+    closed_at: datetime | None = None
+    end_at: datetime | None = None
+    coding_hours: float | None = None
+    pickup_hours: float | None = None
+    cycle_hours: float | None = None
+    review_rounds: int = 0
+    commits_after_first_review: int = 0
+    size_lines: int = 0
+    locations: tuple[str, ...] = ()
+
+
+def is_flow(facts: PrFacts) -> bool:
+    # Flow metrics cover human, ready-for-review PRs; bot and backport PRs are excluded.
+    """Return whether the PR is ready and eligible for human, non-backport flow metrics."""
+    return not facts.is_bot_author and not facts.is_backport and facts.ready_at is not None
+
+
+def locations_for(pr: PullRequestRecord, dimension: str, depth: int) -> tuple[str, ...]:
+    """Return matching labels, else the most-touched directories, else "unclassified".
+
+    Directory locations are the DIRECTORY_LOCATIONS_PER_PR most-touched paths at depth.
+    """
+    if dimension.startswith("label:"):
+        prefix = dimension[6:].lower()
+        labels = tuple(sorted({label for label in pr.labels if label.lower().startswith(prefix)}))
+        if labels:
+            return labels
+    if pr.files:
+        directories = Counter(
+            "dir:" + ("/".join(path.split("/")[:depth]) if "/" in path else "/")
+            for path in pr.files
+        )
+        return tuple(
+            name
+            for name, _ in sorted(directories.items(), key=lambda item: (-item[1], item[0]))[
+                :DIRECTORY_LOCATIONS_PER_PR
+            ]
+        )
+    return ("unclassified",)
 
 
 def hours_between(start: datetime | None, end: datetime | None) -> float | None:

@@ -2,8 +2,7 @@ from dataclasses import replace
 
 from tests.factories import at, record
 
-from insights.analytics.classify import is_flow, locations_for
-from insights.analytics.types import PrFacts
+from insights.analytics.facts import PrFacts, is_flow, locations_for
 
 
 def test_location_labels_then_directories_then_unclassified():

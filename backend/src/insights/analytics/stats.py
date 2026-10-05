@@ -7,7 +7,7 @@ from typing import Literal
 import numpy as np
 from numpy.typing import NDArray
 
-from insights.analytics.thresholds import BOOTSTRAP_CI, BOOTSTRAP_ITERATIONS
+from insights.analytics import BOOTSTRAP_CI, BOOTSTRAP_ITERATIONS
 
 # Change this only when intentionally changing statistical sampling results. It stands in for
 # ANALYTICS_VERSION in sampling_hash, so analytics releases keep the same bootstrap seeds.

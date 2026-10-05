@@ -6,11 +6,9 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 
-from insights.analytics import ANALYTICS_VERSION
-from insights.analytics.classify import is_flow
-from insights.analytics.thresholds import THRESHOLDS_VERSION
+from insights.analytics import ANALYTICS_VERSION, THRESHOLDS_VERSION
+from insights.analytics.facts import PrFacts, is_flow
 from insights.analytics.timeline import Interval, ledger_hours
-from insights.analytics.types import PrFacts
 
 
 @dataclass(frozen=True, slots=True)
