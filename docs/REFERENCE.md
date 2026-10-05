@@ -287,7 +287,7 @@ Latest checks: 2026-10-05 UTC, analytics 1.7.0, prompt v11, after the scope redu
 
 Earlier acceptance measured 3,541 PRs with no invariant violations, three matching PR pages, 533 merged PRs with ledger rounding error 0.0000004833, cold compute 1,376.95 ms and warm HTTP p95 32.32 ms.
 Those analytics 1.2/1.3 measurements and npm ci/audit checks were not repeated here. They are local measurements, not production load evidence.
-The original 90-day performance gate remains excluded; nine upstream deprecation warnings remain.
+The original 90-day performance gate remains excluded; three upstream deprecation warnings remain.
 
 The harness runs four planted scenarios × five seeds through the single English narrative.
 Offline and real Bedrock Sonnet 4.6 suites were run on analytics 1.6.0 and prompt v11;
