@@ -1,3 +1,4 @@
+/** Render cited narrative evidence and explanations from local report responses. */
 import { useState, type ReactNode } from "react";
 import { fetchJson, message, useAbortable } from "../api";
 import { format, percent, signed, capitalize, states } from "../format";
@@ -61,6 +62,36 @@ function change(e: Evidence): string {
   if (e.change_pp != null) return signed(e.change_pp, " pp", 1);
   if (e.change_rel != null) return signed(e.change_rel);
   return "";
+}
+
+function evidenceLabel(e: Evidence): string {
+  if (e.id === "E22")
+    return "Weeks with more PRs ready for review than receiving a first review";
+  if (e.id === "E24") {
+    const k = e.extra?.k;
+    return k == null
+      ? "Share of reviews performed by the busiest reviewers"
+      : `Share of reviews performed by the top ${k} reviewers`;
+  }
+  return e.label;
+}
+
+function evidenceValue(e: Evidence): string {
+  const total = e.extra?.weeks_total;
+  if (e.id === "E22" && total != null)
+    return `${format(e.value, e.unit)} of ${total} weeks`;
+  return format(e.value, e.unit);
+}
+
+function evidenceDetail(e: Evidence): string | null {
+  if (e.id === "E22")
+    return "Counts weeks when more PRs became ready for review than received their first review. " +
+      "First reviews can serve PRs that became ready earlier. Partial weeks are included.";
+  if (e.id === "E24")
+    return "Ranked by human review events in each period; " +
+      "repeat reviews of a PR count separately. " +
+      "The top reviewers may differ between periods.";
+  return null;
 }
 
 function LookFirst({ snapshot }: { snapshot: Snapshot }) {
@@ -193,9 +224,9 @@ function EvidenceList({ evidence, highlight }: { evidence: Evidence[]; highlight
         >
           <span className="evidence-id">{e.id}</span>
           <div>
-            <strong>{e.label}</strong>
+            <strong>{evidenceLabel(e)}</strong>
             <p>
-              <b>{format(e.value, e.unit)}</b>
+              <b>{evidenceValue(e)}</b>
               {e.previous != null && (
                 <> · Previous {format(e.previous, e.unit)}</>
               )}
@@ -204,6 +235,7 @@ function EvidenceList({ evidence, highlight }: { evidence: Evidence[]; highlight
                 <> · {signed(e.change_pp, " pp", 1)}</>
               )}
             </p>
+            {evidenceDetail(e) && <p className="footnote">{evidenceDetail(e)}</p>}
             <code>{e.ref}</code>
           </div>
         </article>
@@ -291,8 +323,8 @@ export function NarrativePanel({
       >
         {e ? (
           <>
-            <span>{e.label}</span>
-            <b>{format(e.value, e.unit)}</b>
+            <span>{evidenceLabel(e)}</span>
+            <b>{evidenceValue(e)}</b>
             {change(e) && <em>{change(e)}</em>}
           </>
         ) : (

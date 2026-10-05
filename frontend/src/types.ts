@@ -1,3 +1,4 @@
+/** Dashboard response contracts and report parameters. */
 export type State =
   "waiting_reviewer" | "waiting_author" | "waiting_merge";
 export type Params = { repo: string; from: string; to: string };
@@ -69,6 +70,7 @@ export interface Evidence {
   change_rel: number | null;
   change_pp: number | null;
   ref: string;
+  extra?: Record<string, number>;
 }
 export interface Hypothesis {
   id: string;

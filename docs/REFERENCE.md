@@ -168,6 +168,15 @@ Timeouts, errors or a second invalid answer return a deterministic template.
 Inspect `meta.generated_by`, `validation`, `attempts`, `fallback_reason` and `violations`.
 In the UI, citation buttons scroll to and highlight the corresponding evidence entry.
 
+Review-queue evidence (E22) displays the number of weeks with more PRs becoming ready for
+review than receiving a first review, out of `extra.weeks_total`. Weeks are Monday-aligned
+UTC buckets clipped to the report window, so partial weeks count. First reviews can serve
+PRs that became ready earlier; this is a flow comparison, not an unreviewed-PR count.
+Review-concentration evidence (E24) displays the actual `extra.k` in its label. Reviewers
+are ranked by human review-event counts separately in each period; repeated reviews of a
+PR count separately, and the top reviewers can differ between periods. The same labels
+and values appear in hypothesis evidence chips, including for cached narrative responses.
+
 ## Configuration
 
 Copy `.env.example`; never commit `.env`. Full environment defaults are in `backend/src/insights/config.py`.
