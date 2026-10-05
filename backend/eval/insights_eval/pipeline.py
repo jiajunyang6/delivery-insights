@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from insights.analytics.ci import union_intervals
-from insights.analytics.classify import LinkInput, is_flow, link_prs
+from insights.analytics.classify import is_flow
 from insights.analytics.dataset import Dataset, PrData, RepoData, Review, SnapshotParams
 from insights.analytics.facts import compute_facts
 from insights.analytics.snapshot import build_snapshot
@@ -22,15 +22,13 @@ def dataset_from_repo(
     location_dimension: str = "label:area-",
     covered_since: datetime | None = None,
 ) -> Dataset:
-    """Derive timelines, facts and cross-PR links, then assemble an in-memory analytics dataset.
+    """Derive timelines and facts, then assemble an in-memory analytics dataset.
 
     PR numbers serve as local identifiers in this synthetic repo. covered_since overrides the
     reported history coverage (START by default), allowing comparison-availability checks.
-    Linked facts replace provisional per-PR facts.
     """
     prs: list[PrData] = []
     reviews: list[Review] = []
-    links: list[LinkInput] = []
     mapped = map_runs({p.number: p for p in syn.records}, syn.ci_runs)
     for record in syn.records:
         ci_intervals = union_intervals(mapped.get(record.number, ()))
@@ -40,13 +38,10 @@ def dataset_from_repo(
             record.events,
             result,
             default_branch=syn.default_branch,
-            location_rules=(),
-            now=syn.as_of,
             location_dimension=location_dimension,
             ci_covered=bool(ci_intervals),
         )
         identifier = record.number
-        links.append(LinkInput(identifier, record, facts))
         prs.append(
             PrData(
                 identifier,
@@ -70,12 +65,9 @@ def dataset_from_repo(
                 and e.actor.login
                 and human_event(e, record.author.login)
             )
-    # Revert, reland and supersession classification requires the complete repository view,
-    # not just the PR currently being derived in the loop above.
-    linked = link_prs(links, repo_full_name=syn.repo, default_branch=syn.default_branch)
     return Dataset(
         (RepoData(syn.repo, 1, covered_since or START, syn.as_of),),
-        tuple(replace(p, facts=linked[p.pr_id]) for p in prs),
+        tuple(prs),
         tuple(reviews),
         syn.period_from,
         syn.period_to,

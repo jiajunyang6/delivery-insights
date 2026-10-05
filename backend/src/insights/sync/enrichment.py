@@ -1,24 +1,22 @@
-"""Enrichment jobs: GitHub Actions runs and ownership rules, rederiving affected PRs."""
+"""CI enrichment job: GitHub Actions runs, rederiving the PRs whose CI waiting changed."""
 
 from dataclasses import asdict
 from datetime import datetime, timedelta
 from typing import Any, cast
 
 import structlog
-from sqlalchemy import BigInteger, any_, delete, literal, select, update
+from sqlalchemy import BigInteger, any_, literal, select, update
 from sqlalchemy.dialects.postgresql import ARRAY, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from insights.config import Settings
 from insights.db.ci import load_ci_data, run_from_row
-from insights.db.models import OwnershipRule as StoredRule
-from insights.db.models import PrFact, Repository, WorkflowRun
-from insights.domain import CiRun, OwnershipRule, RepoRef
+from insights.db.models import Repository, WorkflowRun
+from insights.domain import CiRun, RepoRef
 from insights.sources.base import SourceAdapter
 from insights.sync.derive import derive_prs
 from insights.sync.queue import (
     enqueue_precompute,
-    enqueue_sync,
     last_success,
     now_for,
     run_job,
@@ -82,49 +80,8 @@ async def save_runs(
     return len(changed), len(affected), violations
 
 
-async def save_ownership(
-    session: AsyncSession, repo_id: int, rules: list[OwnershipRule], *, now: datetime
-) -> tuple[bool, bool]:
-    """Replace changed rules and return (code_changed, area_changed) without committing.
-
-    Both changes advance data version; CODEOWNERS changes also invalidate per-PR derivation.
-    """
-    old = [
-        OwnershipRule(r.source, r.pattern, tuple(r.owners), r.line_no)
-        for r in await session.scalars(
-            select(StoredRule)
-            .where(StoredRule.repo_id == repo_id)
-            .order_by(StoredRule.source, StoredRule.line_no)
-        )
-    ]
-    new = sorted(rules, key=lambda r: (r.source, r.line_no))
-    code_changed = [r for r in old if r.source == "codeowners"] != [
-        r for r in new if r.source == "codeowners"
-    ]
-    area_changed = [r for r in old if r.source == "area_owners"] != [
-        r for r in new if r.source == "area_owners"
-    ]
-    if not code_changed and not area_changed:
-        return False, False
-    await session.execute(delete(StoredRule).where(StoredRule.repo_id == repo_id))
-    if new:
-        await session.execute(
-            insert(StoredRule),
-            [{**asdict(r), "owners": list(r.owners), "repo_id": repo_id} for r in new],
-        )
-    values: dict[str, Any] = {"data_version": Repository.data_version + 1}
-    # Only CODEOWNERS feeds PR locations; area owners are read when snapshots are built.
-    if code_changed:
-        values["derived_key"] = None
-        await session.execute(
-            update(PrFact).where(PrFact.repo_id == repo_id).values(derive_key=None)
-        )
-    await session.execute(update(Repository).where(Repository.id == repo_id).values(**values))
-    return code_changed, area_changed
-
-
 async def enrich_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
-    """arq entry point for the "ci_runs" and "ownership" jobs of one repository."""
+    """arq entry point for the "ci_runs" job of one repository."""
     settings = cast(Settings, ctx["settings"])
     async with run_job(ctx, repo_full_name, kind, job_id) as job:
         if job is None:
@@ -155,21 +112,6 @@ async def enrich_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_i
                 "invariant_violations": violations,
             }
             changed = updates > 0
-        elif kind == "ownership":
-            rules = await adapter.ownership_rules(ref)
-            async with sessions_for(ctx)() as session, session.begin():
-                code, area = await save_ownership(session, repo.id, rules, now=now_for(ctx))
-            changed = code or area
-            stats = {
-                "rules": len(rules),
-                "codeowners_changed": code,
-                "area_owners_changed": area,
-            }
-            if code:
-                async with sessions_for(ctx)() as session:
-                    await enqueue_sync(
-                        ctx["redis"], session, repo_full_name, "rederive", now=now_for(ctx)
-                    )
         if changed:
             await enqueue_precompute(ctx, repo)
         job.stats = stats

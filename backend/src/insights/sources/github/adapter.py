@@ -2,14 +2,12 @@
 
 from contextlib import suppress
 from datetime import datetime
-from urllib.parse import quote
 
 import structlog
 
 from insights.config import REPO_RE, split_list
 from insights.domain import (
     CiRun,
-    OwnershipRule,
     PageResult,
     PullRequestRecord,
     RepoRef,
@@ -18,7 +16,6 @@ from insights.domain import (
 from insights.sources.github.actions import fetch_runs
 from insights.sources.github.client import GitHubClient, GitHubNotFoundError, GitHubTransientError
 from insights.sources.github.normalize import normalize_pr, parse_time, remove_nulls
-from insights.sources.github.ownership import parse_area_owners, parse_codeowners
 from insights.sources.github.queries import PULL_REQUEST_TIMELINE, PULL_REQUESTS_PAGE
 
 logger = structlog.get_logger(__name__)
@@ -150,33 +147,3 @@ class GitHubAdapter:
         if not REPO_RE.fullmatch(repo.full_name):
             raise ValueError("Invalid repository")
         return await fetch_runs(self.client, repo, created_from=created_from, created_to=created_to)
-
-    async def ownership_rules(self, repo: RepoRef) -> list[OwnershipRule]:
-        """Read the first available CODEOWNERS file plus configured area-owner rules.
-
-        Missing files are allowed; other upstream errors propagate instead of implying no owners.
-        """
-        if not REPO_RE.fullmatch(repo.full_name):
-            raise ValueError("Invalid repository")
-        rules: list[OwnershipRule] = []
-        for path in (".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS"):
-            try:
-                response = await self.client.rest_get(
-                    f"/repos/{repo.full_name}/contents/{path}",
-                    accept="application/vnd.github.raw+json",
-                )
-            except GitHubNotFoundError:
-                continue
-            rules.extend(parse_codeowners(response.body))
-            break
-        try:
-            path = quote(self.client.settings.area_owners_path.lstrip("/"), safe="/")
-            response = await self.client.rest_get(
-                f"/repos/{repo.full_name}/contents/{path}",
-                accept="application/vnd.github.raw+json",
-            )
-        except GitHubNotFoundError:
-            pass
-        else:
-            rules.extend(parse_area_owners(response.body))
-        return rules

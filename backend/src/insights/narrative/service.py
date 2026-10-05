@@ -378,11 +378,8 @@ class NarrativeService:
         key = narrative_key(sid, PROMPT_VERSION, model_key, pack_hash)
         if cached := await self.cached(key, conditional):
             return cached
-        # The narratives table still keys rows by audience and language; both are fixed now.
         identity = {
             "snapshot_id": sid,
-            "audience": "director",
-            "lang": "en",
             "prompt_version": PROMPT_VERSION,
             "model_id": model_key,
             "pack_hash": pack_hash,

@@ -32,18 +32,14 @@ def pr_values(record: PullRequestRecord, repo_id: int) -> dict[str, Any]:
         for name in (
             "number",
             "title",
-            "body_excerpt",
             "url",
             "state",
             "is_draft",
-            "author_association",
             "base_ref",
-            "head_ref",
             "created_at",
             "updated_at",
             "closed_at",
             "merged_at",
-            "merge_commit_oid",
             "additions",
             "deletions",
         )
@@ -138,11 +134,7 @@ async def save_page(
     await session.execute(
         update(Repository)
         .where(Repository.id == repo_id)
-        .values(
-            data_version=Repository.data_version + 1,
-            # Lifecycle, title/reference, and timeline changes can alter existing links too.
-            links_pending=True,
-        )
+        .values(data_version=Repository.data_version + 1)
     )
     violations = await derive_prs(session, pr_ids, settings=settings, now=now)
     return SaveResult(len(records), len(events), pr_ids, violations, created)

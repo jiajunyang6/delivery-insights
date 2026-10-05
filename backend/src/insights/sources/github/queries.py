@@ -20,8 +20,7 @@ fragment TimelineFields on PullRequestTimelineItems {
   ... on PullRequestReview { id state submittedAt author { ...ActorFields } }
   ... on ReviewDismissedEvent { createdAt actor { ...ActorFields } previousReviewState review {
     id author { ...ActorFields } } }
-  ... on PullRequestCommit { commit { oid authoredDate committedDate messageHeadline messageBody
-    } }
+  ... on PullRequestCommit { commit { oid authoredDate committedDate } }
   ... on HeadRefForcePushedEvent { createdAt actor { ...ActorFields } }
   ... on IssueComment { createdAt author { ...ActorFields } }
   ... on LabeledEvent { createdAt actor { ...ActorFields } label { name } }
@@ -60,7 +59,6 @@ PULL_REQUESTS_PAGE = (
         id
         number
         title
-        body
         url
         state
         isDraft
@@ -70,13 +68,8 @@ PULL_REQUESTS_PAGE = (
         mergedAt
         additions
         deletions
-        changedFiles
         baseRefName
-        headRefName
-        authorAssociation
         author { ...ActorFields }
-        mergedBy { ...ActorFields }
-        mergeCommit { oid }
         labels(first: 30) { nodes { name } }
         files(first: 100) { pageInfo { hasNextPage } nodes { path } }
         timelineItems(first: 100, itemTypes: [READY_FOR_REVIEW_EVENT, CONVERT_TO_DRAFT_EVENT,

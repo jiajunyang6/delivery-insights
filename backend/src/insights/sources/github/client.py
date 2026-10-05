@@ -185,8 +185,6 @@ class GitHubClient:
         self,
         path: str,
         params: Mapping[str, str | int] | None = None,
-        *,
-        accept: str | None = None,
     ) -> RestResponse:
         """Fetch a relative API path, reusing an ETag only with its cached response body.
 
@@ -204,7 +202,7 @@ class GitHubClient:
                     cached = await cast(Awaitable[dict[bytes, bytes]], self.redis.hgetall(key))
                 except RedisError:
                     logger.warning("github_cache_unavailable")
-            headers = {"Accept": accept} if accept else {}
+            headers: dict[str, str] = {}
             if b"etag" in cached and b"body" in cached:
                 headers["If-None-Match"] = cached[b"etag"].decode()
             response = await self._request("GET", url, headers=headers)
@@ -212,7 +210,7 @@ class GitHubClient:
                 if b"body" not in cached:
                     raise GitHubQueryError("conditional_response_without_cache")
                 return RestResponse(orjson.loads(cached[b"body"]))
-            body: Any = response.text if accept and "raw" in accept else response.json()
+            body: Any = response.json()
             etag = response.headers.get("etag")
             if self.redis is not None and etag:
                 try:

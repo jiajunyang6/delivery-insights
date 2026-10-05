@@ -61,19 +61,15 @@ class Event:
 class PullRequestRecord:
     number: int
     title: str
-    body_excerpt: str
     url: str
     state: str
     is_draft: bool
     author: Actor
-    author_association: str
     base_ref: str
-    head_ref: str
     created_at: datetime
     updated_at: datetime
     closed_at: datetime | None
     merged_at: datetime | None
-    merge_commit_oid: str | None
     additions: int
     deletions: int
     labels: tuple[str, ...]
@@ -106,14 +102,6 @@ class CiRun:
     run_started_at: datetime | None
     updated_at: datetime
     pr_numbers: tuple[int, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class OwnershipRule:
-    source: str
-    pattern: str
-    owners: tuple[str, ...]
-    line_no: int
 
 
 class GitHubError(Exception):

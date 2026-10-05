@@ -56,7 +56,6 @@ class TimelineResult:
     intervals: tuple[Interval, ...]
     approved_at: datetime | None
     review_rounds: int
-    state_at_end: str | None
 
 
 def pr_input(pr: PullRequestRecord) -> PrInput:
@@ -116,7 +115,6 @@ def build_timeline(
     Before ready_at there is at most one coding interval. From ready_at the state is re-evaluated
     at every event and CI boundary until merge, close or now; an open PR's last interval has
     end_at None. review_rounds counts entries into waiting_author caused by review feedback.
-    state_at_end is set only for PRs closed without merging.
 
     Consecutive feedback while already waiting_author is one round; approval-only PRs can
     have zero rounds. Pre-ready events establish initial state but do not add review rounds.
@@ -132,7 +130,7 @@ def build_timeline(
             if (end_at is None or coding_start < end_at)
             else ()
         )
-        return TimelineResult(None, intervals, None, 0, None)
+        return TimelineResult(None, intervals, None, 0)
     output = [Interval("coding", coding_start, ready_at)] if coding_start < ready_at else []
     ordered = sorted(events, key=lambda e: (e.occurred_at, EVENT_ORDER[e.kind], e.dedup_key))
     # Only a close that is later reopened pauses the PR; the terminal close ends the timeline.
@@ -255,42 +253,7 @@ def build_timeline(
     if end_at is None or segment_start < end_at:
         output.append(Interval(current, segment_start, end_at))
     approved = next((i.start_at for i in output if i.state == "waiting_merge"), None)
-    return TimelineResult(
-        ready_at,
-        tuple(output),
-        approved,
-        rounds,
-        current if pr.state == "CLOSED" and pr.merged_at is None else None,
-    )
-
-
-def state_at(intervals: Sequence[Interval], at: datetime) -> Interval | None:
-    """Find the last interval containing at with an exclusive end, or None if no state exists."""
-    return next(
-        (
-            interval
-            for interval in reversed(intervals)
-            if interval.start_at <= at and (interval.end_at is None or at < interval.end_at)
-        ),
-        None,
-    )
-
-
-def is_open_at(
-    ready_at: datetime | None,
-    end_at: datetime | None,
-    intervals: Sequence[Interval],
-    at: datetime,
-) -> bool:
-    """Test readiness and lifecycle bounds and require a waiting interval at the given instant."""
-    interval = state_at(intervals, at)
-    return bool(
-        ready_at is not None
-        and ready_at <= at
-        and (end_at is None or end_at > at)
-        and interval
-        and interval.state in WAITING_STATES
-    )
+    return TimelineResult(ready_at, tuple(output), approved, rounds)
 
 
 def ledger_hours(

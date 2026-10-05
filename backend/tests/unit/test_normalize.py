@@ -26,23 +26,22 @@ def test_bot_detection(node, extra, expected):
 
 def test_normalization_and_hash(github_page):
     node = github_page["data"]["repository"]["pullRequests"]["nodes"][0]
-    node["body"] = "z" * 4100
     node["author"] = None
     node["files"]["pageInfo"]["hasNextPage"] = True
     pr = normalize_pr(node)
     assert pr.author.login is None and not pr.author.is_bot
-    assert len(pr.body_excerpt) == 4000
     assert pr.labels == ("area-A",)
     assert pr.files == ("src/A/file.cs",)
     assert content_hash(pr) == content_hash(replace(pr, events=tuple(reversed(pr.events))))
-    assert pr.events[0].payload["reverts"] == ["1234567"]
+    assert pr.events[0].payload == {
+        "oid": "abcdef012345",
+        "authored_at": "2025-12-31T23:00:00Z",
+        "committed_at": "2026-01-01T00:00:00Z",
+    }
 
 
 def test_all_upstream_strings_are_cleaned_before_hashing(github_page):
     node = github_page["data"]["repository"]["pullRequests"]["nodes"][0]
-    node["body"] = "Body with text"
-    node["mergedBy"] = {"login": "merger"}
-    node["mergeCommit"] = {"oid": "abc"}
     node["timelineItems"]["nodes"].append(
         {
             "__typename": "LabeledEvent",

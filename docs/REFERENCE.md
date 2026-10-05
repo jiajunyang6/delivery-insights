@@ -27,7 +27,7 @@ productivity scores or causal proof. Workflow and timestamp changes affect them.
 ![Delivery Insights data flow and narrative generation](diagrams/how-it-works.svg)
 
 1. **Sync:** staged backfill, overlapping incremental windows and open-PR sweeps write idempotent batches. Coverage and success checkpoints advance after phase completion; the resumable backfill cursor is saved with each batch.
-2. **Derive:** an event-driven state machine creates non-overlapping intervals and per-PR facts. Reverts, relands and superseded PRs are linked. CODEOWNERS changes trigger rederivation; area-owner changes update the data version and enqueue snapshot precomputation.
+2. **Derive:** an event-driven state machine creates non-overlapping intervals and per-PR facts. A PR is located by its matching labels, otherwise by its most-touched directories. CI run changes rederive the affected PRs and enqueue snapshot precomputation.
 3. **Snapshot:** cached or persisted snapshots are reused. On a miss, a read-only repeatable-read transaction loads a consistent dataset for pure analytics, deterministic bootstrap comparisons and canonical JSON; the result is persisted in a separate write transaction. Parameters, versions and watermarks set identity.
 4. **Narrative:** code selects evidence and scores hypotheses. Bedrock supplies wording; local code validates the LLM reply and requests at most one repair. A deterministic template is used when the LLM is disabled, busy, unavailable, times out or remains invalid. The validator and template run inside the API process; the template does not pass through the LLM validator at runtime.
 
@@ -84,7 +84,7 @@ A `202` is a Pending object, not a snapshot. Respect `Retry-After`; inspect each
 `reason` and `job` (status and phase). The UI polls for at most five minutes, then asks for a
 later refresh.
 
-## Snapshot contract in analytics 1.6.0
+## Snapshot contract in analytics 1.7.0
 
 The strict `api/schemas.py` models are the current field contract (`extra="forbid"`). The
 snapshot holds the time ledger shown on the dashboard and every metric the narrative evidence
@@ -102,8 +102,10 @@ catalog reads, and nothing else.
 Analytics 1.6.0 removed the outputs that only the former dashboard sections or the removed
 quality hypothesis consumed: the headline, findings and what-if estimates, at-risk PRs, waste
 and revert chains, the guardrail, merge blockers, review load, predictability, Kaplan–Meier
-survival, the other drivers and the unused efficiency metrics and signals. Every retained value
-is unchanged; in the golden output only the snapshot ID and analytics version differ.
+survival, the other drivers and the unused efficiency metrics and signals. Analytics 1.7.0
+stops deriving the per-PR facts, links and ownership counts those outputs needed. Every
+retained value is unchanged; in the golden output only the snapshot ID and analytics version
+differ.
 
 Sampling uses `digest(seed_params)[:16]` with exactly the former canonical parameter structure
 and only `analytics_version` replaced by frozen `SAMPLING_SEED_VERSION="1.4.0"`, so bootstrap
@@ -177,7 +179,7 @@ Copy `.env.example`; never commit `.env`. Full environment defaults are in `back
 | `AWS_REGION` | `us-west-2` | Bedrock client region |
 | `BEDROCK_MODEL_ID` | `us.anthropic.claude-sonnet-4-6` | Converse model/inference profile |
 | `TRACKED_REPOS` | `bevyengine/bevy` | Comma-separated repository allowlist |
-| `LOCATION_DIMENSION` | `label:area-` | Label, CODEOWNERS or directory grouping |
+| `LOCATION_DIMENSION` | `label:area-` | Label grouping with directory fallback, or directory grouping |
 | `BACKFILL_DAYS` | `120` | Final backfill stage, between 30 and 365 |
 | `SYNC_INTERVAL_MINUTES` | `15` | Incremental cadence; must divide 60 |
 | `CI_SOURCE` | `actions` | `actions` or `none` |
@@ -233,9 +235,9 @@ Tokens, headers, raw upstream responses and prose are not logged; exceptions exp
 `docker compose down -v` intentionally deletes the local database volume; use only for reset.
 The unreleased storage schema is consolidated into `0001_initial`. Earlier three-migration
 databases require that confirmed reset and a new sync; applying this revision in place is
-unsupported. `links_pending` is included in the initial schema. Raw GitHub node IDs and
-actor types remain in the query for timeline paging and bot detection; five unused PR fields,
-four audit/duplicate metadata fields and seven unused fact fields are no longer persisted.
+unsupported. Raw GitHub node IDs and actor types remain in the query for timeline paging and
+bot detection. The schema stores only the PR fields and facts that analytics reads: no PR
+bodies, head branches, merge commits, author associations, ownership rules or link fields.
 Only the `ix_intervals_pr` index was removed, because `UNIQUE(pr_id, seq)` covers its prefix.
 Other indexes remain; no performance claim is made without representative EXPLAIN measurements.
 There is no authenticated administrative UI or backup orchestration in this demo.
@@ -290,7 +292,8 @@ Those analytics 1.2/1.3 measurements and npm ci/audit checks were not repeated h
 The original 90-day performance gate remains excluded; nine upstream deprecation warnings remain.
 
 The harness runs four planted scenarios × five seeds through the single English narrative.
-Offline and real Bedrock Sonnet 4.6 suites were run on analytics 1.6.0 and prompt v11.
+Offline and real Bedrock Sonnet 4.6 suites were run on analytics 1.6.0 and prompt v11;
+analytics 1.7.0 leaves the snapshot values and the offline results unchanged.
 [Evaluation records](EVALUATION.md) retain every current and historical per-case outcome.
 Numeric/citation/hedge denominators include final LLM outputs, excluding fallback.
 
@@ -317,7 +320,7 @@ benchmark or real-world causal calibration. Missing-key evaluation exits 2.
 | Decision | Choice and cost | Follow-up |
 |---|---|---|
 | Time basis | UTC wall-clock, including nights/weekends | Add team calendars |
-| Locations | Current labels → CODEOWNERS → directories; historical labels unavailable | Inspect location rows and current ownership configuration |
+| Locations | Current labels → directories; historical labels unavailable | Choose a label prefix that matches the repository's area labels |
 | Scope | Default-branch flow; bots/backports excluded | Separate release-branch view |
 | Freshness | Background sync, default 15 minutes | Webhooks if lower latency is needed |
 | Sources | Whitelisted GitHub repos only | Extend `SourceAdapter` with shared normalized records |
@@ -335,7 +338,7 @@ Implementation-specific decisions and their reasons are recorded in [DECISIONS.m
 No individual productivity rankings, request-time GitHub fetching, arbitrary repo/org discovery,
 LLM arithmetic, self-assigned LLM confidence or raw-text prompts. No authentication, deployment
 integration, webhook ingestion, second source adapter implementation or business-hours mode.
-Linked chains are stored, but chain-level elapsed delivery time is deferred.
+Revert, reland and supersession links are not derived.
 Real-history backtesting, human calibration, AI-authorship analysis, stacked-PR dependency
 waiting, cumulative-flow charts and release/deployment timing remain outside this version.
 
@@ -344,7 +347,7 @@ waiting, cumulative-flow charts and release/deployment timing remain outside thi
 Implemented: deterministic evidence scoring and validation, repair/template fallback, immutable
 snapshots and ETags, staged backfill/open sweeps,
 an English narrative with three scored hypotheses, offline eval, React dashboard,
-CODEOWNERS/area-owner enrichment, Actions CI waiting, Docker and CI config.
+Actions CI waiting, Docker and CI config.
 
 ### Known limitations
 
@@ -354,8 +357,7 @@ CODEOWNERS/area-owner enrichment, Actions CI waiting, Docker and CI config.
   the period are not counted in throughput.
 
 GitHub omits design discussions, offline coordination and deployments. Rewritten or rebased
-commit timestamps distort coding time. Current labels/owners are not historical ownership.
-Private membership prevents expanding some owner teams into people; teams count as owners.
+commit timestamps distort coding time. Current labels are not historical ownership.
 Small samples suppress p50 below 20, p90 below 30, and rates below 30 cases/5 events.
 Driver/location measures have their own documented gates. Insufficient values remain null.
 Actions telemetry may omit the demo repository's primary Azure Pipelines CI.

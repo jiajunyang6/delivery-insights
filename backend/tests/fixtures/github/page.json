@@ -21,7 +21,6 @@
             "id": "PR_1",
             "number": 1,
             "title": "Example change",
-            "body": "",
             "url": "https://github.com/a/b/pull/1",
             "state": "OPEN",
             "isDraft": false,
@@ -31,16 +30,11 @@
             "mergedAt": null,
             "additions": 10,
             "deletions": 2,
-            "changedFiles": 1,
             "baseRefName": "main",
-            "headRefName": "feature",
-            "authorAssociation": "MEMBER",
             "author": {
               "__typename": "User",
               "login": "author"
             },
-            "mergedBy": null,
-            "mergeCommit": null,
             "labels": {
               "nodes": [
                 {
@@ -76,9 +70,7 @@
                   "commit": {
                     "oid": "abcdef012345",
                     "authoredDate": "2025-12-31T23:00:00Z",
-                    "committedDate": "2026-01-01T00:00:00Z",
-                    "messageHeadline": "Update",
-                    "messageBody": "This reverts commit 1234567"
+                    "committedDate": "2026-01-01T00:00:00Z"
                   }
                 }
               ]

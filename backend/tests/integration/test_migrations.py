@@ -40,14 +40,7 @@ def test_migration_upgrade_indexes_constraints_and_downgrade(postgres_url, monke
                 )
                 assert any(
                     set(u["column_names"])
-                    == {
-                        "snapshot_id",
-                        "audience",
-                        "lang",
-                        "prompt_version",
-                        "model_id",
-                        "pack_hash",
-                    }
+                    == {"snapshot_id", "prompt_version", "model_id", "pack_hash"}
                     for u in inspector.get_unique_constraints("narratives")
                 )
 

@@ -19,7 +19,7 @@ and `NOTES.md` describe the product, `docs/REFERENCE.md` holds the current contr
 | Path | Responsibility |
 |---|---|
 | `backend/src/insights/sources/github/` | GraphQL/REST client, queries and normalization (the only GitHub I/O) |
-| `backend/src/insights/sync/` | arq jobs: `queue.py` job lifecycle and locks, `jobs.py` sync runs, `store.py` writes, `derive.py` timelines/facts/links and rederivation, `enrichment.py` CI and CODEOWNERS |
+| `backend/src/insights/sync/` | arq jobs: `queue.py` job lifecycle and locks, `jobs.py` sync runs, `store.py` writes, `derive.py` timelines/facts and rederivation, `enrichment.py` GitHub Actions CI runs |
 | `backend/src/insights/db/` | SQLAlchemy models and loaders that turn rows into immutable records |
 | `backend/src/insights/analytics/` | Pure computation of the snapshot: timeline, facts, efficiency, time ledger, attribution, CI |
 | `backend/src/insights/snapshots/` | Snapshot orchestration, caching, filters and domain errors |

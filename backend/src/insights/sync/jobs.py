@@ -17,7 +17,7 @@ from insights.db.models import Repository
 from insights.domain import PageResult, RepoRef
 from insights.sources.base import SourceAdapter
 from insights.sources.github.client import GitHubError
-from insights.sync.derive import current_key, derivation_complete, enqueue_rederivation, link_repo
+from insights.sync.derive import current_key, derivation_complete, enqueue_rederivation
 from insights.sync.queue import (
     enqueue_precompute,
     enqueue_sync,
@@ -161,7 +161,7 @@ class SyncRun:
     async def checkpoint(self, **values: Any) -> None:
         """Catch up on changes since the previous checkpoint, then publish progress.
 
-        Relinks if pages changed, sets `derived_key` only when every PR is derived with the
+        Sets `derived_key` only when every PR is derived with the
         current key (otherwise queues a rederive), and writes `values` with `last_synced_at`.
         """
         # Taken before the catch-up, so last_synced_at never claims changes made during it.
@@ -169,11 +169,6 @@ class SyncRun:
         await self.incremental(self.previous_checkpoint)
         key = current_key(self.settings)
         async with sessions_for(self.ctx)() as session, session.begin():
-            # Linking scans every PR in the repository, so it runs per checkpoint, not per page.
-            if await session.scalar(
-                select(Repository.links_pending).where(Repository.id == self.repo.id)
-            ):
-                await link_repo(session, self.repo.id)
             complete = await derivation_complete(session, self.repo.id, key)
             if complete:
                 values["derived_key"] = key
@@ -316,22 +311,20 @@ async def incremental_sync_all(ctx: dict[str, Any]) -> None:
 
 
 async def enqueue_enrichment(ctx: dict[str, Any], repo: Repository) -> None:
-    """Queue due CI and ownership refreshes based on their last successful completion times."""
-    settings = cast(Settings, ctx["settings"])
+    """Queue a CI refresh when the last successful one is more than an hour old."""
+    if cast(Settings, ctx["settings"]).ci_source != "actions":
+        return
     async with sessions_for(ctx)() as session:
-        for kind, interval in (("ci_runs", timedelta(hours=1)), ("ownership", timedelta(days=1))):
-            if kind == "ci_runs" and settings.ci_source != "actions":
-                continue
-            previous = await last_success(ctx, repo.id, kind)
-            if previous is None or previous < now_for(ctx) - interval:
-                await enqueue_sync(ctx["redis"], session, repo.full_name, kind, now=now_for(ctx))
+        previous = await last_success(ctx, repo.id, "ci_runs")
+        if previous is None or previous < now_for(ctx) - timedelta(hours=1):
+            await enqueue_sync(ctx["redis"], session, repo.full_name, "ci_runs", now=now_for(ctx))
 
 
 async def sync_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
     """arq entry point for backfill and incremental syncs of one repository.
 
     Returns the job result, "skipped_locked" or "missing_token". Snapshots are precomputed only
-    when the run changed `data_version`; due CI and ownership enrichment is queued afterwards.
+    when the run changed `data_version`; a due CI refresh is queued afterwards.
     """
     async with run_job(ctx, repo_full_name, kind, job_id) as job:
         if job is None:

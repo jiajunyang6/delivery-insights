@@ -121,13 +121,13 @@ async def test_narrative_is_the_english_director_view(api):
     assert [p["name"] for p in parameters] == ["snapshot_id"]
 
 
-async def test_current_prompt_never_reuses_legacy_language_or_prompt_caches(api):
+async def test_current_prompt_never_reuses_legacy_prompt_caches(api):
     client, app, clock, ctx = api
     snapshot, _, url = await prepare(api, enabled=True)
     pack, _ = build_evidence_pack(snapshot, False)
     pack_hash = digest(pack)[:16]
     model = ctx["settings"].bedrock_model_id
-    for language, version in (("en", "v3"), ("zh", "v3"), ("en", "v4"), ("en", "v6"), ("en", "v7")):
+    for version in ("v3", "v4", "v6", "v7", "v10"):
         key = narrative_key(snapshot["snapshot_id"], version, model, pack_hash)
         await ctx["redis"].hset(
             key, mapping={"body": b'{"narrative":"legacy"}', "etag": '"legacy"', "persist": "1"}
@@ -136,8 +136,6 @@ async def test_current_prompt_never_reuses_legacy_language_or_prompt_caches(api)
             session.add(
                 Narrative(
                     snapshot_id=snapshot["snapshot_id"],
-                    audience="director",
-                    lang=language,
                     prompt_version=version,
                     model_id=model,
                     pack_hash=pack_hash,

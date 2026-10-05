@@ -93,7 +93,7 @@ Settings come from `.env`; never commit it. Without `.env`, code defaults apply 
 | `TRACKED_REPOS` | `bevyengine/bevy` | Comma-separated allowlist, e.g. `bevyengine/bevy,prometheus/prometheus` |
 | `BACKFILL_DAYS` | `120` | History to collect (30–365); the 60-day view needs at least 120 for a full comparison |
 | `PRECOMPUTE_DAYS` | `7,30,60` | Snapshot windows warmed after a successful sync changes repository data |
-| `LOCATION_DIMENSION` | `label:area-` | Area grouping: labels, then CODEOWNERS, then directories |
+| `LOCATION_DIMENSION` | `label:area-` | Area grouping: matching labels, otherwise directories |
 | `CI_SOURCE`, `CI_COMPLETE` | `actions`, `false` | GitHub Actions CI waiting; `false` caps CI-hypothesis confidence |
 
 ## Development
@@ -107,9 +107,10 @@ make eval          # same against real Bedrock (reads the key from .env)
 cd frontend && npm ci && npm test && npm run typecheck && npm run build
 ```
 
-Analytics version **1.6.0** keeps only the time ledger and the metrics behind the narrative
-evidence; retained values are unchanged. Snapshot/cache identities use 1.6.0; statistical
-sampling keeps the original 1.4.0 seed parameters.
+Analytics version **1.7.0** keeps only the time ledger and the metrics behind the narrative
+evidence, and stores only the PR facts they read; retained values are unchanged.
+Snapshot/cache identities use 1.7.0; statistical sampling keeps the original 1.4.0 seed
+parameters.
 
 The unreleased application's migrations are now consolidated into `0001_initial`.
 Upgrading from the earlier three-migration schema requires deleting the local database

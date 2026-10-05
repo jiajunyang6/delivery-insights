@@ -16,20 +16,13 @@ def pr(identifier, *, offset=24, reviewer=20, author=5, merge=5, locations=("are
         number=identifier,
         ready_at=ready,
         first_review_at=reviewed,
-        first_approval_at=approved,
-        approved_at=approved,
         merged_at=merged,
         end_at=merged,
         coding_hours=10,
         pickup_hours=reviewer,
-        review_hours=author,
-        merge_hours=merge,
         cycle_hours=10 + reviewer + author + merge,
         locations=locations,
-        location_source="label",
-        human_reviews=2,
         size_lines=100,
-        size_bucket="M",
     )
     f = replace(f, **facts)
     intervals = tuple(
@@ -55,7 +48,7 @@ def pr(identifier, *, offset=24, reviewer=20, author=5, merge=5, locations=("are
         at(offset),
         human_activity_at=tuple(
             at
-            for at in (f.ready_at, f.first_review_at, f.approved_at, f.merged_at, f.closed_at)
+            for at in (f.ready_at, f.first_review_at, approved, f.merged_at, f.closed_at)
             if at is not None
         ),
     )

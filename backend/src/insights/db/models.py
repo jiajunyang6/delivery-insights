@@ -32,8 +32,7 @@ class Repository(Base):
 
     `covered_since` starts the fully synced range, `sync_watermark` is the newest PR update
     seen, `backfill_cursor` is where backfill resumes, and `data_version` increments when
-    stored data changes. `links_pending` marks links as stale; `derived_key` is set once every
-    PR is derived with that key.
+    stored data changes, and `derived_key` is set once every PR is derived with that key.
     """
 
     __tablename__ = "repositories"
@@ -55,7 +54,6 @@ class Repository(Base):
     last_sync_error: Mapped[str | None] = mapped_column(Text)
     data_version: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))
     derived_key: Mapped[str | None] = mapped_column(Text)
-    links_pending: Mapped[bool] = mapped_column(Boolean, server_default=text("FALSE"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )
@@ -71,20 +69,16 @@ class PullRequest(Base):
     repo_id: Mapped[int] = mapped_column(Integer, ForeignKey("repositories.id", ondelete="CASCADE"))
     number: Mapped[int] = mapped_column(Integer)
     title: Mapped[str] = mapped_column(Text)
-    body_excerpt: Mapped[str] = mapped_column(Text, server_default=text("''"))
     url: Mapped[str] = mapped_column(Text)
     state: Mapped[str] = mapped_column(Text)
     is_draft: Mapped[bool] = mapped_column(Boolean)
     author_login: Mapped[str | None] = mapped_column(Text)
-    author_association: Mapped[str] = mapped_column(Text)
     is_bot_author: Mapped[bool] = mapped_column(Boolean)
     base_ref: Mapped[str] = mapped_column(Text)
-    head_ref: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     merged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    merge_commit_oid: Mapped[str | None] = mapped_column(Text)
     additions: Mapped[int] = mapped_column(Integer)
     deletions: Mapped[int] = mapped_column(Integer)
     labels: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'"))
@@ -95,7 +89,6 @@ class PullRequest(Base):
         Index("ix_pr_repo_created", "repo_id", "created_at"),
         Index("ix_pr_repo_updated", "repo_id", "updated_at"),
         Index("ix_pr_repo_state", "repo_id", "state"),
-        Index("ix_pr_merge_commit", "repo_id", "merge_commit_oid"),
     )
 
 
@@ -138,47 +131,18 @@ class PrFact(Base):
     number: Mapped[int] = mapped_column(Integer)
     is_bot_author: Mapped[bool] = mapped_column(Boolean)
     is_backport: Mapped[bool] = mapped_column(Boolean)
-    external_contributor: Mapped[bool] = mapped_column(Boolean)
-    first_commit_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     first_review_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    first_approval_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     merged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     end_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     coding_hours: Mapped[float | None] = mapped_column(Float)
     pickup_hours: Mapped[float | None] = mapped_column(Float)
-    review_hours: Mapped[float | None] = mapped_column(Float)
-    merge_hours: Mapped[float | None] = mapped_column(Float)
     cycle_hours: Mapped[float | None] = mapped_column(Float)
     review_rounds: Mapped[int] = mapped_column(Integer)
-    feedback_before_approval: Mapped[int] = mapped_column(Integer)
     commits_after_first_review: Mapped[int] = mapped_column(Integer)
-    updates_after_approval: Mapped[int] = mapped_column(Integer)
-    distinct_approvers: Mapped[int] = mapped_column(Integer)
-    second_approval_wait_hours: Mapped[float | None] = mapped_column(Float)
-    merged_without_approval: Mapped[bool] = mapped_column(Boolean)
-    review_requested_before_first_review: Mapped[bool] = mapped_column(Boolean)
-    human_reviews: Mapped[int] = mapped_column(Integer)
     size_lines: Mapped[int] = mapped_column(Integer)
-    size_bucket: Mapped[str] = mapped_column(Text)
     locations: Mapped[list[str]] = mapped_column(ARRAY(Text))
-    location_source: Mapped[str] = mapped_column(Text)
-    is_revert: Mapped[bool] = mapped_column(Boolean, server_default=text("FALSE"))
-    reverts_pr_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("pull_requests.id", ondelete="SET NULL")
-    )
-    reverted_by_pr_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("pull_requests.id", ondelete="SET NULL")
-    )
-    reverted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    reland_of_pr_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("pull_requests.id", ondelete="SET NULL")
-    )
-    close_class: Mapped[str | None] = mapped_column(Text)
-    state_at_close: Mapped[str | None] = mapped_column(Text)
-    late_rejection: Mapped[bool] = mapped_column(Boolean, server_default=text("FALSE"))
     ci_covered: Mapped[bool] = mapped_column(Boolean, server_default=text("FALSE"))
     derive_key: Mapped[str | None] = mapped_column(Text)
     __table_args__ = (
@@ -227,18 +191,6 @@ class WorkflowRun(Base):
     )
 
 
-class OwnershipRule(Base):
-    __tablename__ = "ownership_rules"
-
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    repo_id: Mapped[int] = mapped_column(Integer, ForeignKey("repositories.id", ondelete="CASCADE"))
-    source: Mapped[str] = mapped_column(Text)
-    pattern: Mapped[str] = mapped_column(Text)
-    owners: Mapped[list[str]] = mapped_column(ARRAY(Text))
-    line_no: Mapped[int] = mapped_column(Integer)
-    __table_args__ = (UniqueConstraint("repo_id", "source", "line_no"),)
-
-
 class Snapshot(Base):
     __tablename__ = "snapshots"
 
@@ -263,8 +215,6 @@ class Narrative(Base):
     snapshot_id: Mapped[str] = mapped_column(
         Text, ForeignKey("snapshots.snapshot_id", ondelete="CASCADE")
     )
-    audience: Mapped[str] = mapped_column(Text)
-    lang: Mapped[str] = mapped_column(Text)
     prompt_version: Mapped[str] = mapped_column(Text)
     pack_hash: Mapped[str] = mapped_column(Text)
     model_id: Mapped[str] = mapped_column(Text)
@@ -274,11 +224,7 @@ class Narrative(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )
-    __table_args__ = (
-        UniqueConstraint(
-            "snapshot_id", "audience", "lang", "prompt_version", "model_id", "pack_hash"
-        ),
-    )
+    __table_args__ = (UniqueConstraint("snapshot_id", "prompt_version", "model_id", "pack_hash"),)
 
 
 class SyncJob(Base):

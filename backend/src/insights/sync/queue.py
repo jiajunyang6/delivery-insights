@@ -27,7 +27,6 @@ JOB_ROUTES = {
     "incremental": ("sync_repo", "sync"),
     "rederive": ("rederive_repo", "rederive"),
     "ci_runs": ("enrich_repo", "ci"),
-    "ownership": ("enrich_repo", "owners"),
 }
 
 
@@ -215,7 +214,7 @@ class JobRun:
         Failure text is capped at 500 characters; failed enrichment preserves existing stats.
         """
         values: dict[str, Any] = {"status": result, "finished_at": now_for(self.ctx)}
-        if include_stats and (result == "succeeded" or self.kind not in {"ownership", "ci_runs"}):
+        if include_stats and (result == "succeeded" or self.kind != "ci_runs"):
             values["stats"] = self.stats
         if error is not None:
             values["error"] = error[:500]
@@ -243,7 +242,7 @@ async def run_job(
             yield None
             return
         values: dict[str, Any] = {"status": "running", "started_at": now_for(ctx)}
-        if kind in {"rederive", "ci_runs", "ownership"}:
+        if kind in {"rederive", "ci_runs"}:
             values["phase"] = kind
         await set_job(ctx, job_id, **values)
         run = JobRun(ctx, repo, job_id, kind)
@@ -253,7 +252,7 @@ async def run_job(
             # Follow-up queue failures after completion retain the original success ledger.
             if run.result != "running":
                 raise
-            sync = kind not in {"rederive", "ci_runs", "ownership"}
+            sync = kind not in {"rederive", "ci_runs"}
             if sync:
                 status = (
                     "auth_error"

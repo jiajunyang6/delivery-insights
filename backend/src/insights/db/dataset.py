@@ -1,20 +1,16 @@
 """I/O boundary: materialize one consistent database view for pure analytics."""
 
 from collections import defaultdict
-from dataclasses import replace
 from datetime import datetime
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from insights.analytics.classify import ownership_counts
 from insights.analytics.dataset import Dataset, PrData, RepoData, Review, SnapshotParams
 from insights.analytics.timeline import Interval
 from insights.db.ci import load_ci_data
-from insights.db.models import OwnershipRule as StoredRule
 from insights.db.models import PrEvent, PrFact, PrInterval, PullRequest, Repository
 from insights.db.records import facts_from_row
-from insights.domain import OwnershipRule
 
 
 async def load_dataset(
@@ -61,16 +57,6 @@ async def load_dataset(
     names = {r.repo_id: r.repo for r in metadata.repos if r.repo_id is not None}
     if len(names) != len(metadata.repos):
         raise ValueError("Repository metadata is missing database ids")
-    rules: dict[int, list[OwnershipRule]] = defaultdict(list)
-    for rule in await session.scalars(select(StoredRule).where(StoredRule.repo_id.in_(names))):
-        rules[rule.repo_id].append(
-            OwnershipRule(rule.source, rule.pattern, tuple(rule.owners), rule.line_no)
-        )
-    repo_data = [
-        replace(r, owners=ownership_counts(rules[r.repo_id]))
-        for r in metadata.repos
-        if r.repo_id is not None
-    ]
     start, end = metadata.start, metadata.to_excl
     previous_start, as_of = metadata.previous.start, metadata.as_of
     # This SQL selects a loadable superset, including lifecycle overlaps and excluded PRs.
@@ -188,7 +174,7 @@ async def load_dataset(
         session, list(names), created_from=previous_start, created_to=as_of, flow_only=True
     )
     return Dataset(
-        tuple(repo_data),
+        metadata.repos,
         prs,
         reviews,
         params.period_from,

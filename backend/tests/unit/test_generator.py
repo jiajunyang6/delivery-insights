@@ -21,13 +21,13 @@ def test_generator_deterministic_bounded_and_legal():
 
 def test_generator_reviewers_reverts_and_normal_relands_match_source_contract():
     syn = generate(ScenarioSpec.baseline(), 42)
-    by_number = {p.number: p for p in syn.records}
+    by_title = {p.title: p for p in syn.records}
     relands = []
     for p in syn.records:
         reviews = [e for e in p.events if e.kind == "review"]
         assert all(e.actor.login != "rev-x5" for e in reviews)
-        if p.body_excerpt.startswith("Reverts synthetic/repo#"):
-            original = by_number[int(p.body_excerpt.split("#")[1])]
+        if p.title.startswith('Revert "'):
+            original = by_title[p.title[len('Revert "') : -1]]
             assert p.author.login != original.author.login and not p.author.is_bot
             if p.merged_at:
                 assert (p.merged_at - p.created_at).total_seconds() <= 3 * 3600

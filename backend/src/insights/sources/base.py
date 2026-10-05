@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Protocol
 
-from insights.domain import CiRun, OwnershipRule, PageResult, RepoRef
+from insights.domain import CiRun, PageResult, RepoRef
 
 
 class SourceAdapter(Protocol):
@@ -21,8 +21,4 @@ class SourceAdapter(Protocol):
         self, repo: RepoRef, *, created_from: datetime, created_to: datetime
     ) -> list[CiRun]:
         """Fetch CI records created within the requested inclusive timestamp bounds."""
-        ...
-
-    async def ownership_rules(self, repo: RepoRef) -> list[OwnershipRule]:
-        """Fetch available CODEOWNERS and area-owner rules; absent files yield no rules."""
         ...

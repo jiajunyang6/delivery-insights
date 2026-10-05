@@ -45,7 +45,6 @@ class Settings(BaseSettings):
     precompute_days: str = "7,30,60"
     ci_source: Literal["actions", "none"] = "actions"
     ci_complete: bool = False
-    area_owners_path: str = "docs/area-owners.md"
     log_level: str = "INFO"
 
     @model_validator(mode="after")
@@ -61,10 +60,10 @@ class Settings(BaseSettings):
             raise ValueError("SYNC_INTERVAL_MINUTES must divide 60")
         if self.open_sweep_minutes % self.sync_interval_minutes:
             raise ValueError("OPEN_SWEEP_MINUTES must be a multiple of SYNC_INTERVAL_MINUTES")
-        if self.location_dimension not in {"directory", "codeowners"} and not (
+        if self.location_dimension != "directory" and not (
             self.location_dimension.startswith("label:") and self.location_label_prefix
         ):
-            raise ValueError("LOCATION_DIMENSION must be label:<prefix>, codeowners or directory")
+            raise ValueError("LOCATION_DIMENSION must be label:<prefix> or directory")
         if any(
             not value.isdigit() or not 1 <= int(value) <= MAX_PERIOD_DAYS
             for value in split_list(self.precompute_days)

@@ -36,26 +36,24 @@ async def seed(ctx, count=1):
     return repo_id, saved, page
 
 
-async def test_transactional_derivation_and_preserved_links(context):
+async def test_transactional_derivation_is_idempotent(context):
     repo_id, saved, page = await seed(context)
     async with context["session_factory"]() as session, session.begin():
         fact = await session.get(PrFact, saved.pr_ids[0])
         assert fact.derive_key == current_key(context["settings"])
         rows = (await session.scalars(select(PrInterval).order_by(PrInterval.seq))).all()
         assert [r.state for r in rows] == ["waiting_reviewer", "waiting_merge", "waiting_reviewer"]
+        approved = next((r.start_at for r in rows if r.state == "waiting_merge"), None)
         result = TimelineResult(
             fact.ready_at,
             tuple(Interval(r.state, r.start_at, r.end_at) for r in rows),
-            fact.approved_at,
+            approved,
             fact.review_rounds,
-            fact.state_at_close,
         )
         assert not check_invariants(result, pr_input(page.prs[0]))
-        fact.reland_of_pr_id = saved.pr_ids[0]
-        await session.flush()
         await derive_prs(session, saved.pr_ids, settings=context["settings"], now=NOW)
         await session.refresh(fact)
-        assert fact.reland_of_pr_id == saved.pr_ids[0]
+        assert fact.derive_key == current_key(context["settings"])
         assert await derivation_complete(session, repo_id, current_key(context["settings"]))
         again = await save_page(session, repo_id, page, now=NOW, settings=context["settings"])
         assert not again.prs_changed

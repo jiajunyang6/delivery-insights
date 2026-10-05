@@ -99,7 +99,6 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
         area: str,
         *,
         title: str | None = None,
-        body: str = "",
         author_override: Actor | None = None,
         simple: bool = False,
         force_merge: bool = False,
@@ -155,7 +154,6 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
                 oid=oid,
                 authored_at=(authored_at or at).isoformat(),
                 committed_at=at.isoformat(),
-                reverts=[],
             )
             if spec.ci_enabled:
                 queued = max(later(ready, 1 / 60), later(at, 1 / 60))
@@ -300,19 +298,15 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
         return PullRequestRecord(
             number=number,
             title=title or f"Change {number} in {area}",
-            body_excerpt=body,
             url=f"https://github.com/synthetic/repo/pull/{number}",
             state=state,
             is_draft=draft and ready >= AS_OF,
             author=author,
-            author_association="CONTRIBUTOR" if external else "MEMBER",
             base_ref=base,
-            head_ref=f"change-{number}",
             created_at=created,
             updated_at=max([created, *(e.occurred_at for e in events)]),
             closed_at=closed_at,
             merged_at=merge_at,
-            merge_commit_oid=f"{number:040x}" if merge_at else None,
             additions=round(0.7 * size),
             deletions=size - round(0.7 * size),
             labels=tuple(sorted(set(labels))),
@@ -397,7 +391,6 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
             created,
             area,
             title=f'Revert "{original.title}"',
-            body=f"Reverts synthetic/repo#{original.number}",
             author_override=Actor(
                 next(f"dev{i:02}" for i in range(1, 41) if f"dev{i:02}" != original.author.login),
                 False,
@@ -414,7 +407,6 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
                     reland_at,
                     area,
                     title=f'Reland "{original.title}"',
-                    body=f"Reland #{original.number}",
                     author_override=Actor(
                         next(
                             f"dev{i:02}"

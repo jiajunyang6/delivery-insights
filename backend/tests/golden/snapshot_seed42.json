@@ -175,7 +175,7 @@
     }
   },
   "meta": {
-    "analytics_version": "1.6.0",
+    "analytics_version": "1.7.0",
     "ci_source": "none",
     "comparison_available": true,
     "location_dimension": "label:area-",
@@ -311,7 +311,7 @@
       }
     ]
   },
-  "snapshot_id": "s_195df2a07ac157e2",
+  "snapshot_id": "s_7986de5d84c01a61",
   "time_ledger": {
     "ci_coverage": 0.0,
     "ci_data_available": false,
