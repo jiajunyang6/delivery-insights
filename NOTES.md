@@ -117,13 +117,13 @@ I would do one of the followings if I had one more day:
 - **Claude Sonnet 4.6 on Bedrock** is part of the product: it writes narrative wording only,
   and the deterministic validator decides whether it is shown.
 - **How the output was checked:**
-  - 424 backend tests, 73 of them on real Postgres 16 and Redis 7, plus 15 frontend tests.
+  - 326 backend tests, 65 of them on real Postgres 16 and Redis 7, plus 15 frontend tests.
   - Strict ruff/mypy and the frontend typecheck and build.
   - The 20-case narrative evaluation: offline stub and real Bedrock runs on the current
     prompt v11 both pass all gates (earlier and rejected trials retained).
   - Real GitHub sync and browser checks.
-  - Refactor equivalence across golden, ten planted datasets and an ownership fixture;
-    synthetic browser checks for both views, presets, Load more, cards and abstentions.
+  - Scope reduction checked field by field: every retained snapshot value in the golden
+    output is unchanged; browser checks of presets, sync progress, narrative and ledger.
 
 The other details: [trade-offs](docs/REFERENCE.md),
 [evaluation](docs/EVALUATION.md) and [decision log](docs/DECISIONS.md).

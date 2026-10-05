@@ -22,7 +22,7 @@ and `NOTES.md` describe the product, `docs/REFERENCE.md` holds the current contr
 | `backend/src/insights/sync/` | arq jobs: `queue.py` job lifecycle and locks, `jobs.py` sync runs, `store.py` writes, `derive.py` timelines/facts and rederivation, `enrichment.py` GitHub Actions CI runs |
 | `backend/src/insights/db/` | SQLAlchemy models and loaders that turn rows into immutable records |
 | `backend/src/insights/analytics/` | Pure computation of the snapshot: timeline, facts, efficiency, time ledger, attribution, CI |
-| `backend/src/insights/snapshots/` | Snapshot orchestration, caching, filters and domain errors |
+| `backend/src/insights/snapshots/` | Snapshot orchestration, readiness (202 Pending), caching and domain errors |
 | `backend/src/insights/narrative/` | Evidence pack, hypothesis scoring, prompt, validator, template fallback, LLM client |
 | `backend/src/insights/api/` | FastAPI routes, params, schemas (strict OpenAPI contract), errors, middleware |
 | `backend/migrations/` | Alembic, currently one initial revision |

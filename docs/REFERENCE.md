@@ -250,7 +250,7 @@ There is no authenticated administrative UI or backup orchestration in this demo
 - SQLAlchemy statements are parameterized; SQL `text()` usage is limited to static statements/defaults.
 - The evidence pack excludes raw PR text and user names; unsafe location names are replaced.
 - Problem responses omit tracebacks and upstream exception text.
-- React renders all server text as text; external links allow only `https://github.com/`.
+- React renders all server text as text and builds no links from API data.
 - nginx sets CSP, `nosniff` and `no-referrer`. There are no external scripts or fonts.
 - Application containers run as UID 10001; web runs as UID 101.
 - Loopback binding limits the demo's exposure. Production requires authentication,
@@ -274,18 +274,16 @@ make eval-offline
 make eval
 ```
 
-Latest refactor checks: 2026-10-04 UTC, analytics 1.5.0, prompt v8.
+Latest checks: 2026-10-05 UTC, analytics 1.7.0, prompt v11, after the scope reduction.
 
 | Check | Observed result |
 |---|---|
 | Ruff check/format and strict mypy | Pass |
-| Unit suite | 333 cases in the passing full suite |
-| Full suite | 402 passed, including 69 integration tests |
-| Frontend tests, typecheck and build | 9 tests passed; typecheck/build pass with Node 24 |
-| Real sync / browser recovery | 50 rows → stale cursor 422 → rows cleared → refresh → 50 matching rows |
-| Refactor equivalence | Remaining snapshot values, evidence, scoring, templates, assembly, validator codes match `pre-refactor`; only allowlisted deletions and recomputed identity fields differ. Prompt messages matched through stage 7; stage 8 changes only prompt wording/format |
-| Refactored UI (synthetic fixtures) | Both views; 7/30/60 days; 5 → 12 risk rows; ownership counts; card/citation focus; three abstentions; pending sync; no console errors |
-| Stage 9 confirmed live rebuild | Bevy 7/30/120-day backfill and CI completed with zero invariant violations/skipped PRs; incremental changed zero PRs and all 1,640 hashes matched; 7/30/60-day HTTP/ETag and both views passed. Owners are null because the source yielded zero rules. Six final LLM responses passed, with separate current-day 60-day template fallbacks recorded in [storage evidence](storage-rebuild-verification.json) |
+| Backend suite | 326 passed: 261 unit and 65 integration tests |
+| Frontend tests, typecheck and build | 15 tests passed; typecheck/build pass with Node 24 |
+| Scope-reduction equivalence | Every retained snapshot value in the golden output matches the pre-reduction golden (290 values); only the snapshot ID and analytics version differ |
+| Live rebuild | After a confirmed `down -v`, Bevy synced from empty: the 120-day backfill finished in 293 s with status `ok`; the pending panel showed `backfill:7d` progress first |
+| Live browser check | 7, 30 and 60 days: the 7-day `no_slowdown` and 30-day `no_comparison` LLM narratives passed validation first time; the 60-day narrative fell back to the template on a low-band wording violation. No console errors |
 
 Earlier acceptance measured 3,541 PRs with no invariant violations, three matching PR pages, 533 merged PRs with ledger rounding error 0.0000004833, cold compute 1,376.95 ms and warm HTTP p95 32.32 ms.
 Those analytics 1.2/1.3 measurements and npm ci/audit checks were not repeated here. They are local measurements, not production load evidence.
@@ -400,8 +398,8 @@ The GitHub Actions workflow applies backend lint/tests/eval and frontend typeche
 | `backend/migrations/` | Consolidated Alembic initial schema; earlier databases require reset/resync |
 | `backend/tests/` | Unit, integration, fixture and golden checks |
 | `backend/eval/` | Synthetic generator, scenarios and evaluation runner |
-| `frontend/` | React/TypeScript UI, shared abortable requests/formatting/links, Vite config and nginx image |
-| `backend/src/insights/snapshots/` | Shared orchestration, caching, filtering and domain errors |
+| `frontend/` | React/TypeScript UI, shared abortable requests and formatting, Vite config and nginx image |
+| `backend/src/insights/snapshots/` | Shared orchestration, readiness, caching and domain errors |
 | `backend/src/insights/sync/queue.py` | Shared job lifecycle, locks, queue helpers and success lookup |
 | `PLAN.md` | Consolidated historical design input |
 | `docs/` | Decisions, acceptance evidence and evaluation records in Markdown |

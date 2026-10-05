@@ -2,8 +2,8 @@
 
 Delivery Insights shows engineering managers and directors **where pull requests wait** and
 which evidence supports an explanation. It syncs GitHub PR history in the background, computes
-deterministic delivery metrics and bottlenecks, and adds a cited narrative written by Claude
-Sonnet 4.6 on Amazon Bedrock. Each claim in the narrative links to the number behind it, and every number comes from code.
+a deterministic time ledger and the evidence behind three scored hypotheses, and adds a cited
+narrative written by Claude Sonnet 4.6 on Amazon Bedrock. Each claim in the narrative links to the number behind it, and every number comes from code.
 
 **Reviewers:** [NOTES.md](NOTES.md) covers how to run it, the architecture, next steps and AI use.
 
@@ -112,9 +112,9 @@ evidence, and stores only the PR facts they read; retained values are unchanged.
 Snapshot/cache identities use 1.7.0; statistical sampling keeps the original 1.4.0 seed
 parameters.
 
-The unreleased application's migrations are now consolidated into `0001_initial`.
-Upgrading from the earlier three-migration schema requires deleting the local database
-and syncing again; an in-place upgrade is unsupported. After explicitly confirming that
+The unreleased application keeps one migration, `0001_initial`, which is edited in place
+until release. A database created by an earlier version of that file must be deleted and
+synced again; an in-place upgrade is unsupported. After explicitly confirming that
 collected PRs, snapshots and narratives may be deleted, run:
 
 ```bash
@@ -127,7 +127,7 @@ checkpoints under the default configuration. Wait for repository `last_sync_stat
 and full coverage before checking the dashboard. Keep `BACKFILL_DAYS=120` for the 60-day
 view and its comparison period.
 
-Local checks: **402 backend tests** (333 unit, 69 integration), **9 frontend tests**,
+Local checks: **326 backend tests** (261 unit, 65 integration), **15 frontend tests**,
 strict lint/types/build and all eight offline narrative gates pass.
 
 ## Documentation
