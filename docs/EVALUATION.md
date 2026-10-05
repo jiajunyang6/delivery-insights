@@ -102,7 +102,14 @@ Started at 2026-10-05T15:53:59.034767+00:00; model `us.anthropic.claude-sonnet-4
 
 Seed 303 now includes the secondary low H_review_capacity candidate in valid early-signs
 wording, with its counter-evidence cited in the statement. This is one synthetic case; it
-does not calibrate low-band hypotheses or prove live Bevy compliance.
+does not calibrate low-band hypotheses.
+
+Live recheck on 2026-10-05: the Bevy 60-day snapshot `s_4c5c6570ab5afc5f` (2026-08-07 to
+2026-10-05) has two low-band candidates, H_pr_size_growth (0.50) and H_review_capacity
+(0.47), the case that fell back under v10 and v11. Under v13 the served narrative and three
+further uncached generations all passed validation on the first attempt (4/4), kept both
+low candidates in early-signs wording and sent no downgrade. Four generations of one
+snapshot are not a general guarantee.
 
 ## Historical real Bedrock run (v12)
 

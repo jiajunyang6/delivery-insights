@@ -298,7 +298,7 @@ Historical scope-reduction checks (before CI removal):
 | Frontend tests, typecheck and build | 15 tests passed; typecheck/build pass with Node 24 |
 | Scope-reduction equivalence | Every retained snapshot value in the golden output matches the pre-reduction golden (290 values); only the snapshot ID and analytics version differ |
 | Live rebuild | After a confirmed `down -v`, Bevy synced from empty: the 120-day backfill finished in 293 s with status `ok`; the pending panel showed `backfill:7d` progress first |
-| Live browser check | 7, 30 and 60 days: the 7-day `no_slowdown` and 30-day `no_comparison` LLM narratives passed validation first time; the 60-day narrative fell back to the template on a low-band wording violation. No console errors |
+| Live browser check | 7, 30 and 60 days: the 7-day `no_slowdown` and 30-day `no_comparison` LLM narratives passed validation first time; the 60-day narrative fell back to the template on a low-band wording violation under v11. Under v13 the live 60-day snapshot (two low-band hypotheses) passed validation on the first attempt in 4/4 generations. No console errors |
 
 Earlier acceptance measured 3,541 PRs with no invariant violations, three matching PR pages, 533 merged PRs with ledger rounding error 0.0000004833, cold compute 1,376.95 ms and warm HTTP p95 32.32 ms.
 Those analytics 1.2/1.3 measurements and npm ci/audit checks were not repeated here. They are local measurements, not production load evidence.
