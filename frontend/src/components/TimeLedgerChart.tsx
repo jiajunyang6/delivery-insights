@@ -8,7 +8,7 @@ import {
   YAxis,
 } from "recharts";
 import type { Snapshot, State } from "../types";
-import { chartColors, hours, percent, stateColors, stateLabels, states } from "../format";
+import { hours, percent, stateColors, stateLabels, states } from "../format";
 export function TimeLedgerChart({ snapshot: s }: { snapshot: Snapshot }) {
   const data = (
     s.meta.comparison_available ? ["Previous", "Current"] : ["Current"]
@@ -47,7 +47,7 @@ export function TimeLedgerChart({ snapshot: s }: { snapshot: Snapshot }) {
             <CartesianGrid
               strokeDasharray="3 4"
               horizontal={false}
-              stroke={chartColors.grid}
+              stroke="#e4e9e7"
             />
             <XAxis
               type="number"
@@ -106,15 +106,10 @@ export function TimeLedgerChart({ snapshot: s }: { snapshot: Snapshot }) {
       </div>
       <p className="footnote">
         Reviewer: awaiting review feedback. Author: awaiting author follow-up.
-        CI: running checks. Merge: approved and awaiting merge. Shares divide
-        post-ready PR-hours, excluding coding time; they describe observed waits.
+        Merge: approved and awaiting merge. Shares divide
+        post-ready PR-hours, excluding coding time; they describe observed waits,
+        not proven causes.
       </p>
-      {!s.time_ledger.ci_data_available && (
-        <p className="footnote">
-          CI data not available. Observed waiting states do not establish
-          causation.
-        </p>
-      )}
     </section>
   );
 }

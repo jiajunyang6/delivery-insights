@@ -15,14 +15,13 @@ from sqlalchemy import select, update
 from insights.config import Settings
 from insights.db.models import Repository
 from insights.domain import PageResult, RepoRef
-from insights.sources.base import SourceAdapter
+from insights.sources import SourceAdapter
 from insights.sources.github.client import GitHubError
 from insights.sync.derive import current_key, derivation_complete, enqueue_rederivation
 from insights.sync.queue import (
     enqueue_precompute,
     enqueue_sync,
     ensure_repo,
-    last_success,
     now_for,
     run_job,
     sessions_for,
@@ -310,21 +309,11 @@ async def incremental_sync_all(ctx: dict[str, Any]) -> None:
             )
 
 
-async def enqueue_enrichment(ctx: dict[str, Any], repo: Repository) -> None:
-    """Queue a CI refresh when the last successful one is more than an hour old."""
-    if cast(Settings, ctx["settings"]).ci_source != "actions":
-        return
-    async with sessions_for(ctx)() as session:
-        previous = await last_success(ctx, repo.id, "ci_runs")
-        if previous is None or previous < now_for(ctx) - timedelta(hours=1):
-            await enqueue_sync(ctx["redis"], session, repo.full_name, "ci_runs", now=now_for(ctx))
-
-
 async def sync_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
     """arq entry point for backfill and incremental syncs of one repository.
 
     Returns the job result, "skipped_locked" or "missing_token". Snapshots are precomputed only
-    when the run changed `data_version`; a due CI refresh is queued afterwards.
+    when the run changed `data_version`.
     """
     async with run_job(ctx, repo_full_name, kind, job_id) as job:
         if job is None:
@@ -350,6 +339,5 @@ async def sync_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id:
             )
         if version != repo.data_version:
             await enqueue_precompute(ctx, repo)
-        await enqueue_enrichment(ctx, repo)
         logger.info("sync_completed", job=job_id, repo=repo_full_name, phase=kind, **run.stats)
     return job.result

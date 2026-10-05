@@ -22,7 +22,6 @@ def compute_facts(
     default_branch: str,
     location_dimension: str = "label:area-",
     directory_depth: int = 2,
-    ci_covered: bool = False,
 ) -> PrFacts:
     """Derive one PR's facts from its events and timeline.
 
@@ -64,5 +63,4 @@ def compute_facts(
         ),
         size_lines=pr.additions + pr.deletions,
         locations=locations_for(pr, location_dimension, directory_depth),
-        ci_covered=ci_covered,
     )

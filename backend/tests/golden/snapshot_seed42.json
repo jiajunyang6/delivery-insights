@@ -1,7 +1,6 @@
 {
   "as_of": "2026-03-02T00:00:00Z",
   "bottleneck_analysis": {
-    "ci": null,
     "locations": [
       {
         "location": "area-A",
@@ -167,8 +166,7 @@
     }
   },
   "meta": {
-    "analytics_version": "1.7.0",
-    "ci_source": "none",
+    "analytics_version": "1.8.0",
     "comparison_available": true,
     "location_dimension": "label:area-",
     "sample": {
@@ -196,7 +194,6 @@
         "merged": 64,
         "pickup_p50_hours": 4.59,
         "pr_size_p50_lines": 70.5,
-        "waiting_ci_share": 0.0,
         "waiting_reviewer_share": 0.3795,
         "week_start": "2026-01-19"
       },
@@ -205,7 +202,6 @@
         "merged": 68,
         "pickup_p50_hours": 8.05,
         "pr_size_p50_lines": 66.5,
-        "waiting_ci_share": 0.0,
         "waiting_reviewer_share": 0.4823,
         "week_start": "2026-01-26"
       },
@@ -214,7 +210,6 @@
         "merged": 65,
         "pickup_p50_hours": 7.39,
         "pr_size_p50_lines": 99.0,
-        "waiting_ci_share": 0.0,
         "waiting_reviewer_share": 0.5203,
         "week_start": "2026-02-02"
       },
@@ -223,7 +218,6 @@
         "merged": 71,
         "pickup_p50_hours": 6.06,
         "pr_size_p50_lines": 88.0,
-        "waiting_ci_share": 0.0,
         "waiting_reviewer_share": 0.4989,
         "week_start": "2026-02-09"
       },
@@ -232,7 +226,6 @@
         "merged": 56,
         "pickup_p50_hours": 6.67,
         "pr_size_p50_lines": 70.0,
-        "waiting_ci_share": 0.0,
         "waiting_reviewer_share": 0.5139,
         "week_start": "2026-02-16"
       },
@@ -241,7 +234,6 @@
         "merged": 62,
         "pickup_p50_hours": 5.25,
         "pr_size_p50_lines": 61.5,
-        "waiting_ci_share": 0.0,
         "waiting_reviewer_share": 0.5035,
         "week_start": "2026-02-23"
       }
@@ -252,7 +244,6 @@
         "merged": 71,
         "pickup_p50_hours": 6.9,
         "pr_size_p50_lines": 86.0,
-        "waiting_ci_share": 0.0,
         "waiting_reviewer_share": 0.5691,
         "week_start": "2025-12-08"
       },
@@ -261,7 +252,6 @@
         "merged": 65,
         "pickup_p50_hours": 6.05,
         "pr_size_p50_lines": 71.0,
-        "waiting_ci_share": 0.0,
         "waiting_reviewer_share": 0.5335,
         "week_start": "2025-12-15"
       },
@@ -270,7 +260,6 @@
         "merged": 59,
         "pickup_p50_hours": 6.45,
         "pr_size_p50_lines": 90.0,
-        "waiting_ci_share": 0.0,
         "waiting_reviewer_share": 0.4739,
         "week_start": "2025-12-22"
       },
@@ -279,7 +268,6 @@
         "merged": 68,
         "pickup_p50_hours": 7.94,
         "pr_size_p50_lines": 66.0,
-        "waiting_ci_share": 0.0,
         "waiting_reviewer_share": 0.5823,
         "week_start": "2025-12-29"
       },
@@ -288,7 +276,6 @@
         "merged": 94,
         "pickup_p50_hours": 6.1,
         "pr_size_p50_lines": 76.5,
-        "waiting_ci_share": 0.0,
         "waiting_reviewer_share": 0.4318,
         "week_start": "2026-01-05"
       },
@@ -297,16 +284,13 @@
         "merged": 53,
         "pickup_p50_hours": 5.85,
         "pr_size_p50_lines": 76.0,
-        "waiting_ci_share": 0.0,
         "waiting_reviewer_share": 0.5226,
         "week_start": "2026-01-12"
       }
     ]
   },
-  "snapshot_id": "s_7986de5d84c01a61",
+  "snapshot_id": "s_6d3fd930740cfa09",
   "time_ledger": {
-    "ci_coverage": 0.0,
-    "ci_data_available": false,
     "merged_prs": 386,
     "states": {
       "waiting_author": {
@@ -315,13 +299,6 @@
         "previous_pr_hours": 3613.76,
         "previous_share": 0.2748,
         "share": 0.3181
-      },
-      "waiting_ci": {
-        "change_pp": 0.0,
-        "pr_hours": 0.0,
-        "previous_pr_hours": 0.0,
-        "previous_share": 0.0,
-        "share": 0.0
       },
       "waiting_merge": {
         "change_pp": -0.7,
@@ -393,12 +370,6 @@
           "current": 10.71,
           "previous": 8.81,
           "share_of_increase": 0.952
-        },
-        "waiting_ci": {
-          "change": 0.0,
-          "current": 0.0,
-          "previous": 0.0,
-          "share_of_increase": 0.0
         },
         "waiting_merge": {
           "change": 0.1,

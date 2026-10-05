@@ -67,6 +67,11 @@
 PR timelines. FastAPI serves snapshots from local data; Redis supports jobs, caches, locks and
 rate limits. The React dashboard accesses FastAPI through nginx.
 
+Report routes share one API module; evidence definitions live with extraction, and the
+PR-size comparison lives with efficiency metrics. Request cancellation shares the frontend
+API module. Before/after comparisons confirm the OpenAPI contract and 15 synthetic snapshots,
+evidence packs and template narratives are unchanged by this cleanup.
+
 **02 — Narrative generation:** code computes metrics, selects evidence and scores hypotheses.
 Bedrock writes the wording; local validation checks numbers, citations and uncertainty language,
 with at most one repair. A deterministic template handles disabled, busy or failed LLM calls
@@ -117,13 +122,15 @@ I would do one of the followings if I had one more day:
 - **Claude Sonnet 4.6 on Bedrock** is part of the product: it writes narrative wording only,
   and the deterministic validator decides whether it is shown.
 - **How the output was checked:**
-  - 326 backend tests, 65 of them on real Postgres 16 and Redis 7, plus 15 frontend tests.
+  - 316 backend tests, 63 of them on real Postgres 16 and Redis 7, plus 15 frontend tests.
   - Strict ruff/mypy and the frontend typecheck and build.
-  - The 20-case narrative evaluation: offline stub and real Bedrock runs on the current
-    prompt v11 both pass all gates (earlier and rejected trials retained).
+  - The current 15-case offline narrative evaluation passes all eight gates. Real Bedrock
+    evaluation of the revised low-confidence wording is pending; earlier runs are historical.
   - Real GitHub sync and browser checks.
-  - Scope reduction checked field by field: every retained snapshot value in the golden
-    output is unchanged; browser checks of presets, sync progress, narrative and ledger.
+  - CI removal checked field by field: every retained golden snapshot value is unchanged;
+    synthetic browser checks cover presets, a custom period, pending, configuration, narrative
+    and the three-state ledger. After the user's database rebuild, the Bevy worker completed
+    the 120-day backfill and precomputed the 7/30/60-day reports.
 
 The other details: [trade-offs](docs/REFERENCE.md),
 [evaluation](docs/EVALUATION.md) and [decision log](docs/DECISIONS.md).

@@ -1,6 +1,21 @@
 # Evaluation records
 
-Current suites use analytics 1.6.0 and English-only prompt v11: three library hypotheses,
+The current product has two library hypotheses; CI analysis and its planted scenario are
+removed. The current offline suite covers review capacity, PR size growth and no signal,
+five seeds each (15 cases). Its eight gates pass: first-attempt/numeric/citation/hedge
+consistency 15/15, root-cause hits 10/10, abstention 5/5, high precision 10/10, fallback 0/15.
+The raw report is `backend/reports/eval-20261005T063921Z-stub.json` (ignored).
+One secondary low hypothesis is included by the stub; low-band correctness is 0/1 and
+is not calibrated by this suite. Stub validity does not prove real-model compliance.
+
+The prompt adds exact low-band wording and per-candidate reminders without relaxing the
+validator. **Real Bedrock evaluation is pending.** Run `make eval`, or on Windows from
+`backend/`: `uv run --env-file ../.env python -m insights_eval.run --llm bedrock`.
+Require every gate, first-attempt validity at least 0.90 and numeric/citation/hedge
+consistency 1.00. Record the new per-case results here and recheck Bevy's 60-day narrative.
+The old 20-case suites below are historical and include CI scenarios no longer supported.
+
+Historical suites use analytics 1.6.0 and English-only prompt v11: three library hypotheses,
 one director narrative, four planted scenarios × five seeds. Offline and real Bedrock
 suites passed all eight gates. Earlier suites (prompt v8 and before, five scenarios
 including the removed quality trade-off, two seeds and two audiences) are historical.
@@ -31,7 +46,31 @@ These observations do not prove general first-attempt or causal quality. See
 [storage evidence](storage-rebuild-verification.json); the passing synthetic gates above
 remain a separate result.
 
-## Current offline suite (v11)
+## Current offline run
+
+Recorded run: 2026-10-05T06:39:21.943913+00:00; analytics `1.8.0`, prompt `v12`, model `stub`.
+
+| Scenario | Seed | Top hypothesis | Band | First valid | Hit | Fallback |
+|---|---|---|---|---|---|---|
+| review_capacity | 101 | H_review_capacity | high | true | true | - |
+| review_capacity | 202 | H_review_capacity | high | true | true | - |
+| review_capacity | 303 | H_review_capacity | high | true | true | - |
+| review_capacity | 404 | H_review_capacity | high | true | true | - |
+| review_capacity | 505 | H_review_capacity | high | true | true | - |
+| pr_size_growth | 101 | H_pr_size_growth | high | true | true | - |
+| pr_size_growth | 202 | H_pr_size_growth | high | true | true | - |
+| pr_size_growth | 303 | H_pr_size_growth | high | true | true | - |
+| pr_size_growth | 404 | H_pr_size_growth | high | true | true | - |
+| pr_size_growth | 505 | H_pr_size_growth | high | true | true | - |
+| no_signal | 101 | - | - | true | true | - |
+| no_signal | 202 | - | - | true | true | - |
+| no_signal | 303 | - | - | true | true | - |
+| no_signal | 404 | - | - | true | true | - |
+| no_signal | 505 | - | - | true | true | - |
+
+All 15 final outputs pass the validator; no repair calls or fallback. Real-model results remain pending.
+
+## Historical offline suite (v11)
 
 Started at 2026-10-05T05:31:45.030620+00:00; model `stub`, prompt `v11`, analytics `1.6.0`.
 Four scenarios × five seeds, English director narrative: 20 runs; overall passed: true.
@@ -70,7 +109,7 @@ Four scenarios × five seeds, English director narrative: 20 runs; overall passe
 | no_signal | 404 | llm | true | 1 | passed | - / - | true | true | - | none |
 | no_signal | 505 | llm | true | 1 | passed | - / - | true | true | - | none |
 
-## Current real Bedrock suite (v11)
+## Historical real Bedrock suite (v11)
 
 Started at 2026-10-05T05:43:00.893710+00:00; model `us.anthropic.claude-sonnet-4-6`, prompt `v11`, analytics `1.6.0`.
 Four scenarios × five seeds, English director narrative: 20 runs; overall passed: true.

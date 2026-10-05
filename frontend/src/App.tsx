@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
-import { useAbortable } from "./hooks/useAbortable";
 import {
   ApiProblem,
   fetchJson,
   loadInsights,
   message,
   pendingText,
+  useAbortable,
 } from "./api";
-import { dateRange } from "./format";
-import { periodError } from "./period";
+import { dateRange, periodError } from "./format";
 import type {
   DateLimits,
   Params,

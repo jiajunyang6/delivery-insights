@@ -16,7 +16,7 @@ from insights_eval.stub_llm import StubLLMClient
 
 async def test_stub_reads_only_pack_and_produces_valid_tool_output():
     snapshot = golden()
-    pack, _ = build_evidence_pack(snapshot, True)
+    pack, _ = build_evidence_pack(snapshot)
     client = StubLLMClient()
     reply = await client.submit(
         system=SYSTEM_PROMPT, messages=[user_message(pack)], tool_spec=TOOL_SPEC
@@ -30,8 +30,8 @@ async def test_stub_reads_only_pack_and_produces_valid_tool_output():
 
 async def test_final_recheck_detects_assembly_numeric_and_citation_corruption():
     snapshot = golden()
-    pack, _ = build_evidence_pack(snapshot, True)
-    result = await generate(snapshot, llm=StubLLMClient(), ci_complete=True, now=AS_OF)
+    pack, _ = build_evidence_pack(snapshot)
+    result = await generate(snapshot, llm=StubLLMClient(), now=AS_OF)
     assert recheck(result.payload, pack) == []
     corrupted = deepcopy(result.payload)
     corrupted["narrative"] = "Median cycle time was 99999 hours [E1]. Nothing changed [E999]."
@@ -85,10 +85,10 @@ def test_metrics_fail_bad_runs_and_empty_denominators_do_not_pass():
     assert not gates(metrics([fallback, no_signal]))["fallback_rate"]["passed"]
 
 
-async def test_default_twenty_run_offline_gates(capsys):
+async def test_default_fifteen_run_offline_gates(capsys):
     seeds = [101, 202, 303, 404, 505]
     results = await evaluate(StubLLMClient(), seeds=seeds, scenarios=list(SCENARIOS))
-    assert len(results) == 20
+    assert len(results) == 15
     checked = gates(metrics(results))
     assert all(g["passed"] for g in checked.values()), checked
     assert all(not r["recheck_violations"] for r in results)

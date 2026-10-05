@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { useAbortable } from "../hooks/useAbortable";
-import { fetchJson, message } from "../api";
+import { fetchJson, message, useAbortable } from "../api";
 import { format, percent, signed, capitalize, states } from "../format";
 import type {
   AbstainReason,
@@ -13,7 +12,6 @@ import type {
 
 const hypothesisTitles: Record<string, string> = {
   H_review_capacity: "Limited review capacity",
-  H_ci_bottleneck: "Slow or congested CI",
   H_pr_size_growth: "Pull requests getting larger",
 };
 const openReasons: Record<string, string> = {
@@ -48,7 +46,6 @@ const abstainText: Record<AbstainReason, { title: string; detail: string }> = {
 const waitingOn: Record<State, string> = {
   waiting_reviewer: "waiting on reviewers",
   waiting_author: "waiting on authors",
-  waiting_ci: "waiting on CI",
   waiting_merge: "waiting to merge after approval",
 };
 

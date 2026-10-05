@@ -13,7 +13,7 @@ from insights.analytics.thresholds import BOOTSTRAP_CI, BOOTSTRAP_ITERATIONS
 # ANALYTICS_VERSION in sampling_hash, so analytics releases keep the same bootstrap seeds.
 SAMPLING_SEED_VERSION = "1.4.0"
 
-Statistic = Literal["median", "p90", "mean", "ratio"]
+Statistic = Literal["median", "mean"]
 
 
 def percentile(values: Sequence[float], q: float, min_samples: int) -> float | None:
@@ -33,35 +33,27 @@ def seed_for(params_hash: str, metric_name: str) -> int:
 
 
 def bootstrap_diff(
-    current: Sequence[float] | Sequence[tuple[float, float]],
-    previous: Sequence[float] | Sequence[tuple[float, float]],
+    current: Sequence[float],
+    previous: Sequence[float],
     statistic: Statistic,
     seed: int,
 ) -> tuple[float, float]:
     """Bootstrap BOOTSTRAP_CI interval for statistic(current) - statistic(previous).
 
-    Deterministic for a given seed. "ratio" samples are (numerator, denominator) pairs, reduced
-    as sum/sum per draw (0 when the denominator is 0). Raises ValueError on an empty sample.
+    Deterministic for a given seed; raises ValueError on an empty sample.
     """
     if not current or not previous:
         raise ValueError("Bootstrap requires two nonempty samples")
     rng = np.random.default_rng(seed)
 
-    def sample(values: Sequence[float] | Sequence[tuple[float, float]]) -> NDArray[np.float64]:
+    def sample(values: Sequence[float]) -> NDArray[np.float64]:
         """Resample observations with the shared seeded RNG and compute each draw's statistic."""
         array = np.asarray(values, dtype=np.float64)
-        # Resample whole observations. In ratio mode this preserves each numerator's
-        # relationship to its denominator instead of drawing the two components independently.
         draws = array[rng.integers(0, len(values), size=(BOOTSTRAP_ITERATIONS, len(values)))]
-        if statistic == "ratio":
-            numerator, denominator = draws[:, :, 0].sum(axis=1), draws[:, :, 1].sum(axis=1)
-            return np.divide(
-                numerator, denominator, out=np.zeros_like(numerator), where=denominator != 0
-            )
         if statistic == "mean":
             return np.asarray(np.mean(draws, axis=1), dtype=np.float64)
         return np.asarray(
-            np.percentile(draws, 90 if statistic == "p90" else 50, axis=1, method="linear"),
+            np.percentile(draws, 50, axis=1, method="linear"),
             dtype=np.float64,
         )
 

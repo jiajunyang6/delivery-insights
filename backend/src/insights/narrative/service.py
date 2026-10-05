@@ -154,7 +154,6 @@ async def generate(
     snapshot: Mapping[str, Any],
     *,
     llm: LLMClient | None,
-    ci_complete: bool,
     now: datetime,
     prepared: tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]] | None = None,
     fallback_reason: str | None = None,
@@ -170,7 +169,7 @@ async def generate(
     deadline = monotonic() + NARRATIVE_DEADLINE_SECONDS
     if prepared is None:
         evidence = extract_evidence(snapshot)
-        pack, candidates = build_evidence_pack(snapshot, ci_complete, evidence=evidence)
+        pack, candidates = build_evidence_pack(snapshot, evidence=evidence)
     else:
         pack, candidates, evidence = prepared
     meta: dict[str, Any] = {
@@ -369,7 +368,7 @@ class NarrativeService:
         snapshot = orjson.loads((await self.snapshots.by_id(sid, None)).body)
         settings, redis = self.snapshots.settings, self.snapshots.redis
         evidence = extract_evidence(snapshot)
-        pack, candidates = build_evidence_pack(snapshot, settings.ci_complete, evidence=evidence)
+        pack, candidates = build_evidence_pack(snapshot, evidence=evidence)
         prepared = (pack, candidates, evidence)
         pack_hash = digest(pack)[:16]
         model_key = settings.bedrock_model_id if settings.llm_enabled else "template"
@@ -418,7 +417,6 @@ class NarrativeService:
                 result = await generate(
                     snapshot,
                     llm=None,
-                    ci_complete=settings.ci_complete,
                     now=self.snapshots.now,
                     prepared=prepared,
                     fallback_reason="llm_busy",
@@ -429,7 +427,6 @@ class NarrativeService:
             result = await generate(
                 snapshot,
                 llm=self.llm if settings.llm_enabled else None,
-                ci_complete=settings.ci_complete,
                 now=self.snapshots.now,
                 prepared=prepared,
                 fallback_reason="llm_error" if settings.llm_enabled and self.llm is None else None,

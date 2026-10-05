@@ -26,7 +26,6 @@ JOB_ROUTES = {
     "backfill": ("sync_repo", "sync"),
     "incremental": ("sync_repo", "sync"),
     "rederive": ("rederive_repo", "rederive"),
-    "ci_runs": ("enrich_repo", "ci"),
 }
 
 
@@ -186,17 +185,6 @@ async def enqueue_precompute(ctx: dict[str, Any], repo: Repository) -> None:
     )
 
 
-async def last_success(ctx: dict[str, Any], repo_id: int, kind: str) -> datetime | None:
-    """Return the latest successful finish time for this repository/job kind, or None."""
-    async with sessions_for(ctx)() as session:
-        return await session.scalar(
-            select(SyncJob.finished_at)
-            .where(SyncJob.repo_id == repo_id, SyncJob.kind == kind, SyncJob.status == "succeeded")
-            .order_by(SyncJob.finished_at.desc())
-            .limit(1)
-        )
-
-
 @dataclass
 class JobRun:
     ctx: dict[str, Any]
@@ -211,10 +199,10 @@ class JobRun:
     ) -> None:
         """Persist terminal status and permitted stats, then mark this run finished.
 
-        Failure text is capped at 500 characters; failed enrichment preserves existing stats.
+        Failure text is capped at 500 characters.
         """
         values: dict[str, Any] = {"status": result, "finished_at": now_for(self.ctx)}
-        if include_stats and (result == "succeeded" or self.kind != "ci_runs"):
+        if include_stats:
             values["stats"] = self.stats
         if error is not None:
             values["error"] = error[:500]
@@ -242,7 +230,7 @@ async def run_job(
             yield None
             return
         values: dict[str, Any] = {"status": "running", "started_at": now_for(ctx)}
-        if kind in {"rederive", "ci_runs"}:
+        if kind == "rederive":
             values["phase"] = kind
         await set_job(ctx, job_id, **values)
         run = JobRun(ctx, repo, job_id, kind)
@@ -252,7 +240,7 @@ async def run_job(
             # Follow-up queue failures after completion retain the original success ledger.
             if run.result != "running":
                 raise
-            sync = kind not in {"rederive", "ci_runs"}
+            sync = kind != "rederive"
             if sync:
                 status = (
                     "auth_error"
@@ -272,13 +260,7 @@ async def run_job(
                     else type(exc).__name__
                 )
             await run.finish("failed", error)
-            event = (
-                "sync_failed"
-                if sync
-                else "rederive_failed"
-                if kind == "rederive"
-                else "enrichment_failed"
-            )
+            event = "sync_failed" if sync else "rederive_failed"
             logger.error(event, repo=repo_full_name, job=job_id, error=error[:500])
         else:
             if run.result == "running":

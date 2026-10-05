@@ -41,10 +41,6 @@ def pr(identifier, *, offset=24, reviewer=20, author=5, merge=5, locations=("are
         f,
         intervals,
         identifier,
-        f"PR {identifier}",
-        f"https://github.com/a/b/pull/{identifier}",
-        "author",
-        False,
         at(offset),
         human_activity_at=tuple(
             at

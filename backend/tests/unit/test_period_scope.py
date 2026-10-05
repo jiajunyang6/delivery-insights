@@ -4,7 +4,6 @@ from datetime import date
 import pytest
 from tests.analytics_factory import dataset, pr
 from tests.factories import at, event, record
-from tests.unit.test_ci import run
 
 from insights.analytics.bottlenecks import series
 from insights.analytics.dataset import RepoData, SnapshotParams, Window, active_in
@@ -40,7 +39,7 @@ def period_records():
 
 def period_repo():
     return SyntheticRepo(
-        "a/b", "main", period_records(), (), date(2026, 1, 3), date(2026, 1, 3), at(72)
+        "a/b", "main", period_records(), date(2026, 1, 3), date(2026, 1, 3), at(72)
     )
 
 
@@ -70,22 +69,17 @@ def test_period_boundaries_do_not_leak_future_activity(created, activity, expect
     assert active_in(p, dataset([p]).current) is expected
 
 
-def test_inactive_bot_merged_pr_and_ci_are_excluded_with_consistent_totals():
+def test_inactive_bot_merged_pr_is_excluded_with_consistent_totals():
     active = pr(1)
     inactive = replace(pr(2), human_activity_at=())
     d = dataset(
         [active, inactive],
-        ci_runs=(("a/b", run(pr_numbers=(1, 2))), ("a/b", run(2, pr_numbers=(2,)))),
     )
-    s = build_snapshot(
-        d, params=SnapshotParams(("a/b",), d.period_from, d.period_to, ci_source="actions")
-    )
+    s = build_snapshot(d, params=SnapshotParams(("a/b",), d.period_from, d.period_to))
     assert s["efficiency"]["merged_prs"]["value"] == 1
     assert s["time_ledger"]["merged_prs"] == 1
     assert s["time_ledger"]["total_pr_hours"] == 30
     assert sum(w["merged"] for w in s["series"]["current"]) == 1
-    assert s["bottleneck_analysis"]["ci"]["queue_p50_minutes"]["n"] == 1
-    assert s["bottleneck_analysis"]["ci"]["flaky_rerun_rate"]["n"] == 1
 
 
 def test_weekly_series_keeps_the_full_selected_period_cohort():

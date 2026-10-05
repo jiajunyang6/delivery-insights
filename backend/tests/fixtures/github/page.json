@@ -7,7 +7,6 @@
     },
     "repository": {
       "nameWithOwner": "a/b",
-      "isArchived": false,
       "defaultBranchRef": {
         "name": "main"
       },

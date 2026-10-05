@@ -21,4 +21,3 @@ class PrFacts:
     commits_after_first_review: int = 0
     size_lines: int = 0
     locations: tuple[str, ...] = ()
-    ci_covered: bool = False

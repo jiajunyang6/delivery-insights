@@ -73,7 +73,7 @@ def parse_params(query: QueryParams, settings: Settings, now: datetime) -> Snaps
         dates["to"],
         settings.location_dimension,
         settings.directory_depth,
-        settings.ci_source,
+        sampling_profile="github",
     )
 
 

@@ -10,7 +10,6 @@ const healthy: SetupStatus = {
     region: "us-west-2",
     model_id: "us.anthropic.claude-sonnet-4-6",
     last_error: null,
-    last_error_at: null,
   },
 };
 

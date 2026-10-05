@@ -18,17 +18,17 @@ and `NOTES.md` describe the product, `docs/REFERENCE.md` holds the current contr
 
 | Path | Responsibility |
 |---|---|
-| `backend/src/insights/sources/github/` | GraphQL/REST client, queries and normalization (the only GitHub I/O) |
-| `backend/src/insights/sync/` | arq jobs: `queue.py` job lifecycle and locks, `jobs.py` sync runs, `store.py` writes, `derive.py` timelines/facts and rederivation, `enrichment.py` GitHub Actions CI runs |
+| `backend/src/insights/sources/github/` | GraphQL client, queries and normalization (the only GitHub I/O) |
+| `backend/src/insights/sync/` | arq jobs: `queue.py` job lifecycle and locks, `jobs.py` sync runs, `store.py` writes, `derive.py` timelines/facts and rederivation |
 | `backend/src/insights/db/` | SQLAlchemy models and loaders that turn rows into immutable records |
-| `backend/src/insights/analytics/` | Pure computation of the snapshot: timeline, facts, efficiency, time ledger, attribution, CI |
+| `backend/src/insights/analytics/` | Pure computation of the snapshot: timeline, facts, efficiency, time ledger, attribution |
 | `backend/src/insights/snapshots/` | Snapshot orchestration, readiness (202 Pending), caching and domain errors |
 | `backend/src/insights/narrative/` | Evidence pack, hypothesis scoring, prompt, validator, template fallback, LLM client |
-| `backend/src/insights/api/` | FastAPI routes, params, schemas (strict OpenAPI contract), errors, middleware |
+| `backend/src/insights/api/` | FastAPI report routes in `routes/insights.py`, health/repos, params, strict schemas, errors, middleware |
 | `backend/migrations/` | Alembic, currently one initial revision |
 | `backend/tests/` | Unit and integration tests, factories, golden snapshot (`tests/golden/`) |
 | `backend/eval/` | Synthetic scenarios and the narrative evaluation harness |
-| `frontend/src/` | React dashboard: components, `format.ts`, `hooks/useAbortable.ts` |
+| `frontend/src/` | React dashboard: components, `format.ts`, `api.ts` request cancellation |
 | `docs/` | `REFERENCE.md` contracts, `DECISIONS.md` why, `EVALUATION.md` eval runs, `PLAN.md` historical plan (not authoritative) |
 
 ## Commands
@@ -41,7 +41,7 @@ Python 3.12 with uv, Node 24, Docker Compose v2. Keep lockfiles; install with
 | `docker compose up --build -d` | Run the stack (dashboard :5173, API docs :8000/docs); needs `.env` from `.env.example` |
 | `make lint` / `make fmt` | Ruff + strict mypy / apply formatting and fixes |
 | `make test-unit` / `make test` | Unit tests / full suite (integration tests need Docker) |
-| `make eval-offline` | 20-case narrative evaluation with the stub LLM |
+| `make eval-offline` | 15-case narrative evaluation with the stub LLM |
 | `make eval` | Same against real Bedrock; needs the user's credentials, so ask the user to run it |
 | `npm test`, `npm run typecheck`, `npm run build` | Frontend checks (in `frontend/`) |
 

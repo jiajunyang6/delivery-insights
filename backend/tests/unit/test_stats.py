@@ -1,4 +1,3 @@
-import numpy as np
 import pytest
 
 from insights.analytics.stats import bootstrap_diff, percentile, seed_for
@@ -12,7 +11,7 @@ def test_quantiles_minimum_and_linear_interpolation():
     assert percentile([1], 50, 0) == 1
 
 
-@pytest.mark.parametrize("statistic", ["median", "p90", "mean"])
+@pytest.mark.parametrize("statistic", ["median", "mean"])
 def test_deterministic_bootstrap_matches_vectorized_reference(statistic):
     a, b, seed = [10.0, 20.0, 30.0], [1.0, 2.0, 3.0], 42
     assert bootstrap_diff(a, b, statistic, seed) == bootstrap_diff(a, b, statistic, seed)
@@ -21,11 +20,8 @@ def test_deterministic_bootstrap_matches_vectorized_reference(statistic):
     assert bootstrap_diff([1.0] * 30, [1.0] * 30, statistic, 7) == (0, 0)
 
 
-def test_paired_ratio_resampling():
-    values = [(2.0, 4.0), (20.0, 40.0)]
-    assert bootstrap_diff(values, values, "ratio", 42) == (0, 0)
+def test_seed_identity_and_empty_samples():
     assert seed_for("a", "x") != seed_for("a", "y")
     assert seed_for("a", "x") == seed_for("a", "x")
     with pytest.raises(ValueError):
         bootstrap_diff([], [1.0], "mean", 42)
-    assert np.isfinite(bootstrap_diff([(0.0, 0.0)], [(0.0, 0.0)], "ratio", 42)).all()

@@ -1,18 +1,20 @@
-"""Delivery snapshot endpoint; answers 202 Pending while data syncs."""
+"""Delivery snapshots and their cited narratives; adapt service replies to HTTP."""
 
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, Query, Request
 from starlette.responses import Response
 
 from insights.analytics.dataset import SnapshotParams
 from insights.api import deps
-from insights.api.params import parse_params
-from insights.api.responses import response
-from insights.api.schemas import Pending, Snapshot
+from insights.api.params import parse_params, validate_snapshot_id
+from insights.api.schemas import Narrative, Pending, Snapshot
+from insights.narrative.llm import LLMClient
+from insights.narrative.service import NarrativeService
+from insights.snapshots.caching import Reply
 from insights.snapshots.service import SnapshotService
 
-router = APIRouter(prefix="/v1/insights", tags=["Insights"])
+router = APIRouter(prefix="/v1")
 
 
 def parameters(
@@ -28,7 +30,12 @@ def parameters(
     return parse_params(request.query_params, service.settings, service.now)
 
 
-@router.get("/delivery", response_model=Snapshot, responses={202: {"model": Pending}, 304: {}})
+@router.get(
+    "/insights/delivery",
+    response_model=Snapshot,
+    responses={202: {"model": Pending}, 304: {}},
+    tags=["Insights"],
+)
 async def delivery(
     request: Request,
     params: Annotated[SnapshotParams, Depends(parameters)],
@@ -36,3 +43,32 @@ async def delivery(
 ) -> Response:
     """Serve current local analytics, honoring the request's conditional ETag."""
     return response(await service.delivery(params, request.headers.get("if-none-match")))
+
+
+@router.get(
+    "/snapshots/{snapshot_id}/narrative",
+    response_model=Narrative,
+    responses={304: {}},
+    tags=["Snapshots"],
+)
+async def narrative(
+    request: Request,
+    snapshot_id: str,
+    service: Annotated[SnapshotService, Depends(deps.get_snapshot_service)],
+) -> Response:
+    """Serve a retained snapshot's English narrative, honoring conditional ETags."""
+    sid = validate_snapshot_id(snapshot_id)
+    llm = cast(LLMClient | None, getattr(request.app.state, "llm", None))
+    return response(
+        await NarrativeService(service, llm).get(sid, request.headers.get("if-none-match"))
+    )
+
+
+def response(reply: Reply) -> Response:
+    """Convert domain reply bytes/status/headers into JSON, omitting media type for 304."""
+    return Response(
+        reply.body,
+        status_code=reply.status,
+        headers=reply.headers,
+        media_type=None if reply.status == 304 else "application/json",
+    )

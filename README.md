@@ -2,7 +2,7 @@
 
 Delivery Insights shows engineering managers and directors **where pull requests wait** and
 which evidence supports an explanation. It syncs GitHub PR history in the background, computes
-a deterministic time ledger and the evidence behind three scored hypotheses, and adds a cited
+a deterministic time ledger and the evidence behind two scored hypotheses, and adds a cited
 narrative written by Claude Sonnet 4.6 on Amazon Bedrock. Each claim in the narrative links to the number behind it, and every number comes from code.
 
 **Reviewers:** [NOTES.md](NOTES.md) covers how to run it, the architecture, next steps and AI use.
@@ -61,7 +61,7 @@ Until a period is covered, the API returns `202` with `Retry-After` and the dash
 - **Narrative:** root-cause hypotheses scored by fixed rules, with every claim cited to its
   metric. When delivery did not slow down, or evidence is too weak, it says so and points to
   where PR time goes now.
-- **Where PR time goes:** the time ledger of merged PRs across reviewer, author, CI and merge
+- **Where PR time goes:** the time ledger of merged PRs across reviewer, author and merge
   waiting, current period against the previous one.
 
 ## API
@@ -94,7 +94,6 @@ Settings come from `.env`; never commit it. Without `.env`, code defaults apply 
 | `BACKFILL_DAYS` | `120` | History to collect (30–365); the 60-day view needs at least 120 for a full comparison |
 | `PRECOMPUTE_DAYS` | `7,30,60` | Snapshot windows warmed after a successful sync changes repository data |
 | `LOCATION_DIMENSION` | `label:area-` | Area grouping: matching labels, otherwise directories |
-| `CI_SOURCE`, `CI_COMPLETE` | `actions`, `false` | GitHub Actions CI waiting; `false` caps CI-hypothesis confidence |
 
 ## Development
 
@@ -102,15 +101,15 @@ Settings come from `.env`; never commit it. Without `.env`, code defaults apply 
 make lint          # ruff + strict mypy
 make test-unit     # backend unit tests
 make test          # full suite; integration tests need Docker (Testcontainers)
-make eval-offline  # 20-case synthetic narrative evaluation with a stub LLM
+make eval-offline  # 15-case synthetic narrative evaluation with a stub LLM
 make eval          # same against real Bedrock (reads the key from .env)
 cd frontend && npm ci && npm test && npm run typecheck && npm run build
 ```
 
-Analytics version **1.7.0** keeps only the time ledger and the metrics behind the narrative
-evidence, and stores only the PR facts they read; retained values are unchanged.
-Snapshot/cache identities use 1.7.0; statistical sampling keeps the original 1.4.0 seed
-parameters.
+The snapshot contains the time ledger and the metrics supporting the review-capacity and
+PR-size hypotheses. CI telemetry, its hypothesis and Actions collection have been removed.
+Analytics and prompt versions isolate existing snapshots and narrative caches; workers
+rederive PR timelines from lifecycle events. Bootstrap sampling keeps its frozen identity.
 
 The unreleased application keeps one migration, `0001_initial`, which is edited in place
 until release. A database created by an earlier version of that file must be deleted and
@@ -127,8 +126,14 @@ checkpoints under the default configuration. Wait for repository `last_sync_stat
 and full coverage before checking the dashboard. Keep `BACKFILL_DAYS=120` for the 60-day
 view and its comparison period.
 
-Local checks: **326 backend tests** (261 unit, 65 integration), **15 frontend tests**,
-strict lint/types/build and all eight offline narrative gates pass.
+Local checks: **316 backend tests** (253 unit, 63 integration), **15 frontend tests**,
+strict lint/types/build and all eight offline narrative gates pass. The current prompt
+requires a new real Bedrock evaluation; previous real results are historical.
+
+The module cleanup preserves the OpenAPI contract and computed/narrative outputs. Request
+cancellation now lives in `frontend/src/api.ts`; frontend type checking also rejects unused
+locals and parameters. Current module boundaries are described in
+[REFERENCE.md](docs/REFERENCE.md#development).
 
 ## Documentation
 

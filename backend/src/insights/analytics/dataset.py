@@ -4,14 +4,13 @@ from bisect import bisect_left
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 from insights.analytics import ANALYTICS_VERSION
 from insights.analytics.classify import is_flow
 from insights.analytics.thresholds import THRESHOLDS_VERSION
 from insights.analytics.timeline import Interval, ledger_hours
 from insights.analytics.types import PrFacts
-from insights.domain import CiRun
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,7 +20,7 @@ class SnapshotParams:
     period_to: date
     location_dimension: str = "label:area-"
     directory_depth: int = 2
-    ci_source: str = "none"
+    sampling_profile: Literal["default", "github"] = field(default="default", kw_only=True)
 
     def canonical_dict(self) -> dict[str, Any]:
         """Return normalized parameters and versions used to identify deterministic snapshots."""
@@ -31,7 +30,7 @@ class SnapshotParams:
             "to": self.period_to.isoformat(),
             "location_dimension": self.location_dimension,
             "directory_depth": self.directory_depth,
-            "ci_source": self.ci_source,
+            "sampling_profile": self.sampling_profile,
             "analytics_version": ANALYTICS_VERSION,
             "thresholds_version": THRESHOLDS_VERSION,
         }
@@ -54,10 +53,6 @@ class PrData:
     facts: PrFacts
     intervals: tuple[Interval, ...]
     number: int
-    title: str
-    url: str
-    author: str | None
-    is_draft: bool
     created_at: datetime
     human_activity_at: tuple[datetime, ...] = ()
 
@@ -91,8 +86,6 @@ class Dataset:
     reviews: tuple[Review, ...]
     period_from: date
     period_to: date
-    ci_runs: tuple[tuple[str, CiRun], ...] = ()
-    current_day: bool = False
     # init=False gives every dataclasses.replace() an empty, independent cache.
     cohort_cache: dict[Window, tuple[tuple[PrData, ...], tuple[Review, ...] | None]] = field(
         default_factory=dict, init=False, compare=False, repr=False

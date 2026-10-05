@@ -35,7 +35,7 @@ async def precompute_snapshots(ctx: dict[str, Any], repo_full_name: str) -> None
             end,
             settings.location_dimension,
             settings.directory_depth,
-            settings.ci_source,
+            sampling_profile="github",
         )
         try:
             await service.delivery(params)

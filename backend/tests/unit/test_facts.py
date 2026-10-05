@@ -6,7 +6,7 @@ from insights.domain import Actor
 
 
 def facts(pr):
-    timeline = build_timeline(pr_input(pr), pr.events, (), at(30))
+    timeline = build_timeline(pr_input(pr), pr.events, at(30))
     return compute_facts(pr, pr.events, timeline, default_branch="main")
 
 

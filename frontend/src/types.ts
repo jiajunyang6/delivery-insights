@@ -1,5 +1,5 @@
 export type State =
-  "waiting_reviewer" | "waiting_author" | "waiting_ci" | "waiting_merge";
+  "waiting_reviewer" | "waiting_author" | "waiting_merge";
 export type Params = { repo: string; from: string; to: string };
 export interface DateLimits {
   earliest_from: string;
@@ -20,7 +20,6 @@ export interface SetupStatus {
     region: string;
     model_id: string;
     last_error: string | null;
-    last_error_at: string | null;
   };
 }
 export interface RepoList {
@@ -46,7 +45,6 @@ export interface Pending {
 export interface Snapshot {
   snapshot_id: string;
   time_ledger: {
-    ci_data_available: boolean;
     total_pr_hours: number;
     states: Record<
       State,

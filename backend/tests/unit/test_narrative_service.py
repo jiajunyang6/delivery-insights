@@ -20,7 +20,7 @@ NOW = datetime(2026, 3, 2, tzinfo=UTC)
 @pytest.mark.parametrize("mode", ["disabled", "first", "repair", "failed", "error", "second_error"])
 async def test_generation_repair_fallback_and_grounded_output(mode):
     snapshot = golden()
-    pack, _ = build_evidence_pack(snapshot, False)
+    pack, _ = build_evidence_pack(snapshot)
     valid = build_template(pack)
     bad = {"narrative": "Definitely 999 hours.", "hypotheses": []}
     script = {
@@ -31,7 +31,7 @@ async def test_generation_repair_fallback_and_grounded_output(mode):
         "second_error": [bad, LLMUnavailable("ReadTimeout")],
     }
     llm = FakeLLMClient(script[mode]) if mode != "disabled" else None
-    result = await generate(snapshot, llm=llm, ci_complete=False, now=NOW)
+    result = await generate(snapshot, llm=llm, now=NOW)
     Narrative.model_validate(result.payload)
     meta = result.payload["meta"]
     assert meta["pack_hash"] == digest(pack)[:16]
@@ -53,7 +53,7 @@ async def test_generation_repair_fallback_and_grounded_output(mode):
 
 async def test_missing_tool_use_repairs_with_text_message():
     snapshot = golden()
-    pack, _ = build_evidence_pack(snapshot, False)
+    pack, _ = build_evidence_pack(snapshot)
     valid = build_template(pack)
 
     class NoToolFirst(FakeLLMClient):
@@ -70,7 +70,7 @@ async def test_missing_tool_use_repairs_with_text_message():
             return await super().submit(**kwargs)
 
     llm = NoToolFirst([valid])
-    result = await generate(snapshot, llm=llm, ci_complete=False, now=NOW)
+    result = await generate(snapshot, llm=llm, now=NOW)
     assert result.payload["meta"]["validation"] == "passed"
     assert "text" in llm.calls[-1]["messages"][-1]["content"][0]
 
@@ -79,7 +79,7 @@ async def test_missing_tool_use_repairs_with_text_message():
 async def test_generate_downgrade_is_code_owned(target, expected, monkeypatch):
     snapshot, (pack, output) = golden(), validation_fixture()
     synthetic, evidence = scoring_fixture()
-    candidates, _ = score_hypotheses(synthetic, evidence, ci_complete=False)
+    candidates, _ = score_hypotheses(synthetic, evidence)
     candidates[0]["chain"] = pack["hypotheses"][0]["chain"]
     pack.update(lang="en", abstain_reason=None)
     import insights.narrative.service as service
@@ -93,7 +93,7 @@ async def test_generate_downgrade_is_code_owned(target, expected, monkeypatch):
         else "There are early signs that review capacity is the main cause [E1][E15]."
     )
     output["narrative"] = "Median cycle time rose 18% [E1]. " + h["statement"]
-    result = await generate(snapshot, llm=FakeLLMClient([output]), ci_complete=False, now=NOW)
+    result = await generate(snapshot, llm=FakeLLMClient([output]), now=NOW)
     assert result.payload["meta"]["generated_by"] == "llm"
     final = result.payload["hypotheses"][0]
     assert final["confidence"] == expected
@@ -102,7 +102,7 @@ async def test_generate_downgrade_is_code_owned(target, expected, monkeypatch):
 
 def test_assembly_resorts_after_downgrade_and_keeps_outside_score_fixed():
     snapshot, evidence = scoring_fixture()
-    candidates, _ = score_hypotheses(snapshot, evidence, ci_complete=False)
+    candidates, _ = score_hypotheses(snapshot, evidence)
     second = deepcopy(candidates[0])
     second.update(
         id="H_pr_size_growth",
@@ -111,7 +111,7 @@ def test_assembly_resorts_after_downgrade_and_keeps_outside_score_fixed():
         confidence_level="medium",
     )
     candidates.append(second)
-    pack, _ = build_evidence_pack(snapshot, False)
+    pack, _ = build_evidence_pack(snapshot)
     output = {
         "narrative": "Cycle data [E1].",
         "hypotheses": [

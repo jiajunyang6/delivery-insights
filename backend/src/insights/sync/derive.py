@@ -15,11 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
 from insights.analytics import derive_key
-from insights.analytics.ci import union_intervals
 from insights.analytics.facts import compute_facts
 from insights.analytics.timeline import build_timeline, check_invariants, pr_input
 from insights.config import Settings
-from insights.db.ci import load_ci_data
 from insights.db.models import PrFact, PrInterval, PullRequest, Repository
 from insights.db.records import load_records
 from insights.sync.queue import (
@@ -70,14 +68,12 @@ async def derive_prs(
         )
     }
     records = await load_records(session, prs)
-    ci = await load_ci_data(session, list(repositories), pr_ids=list(pr_ids))
     fact_values: list[dict[str, Any]] = []
     interval_values: list[dict[str, Any]] = []
     invariant_violations = 0
     for pr in prs:
         record = records[pr.id]
-        ci_intervals = union_intervals(ci.by_pr.get(pr.id, ()))
-        result = build_timeline(pr_input(record), record.events, ci_intervals, now)
+        result = build_timeline(pr_input(record), record.events, now)
         errors = check_invariants(result, pr_input(record))
         if errors:
             invariant_violations += 1
@@ -92,7 +88,6 @@ async def derive_prs(
             record.events,
             result,
             default_branch=repositories[pr.repo_id].default_branch or "",
-            ci_covered=bool(ci_intervals),
             location_dimension=settings.location_dimension,
             directory_depth=settings.directory_depth,
         )

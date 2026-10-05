@@ -1,4 +1,4 @@
-"""HTTP client for GitHub GraphQL and REST: retries, rate-limit waits and ETag caching."""
+"""HTTP client for GitHub GraphQL: retries and rate-limit waits."""
 
 from insights.domain import (
     GitHubAuthError,
@@ -17,44 +17,31 @@ __all__ = [
     "GitHubQueryError",
     "GitHubRateLimited",
     "GitHubTransientError",
-    "RestResponse",
 ]
 import asyncio
-from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from time import time
 from typing import Any, cast
 
 import httpx
-import orjson
 import structlog
-from redis.asyncio import Redis
-from redis.exceptions import RedisError
 
 from insights.config import Settings
-from insights.redis import github_etag_key
 
 logger = structlog.get_logger(__name__)
-
-
-@dataclass(frozen=True, slots=True)
-class RestResponse:
-    body: Any
 
 
 class GitHubClient:
     def __init__(
         self,
         settings: Settings,
-        redis: Redis | None = None,
         *,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         clock: Callable[[], float] = time,
     ) -> None:
         """Create authenticated HTTP/quota handling with injectable time and sleep."""
         self.settings = settings
-        self.redis = redis
         self.sleep = sleep
         self.clock = clock
         self.lock = asyncio.Lock()
@@ -71,7 +58,7 @@ class GitHubClient:
         )
 
     async def aclose(self) -> None:
-        """Close the owned HTTP client; supplied Redis remains caller-owned."""
+        """Close the owned HTTP client."""
         await self.http.aclose()
 
     async def _wait(self, delay: float, waited: float, reason: str) -> float:
@@ -180,44 +167,3 @@ class GitHubClient:
                     reset = datetime.fromisoformat(rate["resetAt"]).timestamp()
                     await self._wait(reset + 5 - self.clock(), 0, "low_quota")
             return cast(dict[str, Any], data)
-
-    async def rest_get(
-        self,
-        path: str,
-        params: Mapping[str, str | int] | None = None,
-    ) -> RestResponse:
-        """Fetch a relative API path, reusing an ETag only with its cached response body.
-
-        Relative paths keep authenticated requests on the configured GitHub API host.
-        Redis is best-effort; a 304 without a body is an error, never an empty success.
-        """
-        if not path.startswith("/") or path.startswith("//") or "://" in path or "\\" in path:
-            raise ValueError("REST path must be a relative API path")
-        url = str(httpx.URL(self.settings.github_api_url.rstrip("/") + path, params=params))
-        key = github_etag_key(url)
-        async with self.lock:
-            cached: dict[bytes, bytes] = {}
-            if self.redis is not None:
-                try:
-                    cached = await cast(Awaitable[dict[bytes, bytes]], self.redis.hgetall(key))
-                except RedisError:
-                    logger.warning("github_cache_unavailable")
-            headers: dict[str, str] = {}
-            if b"etag" in cached and b"body" in cached:
-                headers["If-None-Match"] = cached[b"etag"].decode()
-            response = await self._request("GET", url, headers=headers)
-            if response.status_code == 304:
-                if b"body" not in cached:
-                    raise GitHubQueryError("conditional_response_without_cache")
-                return RestResponse(orjson.loads(cached[b"body"]))
-            body: Any = response.json()
-            etag = response.headers.get("etag")
-            if self.redis is not None and etag:
-                try:
-                    async with self.redis.pipeline(transaction=True) as pipeline:
-                        pipeline.hset(key, mapping={"etag": etag, "body": orjson.dumps(body)})
-                        pipeline.expire(key, 7 * 86400)
-                        await pipeline.execute()
-                except RedisError:
-                    logger.warning("github_cache_unavailable")
-            return RestResponse(body)

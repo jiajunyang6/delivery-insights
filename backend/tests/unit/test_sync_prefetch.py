@@ -16,7 +16,7 @@ NOW = datetime(2026, 3, 2, tzinfo=UTC)
 
 def page(cursor=None, more=False, days=0):
     updated = NOW - timedelta(days=days)
-    return PageResult(RepositoryInfo("a/b", "main", False), (), cursor, more, updated, updated, 1)
+    return PageResult(RepositoryInfo("a/b", "main"), (), cursor, more, updated, updated, 1)
 
 
 def run():

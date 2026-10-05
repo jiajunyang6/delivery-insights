@@ -143,7 +143,6 @@ class PrFact(Base):
     commits_after_first_review: Mapped[int] = mapped_column(Integer)
     size_lines: Mapped[int] = mapped_column(Integer)
     locations: Mapped[list[str]] = mapped_column(ARRAY(Text))
-    ci_covered: Mapped[bool] = mapped_column(Boolean, server_default=text("FALSE"))
     derive_key: Mapped[str | None] = mapped_column(Text)
     __table_args__ = (
         Index("ix_facts_repo_merged", "repo_id", "merged_at"),
@@ -167,27 +166,6 @@ class PrInterval(Base):
     __table_args__ = (
         UniqueConstraint("pr_id", "seq"),
         Index("ix_intervals_repo_state_start", "repo_id", "state", "start_at"),
-    )
-
-
-class WorkflowRun(Base):
-    __tablename__ = "workflow_runs"
-
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
-    repo_id: Mapped[int] = mapped_column(Integer, ForeignKey("repositories.id", ondelete="CASCADE"))
-    workflow_name: Mapped[str] = mapped_column(Text)
-    event: Mapped[str] = mapped_column(Text)
-    head_sha: Mapped[str] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(Text)
-    conclusion: Mapped[str | None] = mapped_column(Text)
-    run_attempt: Mapped[int] = mapped_column(Integer)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    run_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    pr_numbers: Mapped[list[int]] = mapped_column(ARRAY(Integer), server_default=text("'{}'"))
-    __table_args__ = (
-        Index("ix_runs_repo_sha", "repo_id", "head_sha"),
-        Index("ix_runs_repo_created", "repo_id", "created_at"),
     )
 
 

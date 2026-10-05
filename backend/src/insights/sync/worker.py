@@ -11,7 +11,6 @@ from insights.logging import configure_logging
 from insights.sources.github.adapter import GitHubAdapter
 from insights.sources.github.client import GitHubClient
 from insights.sync.derive import rederive_repo
-from insights.sync.enrichment import enrich_repo
 from insights.sync.jobs import incremental_sync_all, reconcile_tracked_repos, sync_repo
 from insights.sync.maintenance import housekeeping, precompute_snapshots
 
@@ -21,7 +20,7 @@ async def startup(ctx: dict[str, Any]) -> None:
     settings = Settings()
     configure_logging(settings.log_level)
     engine, sessions = create_database(settings)
-    client = GitHubClient(settings, ctx["redis"])
+    client = GitHubClient(settings)
     ctx.update(
         settings=settings,
         engine=engine,
@@ -44,7 +43,6 @@ class WorkerSettings:
         rederive_repo,
         precompute_snapshots,
         housekeeping,
-        enrich_repo,
     ]
     cron_jobs: ClassVar[list[Any]] = [
         cron(incremental_sync_all, minute=set(range(0, 60, Settings().sync_interval_minutes))),

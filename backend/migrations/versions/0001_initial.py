@@ -156,32 +156,6 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_table(
-        "workflow_runs",
-        sa.Column("id", sa.BigInteger(), autoincrement=False, nullable=False),
-        sa.Column("repo_id", sa.Integer(), nullable=False),
-        sa.Column("workflow_name", sa.Text(), nullable=False),
-        sa.Column("event", sa.Text(), nullable=False),
-        sa.Column("head_sha", sa.Text(), nullable=False),
-        sa.Column("status", sa.Text(), nullable=False),
-        sa.Column("conclusion", sa.Text(), nullable=True),
-        sa.Column("run_attempt", sa.Integer(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("run_started_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column(
-            "pr_numbers",
-            postgresql.ARRAY(sa.Integer()),
-            server_default=sa.text("'{}'"),
-            nullable=False,
-        ),
-        sa.ForeignKeyConstraint(["repo_id"], ["repositories.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("id"),
-    )
-    op.create_index(
-        "ix_runs_repo_created", "workflow_runs", ["repo_id", "created_at"], unique=False
-    )
-    op.create_index("ix_runs_repo_sha", "workflow_runs", ["repo_id", "head_sha"], unique=False)
-    op.create_table(
         "pr_events",
         sa.Column("id", sa.BigInteger(), nullable=False),
         sa.Column("pr_id", sa.BigInteger(), nullable=False),
@@ -221,7 +195,6 @@ def upgrade() -> None:
         sa.Column("commits_after_first_review", sa.Integer(), nullable=False),
         sa.Column("size_lines", sa.Integer(), nullable=False),
         sa.Column("locations", postgresql.ARRAY(sa.Text()), nullable=False),
-        sa.Column("ci_covered", sa.Boolean(), server_default=sa.text("FALSE"), nullable=False),
         sa.Column("derive_key", sa.Text(), nullable=True),
         sa.ForeignKeyConstraint(["pr_id"], ["pull_requests.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["repo_id"], ["repositories.id"], ondelete="CASCADE"),
@@ -271,9 +244,6 @@ def downgrade() -> None:
     op.drop_index("ix_events_pr_time", table_name="pr_events")
     op.drop_index("ix_events_kind_time", table_name="pr_events")
     op.drop_table("pr_events")
-    op.drop_index("ix_runs_repo_sha", table_name="workflow_runs")
-    op.drop_index("ix_runs_repo_created", table_name="workflow_runs")
-    op.drop_table("workflow_runs")
     op.drop_index("ix_sync_jobs_repo_created", table_name="sync_jobs")
     op.drop_table("sync_jobs")
     op.drop_index("ix_pr_repo_updated", table_name="pull_requests")

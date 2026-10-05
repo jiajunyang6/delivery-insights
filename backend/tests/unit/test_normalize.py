@@ -3,7 +3,6 @@ from dataclasses import asdict, replace
 import pytest
 
 from insights.domain import EventKind
-from insights.sources.github.actions import normalize_run
 from insights.sources.github.normalize import actor, normalize_pr, remove_nulls
 from insights.sync.store import content_hash
 
@@ -66,28 +65,6 @@ def test_all_upstream_strings_are_cleaned_before_hashing(github_page):
     assert asdict(dirty) == asdict(clean)
     assert content_hash(dirty) == content_hash(clean)
     assert remove_nulls({"nested\x00": ["a\x00", {"b": "c\x00"}]}) == {"nested": ["a", {"b": "c"}]}
-
-
-def test_workflow_strings_are_cleaned():
-    run = normalize_run(
-        {
-            "id": 1,
-            "name": "work\x00flow",
-            "event": "pull\x00_request",
-            "head_sha": "a\x00bc",
-            "status": "com\x00pleted",
-            "conclusion": "suc\x00cess",
-            "created_at": "2026-01-01T00:00:00Z",
-            "updated_at": "2026-01-01T01:00:00Z",
-        }
-    )
-    assert (run.workflow_name, run.event, run.head_sha, run.status, run.conclusion) == (
-        "workflow",
-        "pull_request",
-        "abc",
-        "completed",
-        "success",
-    )
 
 
 def test_dismissals_keep_original_decision_and_distinct_ids(github_page):

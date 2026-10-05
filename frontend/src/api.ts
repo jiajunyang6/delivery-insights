@@ -1,4 +1,17 @@
+import { useEffect, type DependencyList } from "react";
 import type { Params, Pending, Snapshot } from "./types";
+
+/** Abort superseded requests and the current request on unmount. */
+export function useAbortable(
+  effect: (signal: AbortSignal) => void,
+  dependencies: DependencyList,
+) {
+  useEffect(() => {
+    const controller = new AbortController();
+    effect(controller.signal);
+    return () => controller.abort();
+  }, dependencies);
+}
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 export class ApiProblem extends Error {
@@ -62,7 +75,7 @@ export async function fetchJson<T>(
     headers: response.headers,
   };
 }
-export function query(params: Params): string {
+function query(params: Params): string {
   return new URLSearchParams(params).toString();
 }
 function wait(milliseconds: number, signal: AbortSignal) {

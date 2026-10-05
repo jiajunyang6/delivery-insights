@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from insights import __version__
 from insights.api.errors import install_handlers
 from insights.api.middleware import RequestMiddleware
-from insights.api.routes import health, insights, repos, snapshots
+from insights.api.routes import health, insights, repos
 from insights.config import Settings, get_settings, split_list
 from insights.db.engine import create_database
 from insights.logging import configure_logging
@@ -56,7 +56,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = configuration
     install_handlers(app)
     app.include_router(health.router)
-    for router in (insights.router, snapshots.router, repos.router):
+    for router in (insights.router, repos.router):
         app.include_router(router)
     app.add_middleware(
         CORSMiddleware,

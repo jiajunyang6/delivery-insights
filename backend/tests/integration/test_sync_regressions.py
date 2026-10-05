@@ -23,7 +23,7 @@ pytestmark = pytest.mark.integration
 def page(*records, cursor=None, more=False):
     dates = [pr.updated_at for pr in records]
     return PageResult(
-        RepositoryInfo("a/b", "main", False),
+        RepositoryInfo("a/b", "main"),
         tuple(records),
         cursor,
         more,

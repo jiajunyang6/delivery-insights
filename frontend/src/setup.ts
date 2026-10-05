@@ -10,7 +10,7 @@ const AUTH_ERRORS = new Set([
 const MODEL_ERRORS = new Set(["ValidationException", "ResourceNotFoundException"]);
 const ENDPOINT_ERRORS = new Set(["EndpointConnectionError", "NoRegionError"]);
 
-export type SetupItem = { level: "problem" | "info"; text: string };
+type SetupItem = { level: "problem" | "info"; text: string };
 
 /** Turn configuration health into fixes that name the exact `.env` variable to change. */
 export function setupItems(setup: SetupStatus): SetupItem[] {

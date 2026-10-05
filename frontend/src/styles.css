@@ -49,8 +49,7 @@ button:disabled {
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
-select:focus-visible,
-summary:focus-visible {
+select:focus-visible {
   outline: 3px solid #dda84c;
   outline-offset: 3px;
 }
@@ -291,7 +290,6 @@ main {
   text-transform: uppercase;
   white-space: nowrap;
 }
-tbody tr:last-child td,
 .narrative-panel {
   border-top: 3px solid #428e75;
 }
@@ -467,10 +465,6 @@ tbody tr:last-child td,
 .look-first p {
   margin: 0 0 8px;
   line-height: 1.6;
-}
-.look-first a {
-  color: var(--green);
-  font-size: 12px;
 }
 .action {
   border-top: 1px solid #dfe7d8;

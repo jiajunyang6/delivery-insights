@@ -7,7 +7,7 @@ from datetime import datetime
 
 from insights.domain import Event, EventKind, PullRequestRecord
 
-WAITING_STATES = ("waiting_reviewer", "waiting_author", "waiting_ci", "waiting_merge")
+WAITING_STATES = ("waiting_reviewer", "waiting_author", "waiting_merge")
 # GitHub can report several actions at one instant; tie-breaking must not depend on page order.
 EVENT_ORDER = {
     kind: index
@@ -107,13 +107,12 @@ def compute_ready_at(pr: PrInput, events: Sequence[Event]) -> datetime | None:
 def build_timeline(
     pr: PrInput,
     events: Sequence[Event],
-    ci_intervals: Sequence[tuple[datetime, datetime]],
     now: datetime,
 ) -> TimelineResult:
     """Split a PR's life into contiguous state intervals; pure and deterministic.
 
     Before ready_at there is at most one coding interval. From ready_at the state is re-evaluated
-    at every event and CI boundary until merge, close or now; an open PR's last interval has
+    at every event until merge, close or now; an open PR's last interval has
     end_at None. review_rounds counts entries into waiting_author caused by review feedback.
 
     Consecutive feedback while already waiting_author is one round; approval-only PRs can
@@ -210,9 +209,9 @@ def build_timeline(
         return feedback
 
     # Precedence: paused, draft, approved with no outstanding change request, unanswered
-    # feedback, CI running, else waiting on a reviewer.
+    # feedback, else waiting on a reviewer.
     def evaluate(at: datetime) -> str:
-        """Choose the state using pause, draft, decision, feedback, CI and reviewer precedence."""
+        """Choose the state using pause, draft, decision, feedback and reviewer precedence."""
         if flags["paused"]:
             return "closed"
         if flags["draft"]:
@@ -222,8 +221,6 @@ def build_timeline(
             return "waiting_merge"
         if last_feedback is not None and (last_update is None or last_feedback > last_update):
             return "waiting_author"
-        if any(start <= at < end for start, end in ci_intervals):
-            return "waiting_ci"
         return "waiting_reviewer"
 
     grouped: dict[datetime, list[Event]] = defaultdict(list)
@@ -234,9 +231,6 @@ def build_timeline(
             grouped[event.occurred_at].append(event)
     flags["draft"] = False
     boundaries = set(grouped)
-    boundaries.update(
-        point for pair in ci_intervals for point in pair if ready_at < point < horizon
-    )
     current, segment_start, rounds = evaluate(ready_at), ready_at, 0
     for at in sorted(boundaries):
         # Evaluate after all simultaneous events to avoid zero-length states and extra rounds.

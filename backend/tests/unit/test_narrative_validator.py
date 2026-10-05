@@ -273,6 +273,23 @@ def test_medium_wording_and_same_level_downgrade():
     assert "V8:invalid_downgrade" in codes(output, pack)
 
 
+@pytest.mark.parametrize("stronger", ["likely", "may", "might", "possibly", "could"])
+def test_low_statement_rejects_stronger_words_even_with_a_high_primary(stronger):
+    pack, output = validation_fixture()
+    secondary = deepcopy(pack["hypotheses"][0])
+    secondary.update(id="H_pr_size_growth", level="low")
+    pack["hypotheses"].append(secondary)
+    statement = (
+        "There are early signs that larger PRs are the main cause of slower cycle time [E1]."
+    )
+    output["hypotheses"].append({"id": secondary["id"], "statement": statement})
+    assert not codes(output, pack)
+    output["hypotheses"][1]["statement"] = statement.replace(
+        "larger PRs are", f"larger PRs {stronger} drive"
+    )
+    assert "V7:hedge_mismatch" in codes(output, pack)
+
+
 @pytest.mark.parametrize("field", ["narrative", "statement", "downgrade", "outside"])
 def test_non_english_text_is_rejected_in_every_generated_field(field):
     pack, output = validation_fixture()

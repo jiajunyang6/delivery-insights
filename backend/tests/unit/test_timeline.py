@@ -79,7 +79,7 @@ M = "waiting_merge"
             16,
             [event("review", 3, state="COMMENTED"), event("commit", 5), event("review", 7)],
             {},
-            [R, "waiting_ci", A, "waiting_ci", M],
+            [R, A, R, M],
             1,
         ),
         (17, [event("review", 2), event("review", 4, state="COMMENTED")], {}, [R, M], 0),
@@ -136,12 +136,11 @@ M = "waiting_merge"
 )
 def test_spec_cases(case, events, changes, states, rounds):
     pr = record(events=tuple(events), **changes)
-    ci = [(at(1), at(8))] if case == 16 else []
-    result = build_timeline(pr_input(pr), pr.events, ci, at(20))
+    result = build_timeline(pr_input(pr), pr.events, at(20))
     assert [i.state for i in result.intervals] == states
     assert result.review_rounds == rounds
     assert check_invariants(result, pr_input(pr)) == []
-    assert build_timeline(pr_input(pr), pr.events, ci, at(20)) == result
+    assert build_timeline(pr_input(pr), pr.events, at(20)) == result
     if case == 11:
         assert sum(ledger_hours(result.intervals, start=at(0), end=at(10)).values()) == 8
     if case == 15:
@@ -150,7 +149,7 @@ def test_spec_cases(case, events, changes, states, rounds):
 
 def test_ledger_clipping_skips_closed_time():
     pr = record(events=(event("closed", 2), event("reopened", 4)))
-    timeline = build_timeline(pr_input(pr), pr.events, (), at(20))
+    timeline = build_timeline(pr_input(pr), pr.events, at(20))
     assert ledger_hours(timeline.intervals, start=at(1), end=at(5))[R] == 2
 
 
@@ -181,5 +180,5 @@ def test_random_legal_sequences_invariants():
         )
         if index % 5 == 0:
             pr = replace(pr, state="OPEN", merged_at=None, closed_at=None)
-        result = build_timeline(pr_input(pr), pr.events, (), at(40))
+        result = build_timeline(pr_input(pr), pr.events, at(40))
         assert not check_invariants(result, pr_input(pr)), (index, result)

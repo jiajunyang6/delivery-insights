@@ -7,11 +7,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from insights.analytics.pointer import resolve_pointer
-from insights.analytics.thresholds import CI_COVERAGE_MIN
-from insights.narrative.catalog import CATALOG
 from insights.narrative.hypotheses import (
-    CI_EVIDENCE_IDS,
-    CI_RUN_IDS,
     changed,
     effect_size,
     explains,
@@ -19,12 +15,128 @@ from insights.narrative.hypotheses import (
     score_hypotheses,
 )
 
+# IDs are stable and sparse; retired metrics leave gaps. Location IDs are added below.
+CATALOG = (
+    (
+        "E1",
+        "cycle_time_p50",
+        "Median cycle time",
+        "/efficiency/cycle_time_p50_hours",
+        "hours",
+        "efficiency",
+    ),
+    ("E3", "merged_prs", "Merged PRs", "/efficiency/merged_prs", "count", "efficiency"),
+    (
+        "E8",
+        "avg_review_rounds",
+        "Average review rounds per merged PR",
+        "/efficiency/avg_review_rounds",
+        "rounds",
+        "efficiency",
+    ),
+    (
+        "E9",
+        "post_review_commit_share",
+        "Share of merged PRs with commits after the first review",
+        "/efficiency/post_review_commit_share",
+        "share",
+        "efficiency",
+    ),
+    (
+        "E15",
+        "pickup_p50",
+        "Median wait for the first review",
+        "/efficiency/pickup_p50_hours",
+        "hours",
+        "bottleneck",
+    ),
+    (
+        "E18",
+        "ledger_waiting_reviewer",
+        "Share of PR time waiting on reviewers",
+        "/time_ledger/states/waiting_reviewer",
+        "share",
+        "bottleneck",
+    ),
+    (
+        "E19",
+        "ledger_waiting_author",
+        "Share of PR time waiting on authors",
+        "/time_ledger/states/waiting_author",
+        "share",
+        "bottleneck",
+    ),
+    (
+        "E21",
+        "ledger_waiting_merge",
+        "Share of PR time waiting to merge after approval",
+        "/time_ledger/states/waiting_merge",
+        "share",
+        "bottleneck",
+    ),
+    (
+        "E22",
+        "queue_weeks_imbalanced",
+        "Weeks in which review demand exceeded first reviews",
+        "/bottleneck_analysis/review_queue/weeks_inflow_exceeds_outflow",
+        "count",
+        "bottleneck",
+    ),
+    (
+        "E24",
+        "review_concentration",
+        "Share of reviews done by the top K reviewers",
+        "/efficiency/review_concentration_top_k",
+        "share",
+        "bottleneck",
+    ),
+    (
+        "E30",
+        "pr_size_p50",
+        "Median PR size",
+        "/efficiency/pr_size_p50_lines",
+        "lines",
+        "bottleneck",
+    ),
+    (
+        "E31",
+        "large_pr_share",
+        "Share of merged PRs with 500 or more changed lines",
+        "/efficiency/large_pr_share",
+        "share",
+        "bottleneck",
+    ),
+    (
+        "E37",
+        "attr_waiting_reviewer_increase",
+        "Share of the added time spent waiting on reviewers",
+        "/trend/attribution/states/waiting_reviewer/share_of_increase",
+        "share",
+        "bottleneck",
+    ),
+    (
+        "E42",
+        "attr_large_prs_increase",
+        "Share of the added cycle time coming from PRs with 500+ lines",
+        "/trend/attribution/large_prs/share_of_increase",
+        "share",
+        "bottleneck",
+    ),
+    (
+        "E48",
+        "slowest_decile_size_ratio",
+        "Median size of the slowest 10% of PRs vs the rest",
+        "/drivers/slowest_decile_size_ratio",
+        "ratio",
+        "bottleneck",
+    ),
+)
+
 SAFE_LOCATION = re.compile(r"^[A-Za-z0-9._:/+#-]{1,120}$")
 WEIGHTS = {
     "E1": 1.0,
     "E15": 0.9,
     "E18": 0.8,
-    "E20": 0.7,
     "E3": 0.6,
     "E8": 0.6,
     "E30": 0.6,
@@ -46,7 +158,7 @@ def extract_evidence(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Resolve catalog and location items from the snapshot.
 
     Items whose pointer is missing or whose value is None are skipped, so IDs can be sparse.
-    E20 and E39 are omitted when the snapshot has no CI data. Up to five locations other than
+    Up to five locations other than
     "other" get a first-review ratio and an added-wait share (see location_id). Entries keep
     their pointer for the API response; the pack strips it.
     """
@@ -125,11 +237,6 @@ def extract_evidence(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
         entries.append(entry)
 
     for identifier, key, label, ref, unit, side in CATALOG:
-        if (
-            identifier in CI_EVIDENCE_IDS - CI_RUN_IDS
-            and not snapshot["time_ledger"]["ci_data_available"]
-        ):
-            continue
         add(identifier, key, label, ref, unit, side)
     locations = [
         (i, loc)
@@ -217,7 +324,6 @@ def observations(
 
 def build_evidence_pack(
     snapshot: Mapping[str, Any],
-    ci_complete: bool,
     *,
     evidence: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -230,9 +336,7 @@ def build_evidence_pack(
     """
     if evidence is None:
         evidence = extract_evidence(snapshot)
-    candidates, abstain = score_hypotheses(
-        snapshot, {e["id"]: e for e in evidence}, ci_complete=ci_complete
-    )
+    candidates, abstain = score_hypotheses(snapshot, {e["id"]: e for e in evidence})
     locations: dict[str, str] = {}
 
     def sanitize(name: str | None) -> str | None:
@@ -259,12 +363,6 @@ def build_evidence_pack(
     gaps = []
     if not snapshot["meta"]["comparison_available"]:
         gaps.append("no_comparison")
-    if not (
-        snapshot["time_ledger"]["ci_data_available"]
-        and snapshot["time_ledger"]["ci_coverage"] >= CI_COVERAGE_MIN
-        and ci_complete
-    ):
-        gaps.append("ci_data_incomplete")
     if snapshot["meta"]["sample"]["merged_prs"] < 30:
         gaps.append("few_samples")
     pack = {

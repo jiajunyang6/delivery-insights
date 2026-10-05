@@ -1,6 +1,5 @@
 import type { DateLimits, Params, RepoStatus } from "../types";
-import { dateRange } from "../format";
-import { isPeriodSelected, periodError } from "../period";
+import { dateRange, isPeriodSelected, periodError } from "../format";
 
 interface Props {
   params: Params;

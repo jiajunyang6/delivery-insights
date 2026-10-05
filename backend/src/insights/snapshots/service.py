@@ -1,4 +1,4 @@
-"""Snapshot delivery: readiness checks, cache and database lookup, computation and row paging."""
+"""Snapshot delivery: readiness checks, cache and database lookup, and pure computation."""
 
 import asyncio
 from collections.abc import AsyncIterator, Awaitable
@@ -181,7 +181,6 @@ class SnapshotService:
             (),
             params.period_from,
             params.period_to,
-            current_day=params.period_to == self.now.date(),
         )
 
     @staticmethod
@@ -275,7 +274,7 @@ class SnapshotService:
             if stored is not None:
                 return stored
             load_started = perf_counter()
-            dataset = await load_dataset(session, params, now=self.now, metadata=metadata)
+            dataset = await load_dataset(session, params, metadata=metadata)
             load_ms = (perf_counter() - load_started) * 1000
             compute_started = perf_counter()
             # SQL has already materialized immutable records; the CPU work uses no DB session

@@ -12,7 +12,6 @@ from insights.narrative.validator import ABSTAIN_SENTENCES
 WAITING = {
     "E18": "waiting on reviewers",
     "E19": "waiting on authors",
-    "E20": "waiting on CI",
     "E21": "waiting to merge after approval",
 }
 

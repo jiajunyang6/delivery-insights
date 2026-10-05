@@ -56,7 +56,7 @@ async def context(migrated_database, redis_url, respx_mock):
     engine = create_async_engine(migrated_database)
     redis = await create_pool(RedisSettings.from_dsn(redis_url))
     await redis.flushdb()
-    client = GitHubClient(settings, redis, sleep=AsyncMock())
+    client = GitHubClient(settings, sleep=AsyncMock())
     ctx = {
         "settings": settings,
         "engine": engine,

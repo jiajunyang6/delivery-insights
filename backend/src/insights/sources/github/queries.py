@@ -50,7 +50,6 @@ PULL_REQUESTS_PAGE = (
   rateLimit { cost remaining resetAt }
   repository(owner: $owner, name: $name) {
     nameWithOwner
-    isArchived
     defaultBranchRef { name }
     pullRequests(first: $pageSize, after: $cursor, states: $states, orderBy: {field: UPDATED_AT,
     direction: DESC}) {

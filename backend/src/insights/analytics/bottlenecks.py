@@ -49,13 +49,10 @@ def time_ledger(dataset: Dataset) -> dict[str, Any]:
             "previous_share": previous_share if comparison else None,
             "change_pp": (share - previous_share) * 100 if comparison else None,
         }
-    coverage = ratio(sum(p.facts.ci_covered for p in current), len(current))
     return {
         "merged_prs": len(current),
         "total_pr_hours": total,
         "states": states,
-        "ci_coverage": coverage,
-        "ci_data_available": coverage > 0,
     }
 
 
@@ -158,9 +155,6 @@ def series(dataset: Dataset, window: Window) -> list[dict[str, Any]]:
                 "waiting_reviewer_share": ratio(totals["waiting_reviewer"], sum(totals.values()))
                 if prs
                 else None,
-                "waiting_ci_share": ratio(totals["waiting_ci"], sum(totals.values()))
-                if prs
-                else None,
             }
         )
     return result
@@ -239,10 +233,3 @@ def attribution(
             else 0,
         },
     }
-
-
-def trend(
-    dataset: Dataset, ledger: dict[str, Any], locations_: list[dict[str, Any]]
-) -> dict[str, Any]:
-    """Wrap the accounting attribution, or None when a comparable sample is unavailable."""
-    return {"attribution": attribution(dataset, ledger, locations_)}

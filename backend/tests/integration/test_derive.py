@@ -28,7 +28,7 @@ async def seed(ctx, count=1):
         )
         for i in range(1, count + 1)
     )
-    page = PageResult(RepositoryInfo("a/b", "main", False), records, None, False, at(10), at(10), 1)
+    page = PageResult(RepositoryInfo("a/b", "main"), records, None, False, at(10), at(10), 1)
     async with ctx["session_factory"]() as session, session.begin():
         repo = await ensure_repo(session, "a/b", NOW)
         saved = await save_page(session, repo.id, page, now=NOW, settings=ctx["settings"])

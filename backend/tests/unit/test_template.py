@@ -20,11 +20,9 @@ def snapshot_for(name):
     )
 
 
-@pytest.mark.parametrize(
-    "name", ["golden", "review_capacity", "pr_size_growth", "ci_slowdown", "no_signal"]
-)
+@pytest.mark.parametrize("name", ["golden", "review_capacity", "pr_size_growth", "no_signal"])
 def test_all_templates_pass_the_same_validator(name):
-    pack, _ = build_evidence_pack(snapshot_for(name), False)
+    pack, _ = build_evidence_pack(snapshot_for(name))
     output = build_template(pack)
     assert validate(output, pack) == []
     assert len(output["narrative"].split(". ")) == 3
@@ -35,7 +33,7 @@ def test_sparse_snapshot_and_no_comparison_templates():
     snapshot["meta"]["comparison_available"] = False
     snapshot["efficiency"]["cycle_time_p50_hours"]["previous"] = None
     snapshot["efficiency"]["cycle_time_p50_hours"]["change_rel"] = None
-    pack, _ = build_evidence_pack(snapshot, False)
+    pack, _ = build_evidence_pack(snapshot)
     assert not pack["hypotheses"] and pack["abstain_reason"] == "no_comparison"
     assert not validate(build_template(pack), pack)
 
@@ -47,7 +45,7 @@ def test_too_few_merged_and_real_no_comparison():
     for sparse in (False, True):
         if sparse:
             snapshot["efficiency"]["cycle_time_p50_hours"]["value"] = None
-        pack, _ = build_evidence_pack(snapshot, False)
+        pack, _ = build_evidence_pack(snapshot)
         output = build_template(pack)
         assert not validate(output, pack)
         assert pack["abstain_reason"] == "no_comparison"
@@ -56,7 +54,7 @@ def test_too_few_merged_and_real_no_comparison():
 
 
 def test_no_slowdown_template_states_it_and_shows_where_time_goes():
-    pack, _ = build_evidence_pack(snapshot_for("no_signal"), False)
+    pack, _ = build_evidence_pack(snapshot_for("no_signal"))
     assert pack["abstain_reason"] == "no_slowdown"
     output = build_template(pack)
     assert "There is no slowdown to explain this period" in output["narrative"]
@@ -77,9 +75,9 @@ def test_explains_names_only_the_changes_each_symptom_records():
     )
 
 
-@pytest.mark.parametrize("name", ["review_capacity", "pr_size_growth", "ci_slowdown"])
+@pytest.mark.parametrize("name", ["review_capacity", "pr_size_growth"])
 def test_cause_sentences_name_what_the_hypothesis_explains(name):
-    pack, _ = build_evidence_pack(snapshot_for(name), False)
+    pack, _ = build_evidence_pack(snapshot_for(name))
     output = build_template(pack)
     assert pack["hypotheses"]
     for candidate, statement in zip(pack["hypotheses"], output["hypotheses"], strict=True):

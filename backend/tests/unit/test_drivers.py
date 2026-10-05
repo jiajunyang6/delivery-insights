@@ -1,6 +1,6 @@
 from tests.analytics_factory import dataset, pr
 
-from insights.analytics.drivers import slowest_decile_size_ratio
+from insights.analytics.efficiency import slowest_decile_size_ratio
 
 
 def test_slowest_decile_size_ratio_uses_ceil_and_sample_gates():

@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from insights.analytics.snapshot import iso
 
-State = Literal["waiting_reviewer", "waiting_author", "waiting_ci", "waiting_merge"]
+State = Literal["waiting_reviewer", "waiting_author", "waiting_merge"]
 Unit = Literal[
     "hours", "minutes", "count", "share", "ratio", "lines", "rounds", "coefficient", "change"
 ]
@@ -71,8 +71,6 @@ class TimeLedger(Contract):
     merged_prs: int
     total_pr_hours: float
     states: dict[State, StateLedger]
-    ci_coverage: float
-    ci_data_available: bool
 
 
 class ReviewQueue(Contract):
@@ -89,16 +87,9 @@ class Location(Contract):
     previous_waiting_reviewer_pr_hours: float | None
 
 
-class CI(Contract):
-    queue_p50_minutes: Metric
-    run_p50_minutes: Metric
-    flaky_rerun_rate: Metric
-
-
 class BottleneckAnalysis(Contract):
     review_queue: ReviewQueue
     locations: list[Location]
-    ci: CI | None
 
 
 class Drivers(Contract):
@@ -124,7 +115,7 @@ class LocationAttribution(Contract):
 class Attribution(Contract):
     basis: Literal["mean_hours_per_merged_pr"]
     states: dict[
-        Literal["coding", "waiting_reviewer", "waiting_author", "waiting_ci", "waiting_merge"],
+        Literal["coding", "waiting_reviewer", "waiting_author", "waiting_merge"],
         StateAttribution,
     ]
     locations: list[LocationAttribution]
@@ -142,7 +133,6 @@ class Week(Contract):
     pickup_p50_hours: float | None
     pr_size_p50_lines: float | None
     waiting_reviewer_share: float | None
-    waiting_ci_share: float | None
 
 
 class Series(Contract):
@@ -159,7 +149,6 @@ class Meta(Contract):
     thresholds_version: str
     location_dimension: str
     comparison_available: bool
-    ci_source: Literal["none", "actions"]
     sample: Sample
 
 

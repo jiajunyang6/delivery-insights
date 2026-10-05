@@ -7,13 +7,11 @@ import structlog
 
 from insights.config import REPO_RE, split_list
 from insights.domain import (
-    CiRun,
     PageResult,
     PullRequestRecord,
     RepoRef,
     RepositoryInfo,
 )
-from insights.sources.github.actions import fetch_runs
 from insights.sources.github.client import GitHubClient, GitHubNotFoundError, GitHubTransientError
 from insights.sources.github.normalize import normalize_pr, parse_time, remove_nulls
 from insights.sources.github.queries import PULL_REQUEST_TIMELINE, PULL_REQUESTS_PAGE
@@ -129,7 +127,6 @@ class GitHubAdapter:
             RepositoryInfo(
                 remove_nulls(repository["nameWithOwner"]),
                 remove_nulls((repository.get("defaultBranchRef") or {}).get("name", "")),
-                repository["isArchived"],
             ),
             tuple(prs),
             connection["pageInfo"]["endCursor"],
@@ -139,11 +136,3 @@ class GitHubAdapter:
             cost,
             skipped,
         )
-
-    async def ci_runs(
-        self, repo: RepoRef, *, created_from: datetime, created_to: datetime
-    ) -> list[CiRun]:
-        """Validate the repository and fetch pull-request CI runs within inclusive time bounds."""
-        if not REPO_RE.fullmatch(repo.full_name):
-            raise ValueError("Invalid repository")
-        return await fetch_runs(self.client, repo, created_from=created_from, created_to=created_to)

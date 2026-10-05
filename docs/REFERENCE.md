@@ -6,17 +6,17 @@ Current contracts are in code and this reference; [the consolidated plan](PLAN.m
 ## The insight and why this metric
 
 The core metric is **where PR time goes**: the post-ready waiting time of merged PRs, split
-into reviewer, author, observed CI and merge waiting, and compared with the previous period.
+into reviewer, author and merge waiting, and compared with the previous period.
 A cited narrative explains a slowdown when the evidence supports one, and otherwise says where
 PR time goes now.
 
 | View | Question | Decision it supports |
 |---|---|---|
-| Time ledger | Who or what is the post-ready wait for? | Review capacity, CI or merge policy |
+| Time ledger | Who or what is the post-ready wait for? | Review capacity, author follow-up or merge policy |
 | Narrative | Did delivery slow down, and which supported cause fits? | Where to investigate first |
 
 The narrative draws on cycle time, first-review wait, review rounds, the review queue and
-review concentration, PR size, CI queue/run/rerun times, the weekly series and an accounting
+review concentration, PR size, the weekly series and an accounting
 attribution of the added hours. They appear on the page only as cited evidence. Relative
 changes use unrounded values, so recomputing them from displayed values can differ slightly.
 These are PR-flow signals, not deployment lead time, DORA change failure rate, individual
@@ -27,14 +27,14 @@ productivity scores or causal proof. Workflow and timestamp changes affect them.
 ![Delivery Insights data flow and narrative generation](diagrams/how-it-works.svg)
 
 1. **Sync:** staged backfill, overlapping incremental windows and open-PR sweeps write idempotent batches. Coverage and success checkpoints advance after phase completion; the resumable backfill cursor is saved with each batch.
-2. **Derive:** an event-driven state machine creates non-overlapping intervals and per-PR facts. A PR is located by its matching labels, otherwise by its most-touched directories. CI run changes rederive the affected PRs and enqueue snapshot precomputation.
+2. **Derive:** an event-driven state machine creates non-overlapping intervals and per-PR facts. A PR is located by its matching labels, otherwise by its most-touched directories. Version changes rederive stored PRs and enqueue snapshot precomputation.
 3. **Snapshot:** cached or persisted snapshots are reused. On a miss, a read-only repeatable-read transaction loads a consistent dataset for pure analytics, deterministic bootstrap comparisons and canonical JSON; the result is persisted in a separate write transaction. Parameters, versions and watermarks set identity.
 4. **Narrative:** code selects evidence and scores hypotheses. Bedrock supplies wording; local code validates the LLM reply and requests at most one repair. A deterministic template is used when the LLM is disabled, busy, unavailable, times out or remains invalid. The validator and template run inside the API process; the template does not pass through the LLM validator at runtime.
 
 | Component | Responsibility |
 |---|---|
 | `api` | Local-data queries, snapshot/narrative persistence |
-| `worker` | GitHub ingestion, derivation, enrichment, precomputation, retention |
+| `worker` | GitHub ingestion, derivation, precomputation, retention |
 | `postgres` | Source data, facts, intervals, immutable snapshots and narratives |
 | `redis` | arq jobs, locks, response caches and fixed-window limits |
 | `web` | React dashboard and nginx same-origin proxy |
@@ -84,7 +84,7 @@ A `202` is a Pending object, not a snapshot. Respect `Retry-After`; inspect each
 `reason` and `job` (status and phase). The UI polls for at most five minutes, then asks for a
 later refresh.
 
-## Snapshot contract in analytics 1.7.0
+## Snapshot contract
 
 The strict `api/schemas.py` models are the current field contract (`extra="forbid"`). The
 snapshot holds the time ledger shown on the dashboard and every metric the narrative evidence
@@ -93,10 +93,10 @@ catalog reads, and nothing else.
 | Block | Contents | Consumers |
 |---|---|---|
 | `period`, `as_of`, `repos`, `meta` | Dates, comparison window, observation cutoff, versions, merged sample | Dashboard, evidence pack |
-| `time_ledger` | Waiting-state PR-hours and shares, current and previous; CI coverage | Where PR time goes, E18–E21 |
+| `time_ledger` | Reviewer/author/merge PR-hours and shares, current and previous | Where PR time goes, E18, E19, E21 |
 | `efficiency` | Cycle p50, merged PRs, first-review p50, review rounds, post-review commits, review concentration, PR size p50, large-PR share | E1, E3, E8, E9, E15, E24, E30, E31 |
-| `bottleneck_analysis` | Review-queue imbalance weeks, location first-review ratios and reviewer wait, CI queue/run/rerun | E22, E44–E46, location items |
-| `drivers`, `trend` | Slowest-decile size ratio; attribution of added hours by state, location and large PRs | E37, E39, E42, E48, location items |
+| `bottleneck_analysis` | Review-queue imbalance weeks, location first-review ratios and reviewer wait | E22, location items |
+| `drivers`, `trend` | Slowest-decile size ratio; attribution of added hours by state, location and large PRs | E37, E42, E48, location items |
 | `series` | Weekly current and previous values | Effect size and persistence |
 
 Analytics 1.6.0 removed the outputs that only the former dashboard sections or the removed
@@ -107,10 +107,13 @@ stops deriving the per-PR facts, links and ownership counts those outputs needed
 retained value is unchanged; in the golden output only the snapshot ID and analytics version
 differ.
 
-Sampling uses `digest(seed_params)[:16]` with exactly the former canonical parameter structure
-and only `analytics_version` replaced by frozen `SAMPLING_SEED_VERSION="1.4.0"`, so bootstrap
-significance does not change across analytics releases. Old snapshots and narrative caches stay
-isolated by version, and repositories with old derived versions are rederived in the background.
+Sampling uses the frozen seed version and the original canonical structure. The retired
+`ci_source` key is reconstructed only inside sampling identity; the internal profile
+replays the historical GitHub default or the direct/synthetic default. The CI setting
+is absent from configuration and API output. Existing GitHub-default and no-CI inputs
+keep their bootstrap draws. Removing observed CI intervals can change real-repository
+reviewer waiting shares, since timelines are now driven by PR events alone. Old snapshots
+and narrative caches stay isolated by version; workers rederive stored PRs in the background.
 
 ## Narrative, confidence and evidence chain
 
@@ -125,7 +128,6 @@ sample counts, changes and eligible hypotheses from this library:
 | Hypothesis | Symptom | Mechanism to look for |
 |---|---|---|
 | Review capacity | More time waiting for review | Demand, concentration and localized first-review delay |
-| CI bottleneck | More observed CI waiting | Queue/runtime increases or flaky reruns |
 | PR size growth | Longer cycle or author/review stages | Larger changes with extra review/rework |
 
 ```text
@@ -147,16 +149,14 @@ No mechanism signal means no hypothesis, even when symptoms look strong. Every e
 hypothesis is shown, ordered by score; a faster cycle time abstains with `no_slowdown`.
 Each candidate in the pack carries `explains`, the changes its present symptoms record, such
 as "the larger share of PR time waiting on reviewers". Cause sentences name that change
-(prompt v11 and the template), so a candidate triggered by reviewer wait is never presented
+(in the prompt and the template), so a candidate triggered by reviewer wait is never presented
 as the cause of a cycle-time change it does not cover.
-CI confidence is capped at 0.50 unless CI is available, coverage is at least 0.50,
-and `CI_COMPLETE=true`. The default is false because Actions may be only partial CI.
 
 | Score after caps and rounding | Level | Wording |
 |---|---|---|
 | At least 0.75 | high | likely |
 | Greater than 0.50, below 0.75 | medium | may / might / possibly / could |
-| 0.35 through 0.50 | low | early signs |
+| 0.35 through 0.50 | low | There are early signs that ...; no likely/may/might/possibly/could |
 | Below 0.35, missing comparison or mechanism | abstain | `no_slowdown`, `insufficient_signal` or `no_comparison` sentence |
 
 Validators check schema, IDs, sentence-local numeric grounding, units, direction,
@@ -182,8 +182,6 @@ Copy `.env.example`; never commit `.env`. Full environment defaults are in `back
 | `LOCATION_DIMENSION` | `label:area-` | Label grouping with directory fallback, or directory grouping |
 | `BACKFILL_DAYS` | `120` | Final backfill stage, between 30 and 365 |
 | `SYNC_INTERVAL_MINUTES` | `15` | Incremental cadence; must divide 60 |
-| `CI_SOURCE` | `actions` | `actions` or `none` |
-| `CI_COMPLETE` | `false` | Assert complete CI only when justified by the repository |
 | `CORS_ORIGINS` | `http://localhost:5173` | Comma-separated allowed browser origins |
 | `RATE_LIMIT_PER_MINUTE` | `120` | Per-client-IP fixed-window limit on `/v1` |
 | `DATABASE_URL` | Compose Postgres URL | Async SQLAlchemy database connection |
@@ -193,7 +191,6 @@ Create the GitHub token under Settings → Developer settings → Personal acces
 → Fine-grained tokens. Choose Public repositories, an expiration and no extra permissions.
 The current implementation targets public repositories; private-repo authorization is not verified.
 Model availability and Bedrock access/billing must be verified in your AWS account.
-Set `CI_COMPLETE=true` only if Actions telemetry covers the CI you intend to measure.
 
 ## Operations
 
@@ -246,7 +243,7 @@ There is no authenticated administrative UI or backup orchestration in this demo
 
 - Secrets are environment-only `SecretStr` values; `.env` and local artifacts are ignored.
 - Query/path inputs use allowlists. Repositories must be tracked. GitHub base URLs come
-  only from trusted configuration; the REST client rejects absolute request URLs.
+  only from trusted configuration; the source client uses GraphQL only.
 - SQLAlchemy statements are parameterized; SQL `text()` usage is limited to static statements/defaults.
 - The evidence pack excludes raw PR text and user names; unsafe location names are replaced.
 - Problem responses omit tracebacks and upstream exception text.
@@ -260,7 +257,7 @@ There is no authenticated administrative UI or backup orchestration in this demo
 
 Tests focus on accounting boundaries and failure behavior, not only happy-path output.
 They cover 22 specified timeline cases plus 200 random invariant sequences, deterministic
-golden output under shuffled input, sample gates, observed CI waits, drivers,
+golden output under shuffled input, sample gates, drivers,
 resumable ingestion, snapshot identity/expiry, privacy, validators and fallback races.
 Integration tests use actual Postgres 16 and Redis 7 through Testcontainers; GitHub and
 Bedrock calls are mocked or SDK-stubbed. Docker must be running for the full suite.
@@ -274,7 +271,15 @@ make eval-offline
 make eval
 ```
 
-Latest checks: 2026-10-05 UTC, analytics 1.7.0, prompt v11, after the scope reduction.
+Current checks: 316 backend tests (63 integration), 15 frontend tests,
+Ruff/strict mypy, typecheck/build and all eight offline narrative gates pass. Browser
+verification uses synthetic data on the newly built UI, including 7/30/60 days, a custom
+period, pending, configuration notice, narrative and the three-state ledger. After the user's
+database rebuild, the Bevy worker completed the 120-day backfill and precomputed the
+7/30/60-day reports; current real Bedrock evaluation is pending. The golden
+comparison removes only CI fields and changes version/identity; retained values match.
+
+Historical scope-reduction checks (before CI removal):
 
 | Check | Observed result |
 |---|---|
@@ -289,10 +294,10 @@ Earlier acceptance measured 3,541 PRs with no invariant violations, three matchi
 Those analytics 1.2/1.3 measurements and npm ci/audit checks were not repeated here. They are local measurements, not production load evidence.
 The original 90-day performance gate remains excluded; three upstream deprecation warnings remain.
 
-The harness runs four planted scenarios × five seeds through the single English narrative.
-Offline and real Bedrock Sonnet 4.6 suites were run on analytics 1.6.0 and prompt v11;
-analytics 1.7.0 leaves the snapshot values and the offline results unchanged.
-[Evaluation records](EVALUATION.md) retain every current and historical per-case outcome.
+The current harness runs three planted scenarios (review capacity, PR size growth and
+no signal) with five seeds: 15 English narratives. CI slowdown is retired. Current offline
+results are in [EVALUATION.md](EVALUATION.md); a new real evaluation is required.
+The following offline and Bedrock results are historical runs with CI analysis enabled.
 Numeric/citation/hedge denominators include final LLM outputs, excluding fallback.
 
 | Metric | Offline (v11) | Real Bedrock (v11) | Required |
@@ -325,7 +330,6 @@ benchmark or real-world causal calibration. Missing-key evaluation exits 2.
 | Snapshot compute | Concurrent cold requests can duplicate deterministic work | Add single-flight only if measured necessary |
 | Commit times | Committer timestamps approximate push/revision time | Collect push events |
 | Reopened PRs | Closed intervals excluded from ledger; elapsed milestones retain them | Review prevalence before changing duration semantics |
-| CI | Actions only, possibly partial; incomplete-CI score cap | Collect check runs, including Azure Pipelines |
 | Confidence | Evidence score tested only on synthetic scenarios | Replay history and calibrate with human labels |
 | Size scenario | Synthetic duration scales with square root of planted size multiplier | Validate this assumption with real observations |
 
@@ -344,8 +348,8 @@ waiting, cumulative-flow charts and release/deployment timing remain outside thi
 
 Implemented: deterministic evidence scoring and validation, repair/template fallback, immutable
 snapshots and ETags, staged backfill/open sweeps,
-an English narrative with three scored hypotheses, offline eval, React dashboard,
-Actions CI waiting, Docker and CI config.
+an English narrative with two scored hypotheses, offline eval, React dashboard,
+Docker and automated verification config.
 
 ### Known limitations
 
@@ -356,9 +360,8 @@ Actions CI waiting, Docker and CI config.
 
 GitHub omits design discussions, offline coordination and deployments. Rewritten or rebased
 commit timestamps distort coding time. Current labels are not historical ownership.
-Small samples suppress p50 below 20, p90 below 30, and rates below 30 cases/5 events.
+Small samples suppress p50 below 20 and rates below 30 cases/5 events.
 Driver/location measures have their own documented gates. Insufficient values remain null.
-Actions telemetry may omit the demo repository's primary Azure Pipelines CI.
 Confidence still needs historical replay and human labels.
 Skipped PRs and anomalous timelines can affect metrics; inspect sync job skipped_prs and invariant_violations counters and their structured warnings before relying on a report.
 Net review-demand share compares arrivals with first reviews, including service of earlier demand; it can be negative and is not an individually tracked unreviewed-PR fraction.
@@ -388,6 +391,24 @@ npm run build
 npm run dev
 ```
 
+The delivery snapshot and narrative routes, including HTTP reply conversion, live in
+`api/routes/insights.py`. The PR-size driver shares `analytics/efficiency.py`; the stable
+numbered catalog shares `narrative/evidence.py`; `sources/__init__.py` exports the source
+protocol. Health and repository routes remain separate. Analytics input records contain
+only consumed fields; the unused current-day marker is absent. Bootstrap supports the
+retained median and mean statistics. The loader does not select PR titles, URLs, authors
+or draft flags for snapshots. Raw source records and persistence retain their existing fields.
+
+Frontend `api.ts` owns fetch/polling and the `useAbortable` effect, which cancels superseded
+requests and requests still active on unmount. `format.ts` owns display and UTC date helpers.
+TypeScript rejects unused locals and parameters. Pure configuration-message logic stays
+separate from JSX so its Node tests need no browser or JSX loader.
+
+Cleanup verification: OpenAPI and 15 synthetic snapshots, evidence packs and template
+narratives match their pre-cleanup values exactly. All 57 backend modules import in separate
+fresh interpreters. The golden snapshot and analytics, sampling and prompt versions are
+unchanged. Full backend/frontend checks and all eight offline narrative gates pass.
+
 Vite proxies `/api` to the local API. Compose serves the built UI through nginx instead.
 Make targets: `up`, `down`, `logs`, `lint`, `fmt`, `test-unit`, `test`, `eval-offline`, `eval`.
 The GitHub Actions workflow applies backend lint/tests/eval and frontend typecheck/build.
@@ -400,6 +421,6 @@ The GitHub Actions workflow applies backend lint/tests/eval and frontend typeche
 | `backend/eval/` | Synthetic generator, scenarios and evaluation runner |
 | `frontend/` | React/TypeScript UI, shared abortable requests and formatting, Vite config and nginx image |
 | `backend/src/insights/snapshots/` | Shared orchestration, readiness, caching and domain errors |
-| `backend/src/insights/sync/queue.py` | Shared job lifecycle, locks, queue helpers and success lookup |
+| `backend/src/insights/sync/queue.py` | Shared job lifecycle, locks and queue helpers |
 | `PLAN.md` | Consolidated historical design input |
 | `docs/` | Decisions, acceptance evidence and evaluation records in Markdown |

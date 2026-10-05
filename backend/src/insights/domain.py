@@ -39,7 +39,6 @@ class RepoRef:
 class RepositoryInfo:
     full_name: str
     default_branch: str
-    is_archived: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,21 +86,6 @@ class PageResult:
     newest_updated_at: datetime | None
     graphql_cost: int
     skipped_prs: int = 0
-
-
-@dataclass(frozen=True, slots=True)
-class CiRun:
-    run_id: int
-    workflow_name: str
-    event: str
-    head_sha: str
-    status: str
-    conclusion: str | None
-    run_attempt: int
-    created_at: datetime
-    run_started_at: datetime | None
-    updated_at: datetime
-    pr_numbers: tuple[int, ...]
 
 
 class GitHubError(Exception):

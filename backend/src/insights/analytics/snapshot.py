@@ -10,10 +10,8 @@ import orjson
 from insights.analytics import ANALYTICS_VERSION
 from insights.analytics import bottlenecks as b
 from insights.analytics import thresholds as t
-from insights.analytics.ci import build_ci
 from insights.analytics.dataset import Dataset, SnapshotParams, merged
-from insights.analytics.drivers import slowest_decile_size_ratio
-from insights.analytics.efficiency import build_efficiency
+from insights.analytics.efficiency import build_efficiency, slowest_decile_size_ratio
 from insights.analytics.stats import SAMPLING_SEED_VERSION
 
 
@@ -70,6 +68,9 @@ def sampling_hash(params: SnapshotParams) -> str:
     """
     seed_params = params.canonical_dict()
     seed_params["analytics_version"] = SAMPLING_SEED_VERSION
+    # Replay both historical parameter shapes without retaining CI collection or metrics.
+    profile = seed_params.pop("sampling_profile")
+    seed_params["ci_source"] = "actions" if profile == "github" else "none"
     return digest(seed_params)[:16]
 
 
@@ -127,7 +128,6 @@ def build_snapshot(dataset: Dataset, *, params: SnapshotParams) -> dict[str, Any
     # same bootstrap seeds.
     params_hash = sampling_hash(params)
     ledger = b.time_ledger(dataset)
-    ledger["ci_data_available"] = params.ci_source != "none" and ledger["ci_coverage"] > 0
     locations = b.locations(dataset)
     snapshot: dict[str, Any] = {
         "snapshot_id": snapshot_id,
@@ -148,10 +148,9 @@ def build_snapshot(dataset: Dataset, *, params: SnapshotParams) -> dict[str, Any
         "bottleneck_analysis": {
             "review_queue": b.review_queue(dataset, dataset.current),
             "locations": locations,
-            "ci": build_ci(dataset, params_hash) if params.ci_source == "actions" else None,
         },
         "drivers": {"slowest_decile_size_ratio": slowest_decile_size_ratio(dataset)},
-        "trend": b.trend(dataset, ledger, locations),
+        "trend": {"attribution": b.attribution(dataset, ledger, locations)},
         "series": {
             "current": b.series(dataset, dataset.current),
             "previous": b.series(dataset, dataset.previous) if dataset.comparison_available else [],
@@ -161,7 +160,6 @@ def build_snapshot(dataset: Dataset, *, params: SnapshotParams) -> dict[str, Any
             "thresholds_version": t.THRESHOLDS_VERSION,
             "location_dimension": params.location_dimension,
             "comparison_available": dataset.comparison_available,
-            "ci_source": params.ci_source,
             "sample": {"merged_prs": len(merged(dataset, dataset.current))},
         },
     }

@@ -8,15 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from insights.analytics.dataset import Dataset, PrData, RepoData, Review, SnapshotParams
 from insights.analytics.timeline import Interval
-from insights.db.ci import load_ci_data
 from insights.db.models import PrEvent, PrFact, PrInterval, PullRequest, Repository
 from insights.db.records import facts_from_row
 
 
 async def load_dataset(
-    session: AsyncSession, params: SnapshotParams, *, now: datetime, metadata: Dataset | None = None
+    session: AsyncSession, params: SnapshotParams, *, metadata: Dataset | None = None
 ) -> Dataset:
-    """Load PRs, intervals, reviews and CI for one snapshot.
+    """Load PRs, intervals and reviews for one snapshot.
 
     Caller owns a REPEATABLE READ, READ ONLY transaction so every query sees one view. A given
     `metadata` skips reloading repository readiness and versions.
@@ -52,7 +51,6 @@ async def load_dataset(
             (),
             params.period_from,
             params.period_to,
-            current_day=params.period_to == now.date(),
         )
     names = {r.repo_id: r.repo for r in metadata.repos if r.repo_id is not None}
     if len(names) != len(metadata.repos):
@@ -65,10 +63,6 @@ async def load_dataset(
         await session.execute(
             select(
                 PrFact,
-                PullRequest.title,
-                PullRequest.url,
-                PullRequest.author_login,
-                PullRequest.is_draft,
                 PullRequest.created_at,
             )
             .join(PullRequest, PullRequest.id == PrFact.pr_id)
@@ -132,14 +126,10 @@ async def load_dataset(
             facts_from_row(f),
             tuple(intervals[f.pr_id]),
             f.number,
-            title,
-            url,
-            author,
-            draft,
             created,
             tuple(activity[f.pr_id]),
         )
-        for f, title, url, author, draft, created in rows
+        for f, created in rows
     )
     flow_filter = (
         PrFact.repo_id.in_(names),
@@ -170,15 +160,10 @@ async def load_dataset(
         ).all()
         if login is not None
     )
-    period_ci = await load_ci_data(
-        session, list(names), created_from=previous_start, created_to=as_of, flow_only=True
-    )
     return Dataset(
         metadata.repos,
         prs,
         reviews,
         params.period_from,
         params.period_to,
-        ci_runs=tuple((names[repo_id], run) for repo_id, run in period_ci.runs),
-        current_day=params.period_to == now.date(),
     )

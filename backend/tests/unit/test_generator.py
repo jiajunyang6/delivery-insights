@@ -9,11 +9,10 @@ def test_generator_deterministic_bounded_and_legal():
     assert len({p.number for p in syn.records}) == len(syn.records)
     for record in syn.records:
         assert all(e.occurred_at < AS_OF for e in record.events)
-        result = build_timeline(pr_input(record), record.events, (), AS_OF)
+        result = build_timeline(pr_input(record), record.events, AS_OF)
         assert not check_invariants(result, pr_input(record)), record.number
     assert set(SCENARIOS) == {
         "review_capacity",
-        "ci_slowdown",
         "pr_size_growth",
         "no_signal",
     }

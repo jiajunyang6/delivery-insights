@@ -10,7 +10,6 @@ from typing import Any
 import numpy as np
 
 from insights.analytics.thresholds import (
-    CI_COVERAGE_MIN,
     MIN_SAMPLES_P50,
     REVIEW_CAPACITY_MIN_WAIT_SHARE,
 )
@@ -32,8 +31,6 @@ LEVELS = {
 }
 LEVEL_ORDER = {name: index for index, name in enumerate(LEVELS)}
 STEPS = ("symptom", "stage", "location", "mechanism")
-CI_RUN_IDS = frozenset({"E44", "E45", "E46"})
-CI_EVIDENCE_IDS = CI_RUN_IDS | {"E20", "E39"}
 # Each location reserves four IDs; slots 1 and 3 are retired, so existing IDs stay stable.
 LOCATION_SLOTS = {"pickup_ratio": 0, "added_wait_share": 2}
 DEFAULT_ABSTAIN_REASON = "insufficient_signal"
@@ -73,7 +70,6 @@ SERIES_KEYS = {
     "E3": "merged",
     "E15": "pickup_p50_hours",
     "E18": "waiting_reviewer_share",
-    "E20": "waiting_ci_share",
     "E30": "pr_size_p50_lines",
 }
 # A stage or location item belongs in the displayed chain only when it shows the added time.
@@ -153,21 +149,11 @@ class SignalContext:
     def __init__(self, snapshot: Mapping[str, Any], evidence: Mapping[str, dict[str, Any]]) -> None:
         """Prepare reusable source availability, localization and counter-evidence predicates."""
         self.evidence = evidence
-        ci = (
-            snapshot["bottleneck_analysis"].get("ci") is not None
-            and snapshot["time_ledger"]["ci_data_available"]
-        )
         drivers = snapshot.get("drivers") is not None
 
         def available(identifier: str) -> bool:
             """Test source availability for an evidence family, independently of item presence."""
-            return (
-                ci
-                if identifier in CI_EVIDENCE_IDS
-                else drivers
-                if identifier in {"E48", "E49", "E50"}
-                else True
-            )
+            return drivers if identifier in {"E48", "E49", "E50"} else True
 
         def signal(role: str, ids: tuple[str, ...], condition: bool) -> Signal:
             """Build a signal that is present only when its condition and all required IDs hold."""
@@ -194,7 +180,6 @@ class SignalContext:
         size_counter = bool(
             changed(e("E30"), 0.20) and e("E30") and evidence["E30"]["significant"] is True
         )
-        ci_counter = flat_rel(e("E44"), 0.05) and flat_rel(e("E45"), 0.05)
         size_flat = bool(
             flat_rel(e("E30"), 0.05)
             and e("E31")
@@ -202,8 +187,6 @@ class SignalContext:
             and abs(evidence["E31"]["change_pp"]) < 2
         )
         self.available = available
-        self.ci = ci
-        self.ci_counter = ci_counter
         self.drivers = drivers
         self.e = e
         self.localized = localized
@@ -252,28 +235,6 @@ def build_review_capacity(context: SignalContext) -> dict[str, Any]:
             ),
         ],
         "counter": [("E30",)] if context.size_counter else [],
-    }
-
-
-def build_ci_bottleneck(context: SignalContext) -> dict[str, Any]:
-    """Define CI-related symptoms, queue/runtime/rerun mechanisms and counter-evidence."""
-    return {
-        "localization": (context.e("E39") or {}).get("value", 0),
-        "location": None,
-        "stage": stage_ids(("E39", at_least(context.e("E39"), ATTRIBUTION_MIN_SHARE))),
-        "location_ids": (),
-        "signals": [
-            context.signal("symptom", ("E20",), changed(context.e("E20"), 3, field="change_pp")),
-            context.signal("symptom", ("E1",), changed(context.e("E1"), 0.1)),
-            context.signal("mechanism", ("E44",), changed(context.e("E44"), 0.2)),
-            context.signal("mechanism", ("E45",), changed(context.e("E45"), 0.2)),
-            context.signal(
-                "mechanism",
-                ("E46",),
-                changed(context.e("E46"), 2, field="change_pp") or at_least(context.e("E46"), 0.1),
-            ),
-        ],
-        "counter": [("E44", "E45")] if context.ci_counter else [],
     }
 
 
@@ -341,16 +302,6 @@ HYPOTHESES = {
         review_actions,
         build_review_capacity,
     ),
-    "H_ci_bottleneck": Hypothesis(
-        "Slow or congested CI",
-        "Slow or congested CI",
-        "E20",
-        lambda location: (
-            "Add CI capacity or speed up the slowest workflows, and fix flaky tests.",
-            "After the change, check whether the share of PR time waiting on CI falls.",
-        ),
-        build_ci_bottleneck,
-    ),
     "H_pr_size_growth": Hypothesis(
         "Pull requests getting larger",
         "Growing pull request size",
@@ -372,7 +323,6 @@ SYMPTOM_EFFECTS = {
     "E8": "more review rounds per PR",
     "E9": "more PRs with commits after the first review",
     "E18": "the larger share of PR time waiting on reviewers",
-    "E20": "the larger share of PR time waiting on CI",
 }
 
 
@@ -395,7 +345,6 @@ def evaluate_candidate(
     context: SignalContext,
     snapshot: Mapping[str, Any],
     evidence: Mapping[str, dict[str, Any]],
-    ci_complete: bool,
 ) -> dict[str, Any]:
     """Score one hypothesis; return its candidate plus the flags select_candidates uses.
 
@@ -444,17 +393,7 @@ def evaluate_candidate(
             - 0.15 * len(counters),
         ),
     )
-    # Without available, sufficiently covered and complete CI data, a CI hypothesis can still
-    # qualify but is held in the low band rather than claimed at medium or high.
-    cap = (
-        LEVELS["low"].downgrade_cap
-        if identifier == "H_ci_bottleneck"
-        and not (
-            context.ci and snapshot["time_ledger"]["ci_coverage"] >= CI_COVERAGE_MIN and ci_complete
-        )
-        else None
-    )
-    confidence = round(min(raw, cap) if cap is not None else raw, 2)
+    confidence = round(raw, 2)
     chain = {
         role: list(
             dict.fromkeys(i for s in signals if s.role == role and s.present for i in s.evidence)
@@ -487,8 +426,8 @@ def evaluate_candidate(
             "counter_evidence": len(counters),
             "covers_both_parts": symptom and mechanism,
             "raw_score": round(raw, 2),
-            "cap": cap,
-            "cap_reason": "ci_data_incomplete" if cap is not None else None,
+            "cap": None,
+            "cap_reason": None,
             "llm_downgrade": None,
         },
         "alternatives_ruled_out": [],
@@ -508,7 +447,7 @@ def evaluate_candidate(
 
 
 def score_hypotheses(
-    snapshot: Mapping[str, Any], evidence: Mapping[str, dict[str, Any]], *, ci_complete: bool
+    snapshot: Mapping[str, Any], evidence: Mapping[str, dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], str | None]:
     """Return the qualifying candidates by confidence, or none and an abstain reason.
 
@@ -519,9 +458,7 @@ def score_hypotheses(
         return [], "no_comparison"
     context = SignalContext(snapshot, evidence)
     evaluated = {
-        identifier: evaluate_candidate(
-            identifier, hypothesis, context, snapshot, evidence, ci_complete
-        )
+        identifier: evaluate_candidate(identifier, hypothesis, context, snapshot, evidence)
         for identifier, hypothesis in HYPOTHESES.items()
     }
     return select_candidates(evidence, evaluated)

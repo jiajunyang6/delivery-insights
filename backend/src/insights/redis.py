@@ -1,6 +1,5 @@
 """Redis and arq connection factories plus the key layout shared by API and worker."""
 
-from hashlib import sha256
 from typing import cast
 
 from redis.asyncio import Redis
@@ -43,8 +42,3 @@ def narrative_lock_key(snapshot_id: str) -> str:
 def rate_limit_key(client_ip: str, epoch_minute: int) -> str:
     """Client-IP request counter key for a single epoch-minute bucket."""
     return f"di:rl:{client_ip}:{epoch_minute}"
-
-
-def github_etag_key(url: str) -> str:
-    """Redis key derived from the complete request URL without exposing that URL in the key."""
-    return f"di:gh:etag:{sha256(url.encode()).hexdigest()}"

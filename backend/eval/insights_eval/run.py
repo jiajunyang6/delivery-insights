@@ -79,8 +79,8 @@ async def evaluate(
             expected_id, expected_location = EXPECTED[scenario]
             started = perf_counter()
             traced = TracedClient(client)
-            pack, _ = build_evidence_pack(snapshot, True)
-            result = await narrate(snapshot, llm=traced, ci_complete=True, now=AS_OF)
+            pack, _ = build_evidence_pack(snapshot)
+            result = await narrate(snapshot, llm=traced, now=AS_OF)
             payload, meta = result.payload, result.payload["meta"]
             hypotheses = payload["hypotheses"]
             top = hypotheses[0] if hypotheses else {}
@@ -211,7 +211,7 @@ async def run(mode: str, seeds: list[int], scenarios: list[str], out: Path) -> i
 def main() -> int:
     """Parse CLI options, deduplicate seeds/scenarios in input order and start the async runner.
 
-    Defaults cover four scenarios and five seeds (20 cases). Argument errors
+    Defaults cover three scenarios and five seeds (15 cases). Argument errors
     exit through argparse; reports go to --out, relative to the process working directory.
     """
     parser = argparse.ArgumentParser(

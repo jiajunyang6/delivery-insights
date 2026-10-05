@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 
-from insights.domain import Actor, CiRun, Event, EventKind, PullRequestRecord
+from insights.domain import Actor, Event, EventKind, PullRequestRecord
 from insights.sources.github.normalize import dedup_key
 
 AREAS = ("area-A", "area-B", "area-C", "area-D", "area-E")
@@ -30,44 +30,27 @@ class ScenarioSpec:
     arrival_mult: Mapping[str, float]
     area_reviewers: Mapping[str, int]
     size_mult: float
-    ci_enabled: bool
-    ci_queue_mult: float
-    ci_run_mult: float
-    flaky_rate: tuple[float, float]
-    reviewers_wait_for_ci: bool
 
     @classmethod
     def baseline(cls) -> "ScenarioSpec":
         """Return the no-intervention spec; normal closures and random variation remain."""
-        return cls(
-            "no_signal",
-            {},
-            {},
-            {},
-            1.0,
-            False,
-            1.0,
-            1.0,
-            (0.03, 0.03),
-            False,
-        )
+        return cls("no_signal", {}, {}, {}, 1.0)
 
 
 @dataclass(frozen=True, slots=True)
 class SyntheticRepo:
-    """Observed records/runs plus inclusive reporting dates and the UTC observation cutoff."""
+    """Observed records plus inclusive reporting dates and the UTC observation cutoff."""
 
     repo: str
     default_branch: str
     records: tuple[PullRequestRecord, ...]
-    ci_runs: tuple[CiRun, ...]
     period_from: date
     period_to: date
     as_of: datetime
 
 
 def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
-    """Build seeded GitHub-like records and optional CI runs without network or database I/O.
+    """Build seeded GitHub-like records without network or database I/O.
 
     History starts at START, interventions start at CURRENT, and observations stop at AS_OF.
     The returned report period ends on the preceding UTC date, inclusive. The same spec/seed
@@ -75,7 +58,6 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
     """
     rng = np.random.default_rng(seed)
     records: list[PullRequestRecord] = []
-    runs: list[CiRun] = []
     next_number = 1000
 
     def ln(median: float, sigma: float) -> float:
@@ -87,7 +69,7 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
         return at + timedelta(hours=hours)
 
     def make(number: int, created: datetime, area: str) -> PullRequestRecord:
-        """Construct one PR lifecycle and append its CI runs."""
+        """Construct one PR lifecycle."""
         current = created >= CURRENT
         size = max(1, round(ln(80, 1.1) * (spec.size_mult if current else 1)))
         external = rng.random() < 0.2
@@ -104,7 +86,6 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
         size_time_factor = float(np.sqrt(spec.size_mult)) if current else 1.0
         authored = later(created, -ln(4 if draft else 12, 1.0) * size_time_factor)
         events: list[Event] = []
-        local_runs: list[CiRun] = []
         area_letter = area[-1].lower()
 
         def add(kind: EventKind, at: datetime, actor: Actor, **payload: Any) -> Event:
@@ -117,11 +98,7 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
             return ev
 
         def commit(at: datetime, authored_at: datetime | None = None) -> None:
-            """Add a unique commit and, when enabled, a CI run linked by its SHA and PR number.
-
-            Flakiness is encoded as two attempts and longer runtime, with success if finished.
-            Runs still executing at AS_OF retain partial timestamps rather than a future result.
-            """
+            """Add a unique commit with authored and committed timestamps."""
             oid = f"{number:020x}{len(events):020x}"
             add(
                 EventKind.COMMIT,
@@ -131,29 +108,6 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
                 authored_at=(authored_at or at).isoformat(),
                 committed_at=at.isoformat(),
             )
-            if spec.ci_enabled:
-                queued = max(later(ready, 1 / 60), later(at, 1 / 60))
-                queue = ln(10 / 60, 0.8) * (spec.ci_queue_mult if queued >= CURRENT else 1)
-                duration = ln(1, 0.5) * (spec.ci_run_mult if queued >= CURRENT else 1)
-                flaky = rng.random() < spec.flaky_rate[int(queued >= CURRENT)]
-                started = later(queued, queue)
-                ended = later(started, duration * (2 if flaky else 1))
-                if queued < AS_OF:
-                    local_runs.append(
-                        CiRun(
-                            number * 100 + len(local_runs),
-                            "Build and test",
-                            "pull_request",
-                            oid,
-                            "completed" if ended <= AS_OF else "in_progress",
-                            "success" if ended <= AS_OF else None,
-                            2 if flaky else 1,
-                            queued,
-                            started if started <= AS_OF else None,
-                            min(ended, AS_OF),
-                            (number,),
-                        )
-                    )
 
         commit(max(created, later(authored, ln(0.5, 0.5))), authored)
         if draft:
@@ -179,10 +133,6 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
         area_mult = {"area-B": 1.2, "area-C": 0.9, "area-D": 1.1}.get(area, 1.0)
         pickup = ln(6 * area_mult * (spec.pickup_mult.get(area, 1) if current else 1), 1.0)
         first_review = later(ready, pickup)
-        if spec.reviewers_wait_for_ci and local_runs:
-            first_review = max(
-                first_review, later(max(run.updated_at for run in local_runs), ln(0.5, 0.5))
-            )
         probability = 0.55 if size < 100 else 0.35 if size < 500 else 0.20
         approved = bool(author.is_bot or rng.random() < probability)
         first_state = (
@@ -199,8 +149,6 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
             else:
                 add(EventKind.COMMENT, clock, author)
             clock = later(clock, ln(5, 1))
-            if spec.reviewers_wait_for_ci and local_runs:
-                clock = max(clock, later(max(run.updated_at for run in local_runs), ln(0.5, 0.5)))
             approved = round_number == 5 or rng.random() < min(0.95, 0.6 + 0.1 * round_number)
             add(
                 EventKind.REVIEW,
@@ -249,17 +197,8 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
         if end >= AS_OF:
             state, merge_at = "OPEN", None
         # Keep only observed events: future approvals/merges must not leak into the historical
-        # snapshot. Limit CI to the retained commit horizon after choosing a closure/open path.
+        # snapshot.
         events = [e for e in events if e.occurred_at < AS_OF]
-        local_runs = [
-            run
-            for run in local_runs
-            if run.created_at
-            <= max((e.occurred_at for e in events if e.kind == EventKind.COMMIT), default=ready)
-            + timedelta(minutes=2)
-            or run.created_at <= ready + timedelta(minutes=2)
-        ]
-        runs.extend(local_runs)
         label_draw = rng.random()
         labels = [area] if label_draw < 0.95 else []
         if label_draw < 0.05:
@@ -305,7 +244,6 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
         "synthetic/repo",
         "main",
         tuple(records),
-        tuple(sorted(runs, key=lambda r: r.run_id)),
         CURRENT.date(),
         (AS_OF - timedelta(days=1)).date(),
         AS_OF,

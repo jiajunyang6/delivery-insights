@@ -2,7 +2,7 @@
 
 import re
 from functools import lru_cache
-from typing import Literal, Self
+from typing import Self
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -12,8 +12,6 @@ MAX_PERIOD_DAYS = 366
 REPO_RE = re.compile(
     r"^(?P<owner>[A-Za-z0-9][A-Za-z0-9-]{0,38})/(?P<name>(?!\.{1,2}$)[A-Za-z0-9._-]{1,100})$"
 )
-OWNER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]{0,38}$")
-NAME_RE = re.compile(r"^(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$")
 
 
 def split_list(value: str) -> list[str]:
@@ -24,7 +22,6 @@ def split_list(value: str) -> list[str]:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(case_sensitive=False, env_ignore_empty=True)
     github_token: SecretStr | None = None
-    github_api_url: str = "https://api.github.com"
     github_graphql_url: str = "https://api.github.com/graphql"
     tracked_repos: str = "bevyengine/bevy"
     location_dimension: str = "label:area-"
@@ -43,8 +40,6 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     rate_limit_per_minute: int = Field(default=120, ge=1)
     precompute_days: str = "7,30,60"
-    ci_source: Literal["actions", "none"] = "actions"
-    ci_complete: bool = False
     log_level: str = "INFO"
 
     @model_validator(mode="after")

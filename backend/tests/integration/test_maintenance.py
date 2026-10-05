@@ -35,9 +35,7 @@ async def test_housekeeping_deletes_all_cache_keys_and_only_finished_old_jobs(co
         job.finished_at = NOW - timedelta(days=31)
         job.status = "succeeded"
         await session.commit()
-    params = SnapshotParams(
-        ("a/b",), at(0).date(), at(0).date(), ci_source=context["settings"].ci_source
-    )
+    params = SnapshotParams(("a/b",), at(0).date(), at(0).date(), sampling_profile="github")
     service = SnapshotService(
         context["session_factory"], context["redis"], context["settings"], NOW
     )

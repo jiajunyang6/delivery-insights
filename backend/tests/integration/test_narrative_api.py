@@ -26,7 +26,7 @@ pytestmark = pytest.mark.integration
 async def prepare(api, *, enabled=False, bad=False):
     client, app, _, ctx = api
     snapshot = (await client.get(DELIVERY)).json()
-    pack, _ = build_evidence_pack(snapshot, False)
+    pack, _ = build_evidence_pack(snapshot)
     valid = build_template(pack)
     if enabled:
         ctx["settings"].aws_bearer_token_bedrock = SecretStr("test")
@@ -124,7 +124,7 @@ async def test_narrative_is_the_english_director_view(api):
 async def test_current_prompt_never_reuses_legacy_prompt_caches(api):
     client, app, clock, ctx = api
     snapshot, _, url = await prepare(api, enabled=True)
-    pack, _ = build_evidence_pack(snapshot, False)
+    pack, _ = build_evidence_pack(snapshot)
     pack_hash = digest(pack)[:16]
     model = ctx["settings"].bedrock_model_id
     for version in ("v3", "v4", "v6", "v7", "v10"):

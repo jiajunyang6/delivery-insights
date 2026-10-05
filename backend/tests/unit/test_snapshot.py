@@ -31,6 +31,14 @@ def test_golden_determinism_contract_and_independent_accounting(synthetic):
     again = build_snapshot(synthetic, params=params(synthetic))
     assert canonical(payload) == canonical(again)
     Snapshot.model_validate(payload)
+    assert set(payload["time_ledger"]) == {"merged_prs", "total_pr_hours", "states"}
+    assert set(payload["time_ledger"]["states"]) == {
+        "waiting_reviewer",
+        "waiting_author",
+        "waiting_merge",
+    }
+    assert "ci" not in payload["bottleneck_analysis"]
+    assert "ci_source" not in payload["meta"]
     if os.getenv("UPDATE_GOLDEN") == "1":
         GOLDEN.parent.mkdir(exist_ok=True)
         GOLDEN.write_bytes(

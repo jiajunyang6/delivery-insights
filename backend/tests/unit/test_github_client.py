@@ -1,5 +1,5 @@
 from copy import deepcopy
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import httpx
 import orjson
@@ -273,31 +273,6 @@ async def test_large_timeline_keeps_source_id_and_actor_type(client, github_page
     assert "fragment ActorFields on Actor { __typename login }" in " ".join(
         requests[0]["query"].split()
     )
-
-
-async def test_rest_etag_cache(client):
-    body = {"workflow_runs": []}
-    redis = MagicMock()
-    redis.hgetall = AsyncMock(side_effect=[{}, {b"etag": b'"abc"', b"body": orjson.dumps(body)}])
-    pipeline = MagicMock()
-    pipeline.__aenter__ = AsyncMock(return_value=pipeline)
-    pipeline.__aexit__ = AsyncMock(return_value=False)
-    pipeline.execute = AsyncMock()
-    redis.pipeline.return_value = pipeline
-    client.redis = redis
-    route = client.router.get("https://api.github.com/repos/a/b/actions/runs").mock(
-        side_effect=[httpx.Response(200, json=body, headers={"etag": '"abc"'}), httpx.Response(304)]
-    )
-    first = await client.rest_get("/repos/a/b/actions/runs")
-    second = await client.rest_get("/repos/a/b/actions/runs")
-    assert first.body == second.body == body
-    assert route.calls[1].request.headers["if-none-match"] == '"abc"'
-
-
-@pytest.mark.parametrize("path", ["https://evil.example/a", "//evil.example/a", "relative"])
-async def test_rest_rejects_absolute_urls(client, path):
-    with pytest.raises(ValueError):
-        await client.rest_get(path)
 
 
 async def test_public_repo_token_retains_team_request_without_org_scope(client, github_page):

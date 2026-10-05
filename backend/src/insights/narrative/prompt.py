@@ -11,7 +11,7 @@ from insights.narrative.validator import ABSTAIN_SENTENCES
 
 # Bump on any prompt or tool-schema change: it is part of the narrative cache key and of the
 # stored narrative identity, so old wording is never served for a new prompt.
-PROMPT_VERSION = "v11"
+PROMPT_VERSION = "v12"
 SYSTEM_PROMPT = """Write concise English delivery narratives from the supplied structured evidence \
 pack.
 The pack contains computed metrics, observations and deterministically scored hypothesis
@@ -39,7 +39,11 @@ Mention and cite counter-evidence when provided. You may lower a band, never rai
 include downgrade with the new level and a cited reason, and use that final band in both
 the statement and any narrative sentence about that hypothesis.
 4. Wording bands: high uses likely; medium uses may, might, possibly or could; low uses
-only early signs, with none of the higher-band words. Any sentence implying a cause
+only the exact phrase 'There are early signs that ...', with none of the higher-band
+words anywhere in that sentence: likely, may, might, possibly or could. A high/medium primary
+hypothesis does not license stronger wording in a low secondary hypothesis. Low candidates
+are optional: omit them if you cannot keep this wording. For a downgrade to low, rewrite
+the statement and related body sentences using the same low wording. Any sentence implying a cause
 (because, due to, causes, drives, explains, leads to, etc.) needs supported band wording
 in that same sentence, no stronger than the highest included hypothesis. Keep metric and
 next-step sentences factual and imperative, such as 'Check reviewer coverage [E53].' Do not embed \
@@ -47,7 +51,7 @@ a causal question or explanation in advice. Never use definite causal words such
 clearly, certainly, undoubtedly, proves or confirms, or mention confidence scores.
 5. Without candidates, return hypotheses=[], include the supplied exact abstention sentence,
 and state no cause in other sentences. Report where PR time goes now using the largest waiting
-share among E18–E21.
+share among E18, E19 and E21.
 6. Omit llm_hypothesis by default. Only with library candidates may you add one distinct
 outside mechanism, supported by both efficiency and bottleneck evidence, each significant=true
 or listed in observations. Cite those IDs in the statement and evidence_ids; use the low band.
@@ -63,6 +67,10 @@ H_review_capacity is high, explains the slower cycle time, with no counter-evide
 capacity in area-Foo is likely the main cause of the slower cycle time [E15][E22][E53]. Prioritize \
 reviewer coverage in area-Foo [E53].","hypotheses":[{"id":"H_review_capacity","statement":"Limited \
 review capacity in area-Foo is likely the main cause of the slower cycle time [E1][E15][E53]."}]}
+
+Low wording example: There are early signs that limited review capacity is the main cause \
+ of the larger share of PR time waiting on reviewers [E18][E22].
+Do not write 'early signs that review capacity may be the cause': may exceeds the low band.
 
 Example B: No candidates, abstain_reason=no_slowdown, E1=30.5 h with no significant
 change, E19=0.41 is the largest waiting share. Tool input:
@@ -138,6 +146,12 @@ def user_message(pack: dict[str, Any]) -> dict[str, Any]:
             f"- {candidate['id']}: calculated band {candidate['level']}; statement may cite ONLY "
             + ", ".join(f"[{identifier}]" for identifier in sorted(allowed))
         )
+        if candidate["level"] == "low":
+            constraints.append(
+                f"  {candidate['id']} is optional. If included, start its statement with "
+                "'There are early signs that ' and use no likely/may/might/possibly/could "
+                "anywhere in that statement or its narrative cause sentence."
+            )
     reason, metric_id = abstention(pack)
     if not constraints:
         constraints.append(
@@ -152,7 +166,7 @@ def user_message(pack: dict[str, Any]) -> dict[str, Any]:
     third = (
         "one imperative next step"
         if pack["hypotheses"]
-        else "the largest waiting share among E18–E21 as a fact"
+        else "the largest waiting share among E18, E19 and E21 as a fact"
     )
     second = "main supported cause" if pack["hypotheses"] else "required abstention"
     outline = (
