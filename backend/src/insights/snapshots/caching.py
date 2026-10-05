@@ -42,12 +42,14 @@ class Reply:
 def snapshot_reply(
     sid: str, body: bytes, etag: str, conditional: str | None, *, immutable: bool
 ) -> Reply:
-    """Build conditional 200/304 snapshot replies with mutable or immutable cache headers."""
+    """Build conditional 200/304 snapshot replies with mutable or immutable cache headers.
+
+    Param-addressed replies use no-cache: the browser revalidates with the ETag every time,
+    so a sync that extends coverage shows at once while unchanged data still costs a 304.
+    """
     headers = {
         "ETag": etag,
-        "Cache-Control": "private, max-age=86400, immutable"
-        if immutable
-        else "private, max-age=60",
+        "Cache-Control": "private, max-age=86400, immutable" if immutable else "private, no-cache",
     }
     # Param-addressed replies change as data syncs, so they point at the immutable ID URL.
     if not immutable:

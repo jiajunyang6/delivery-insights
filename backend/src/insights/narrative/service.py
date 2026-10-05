@@ -14,12 +14,14 @@ from uuid import uuid4
 
 import orjson
 import structlog
+from redis.asyncio import Redis
 from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 
 from insights.analytics.snapshot import canonical, digest, etag, iso
+from insights.config import Settings
 from insights.db.models import Narrative, Snapshot
 from insights.narrative.evidence import build_evidence_pack, extract_evidence
 from insights.narrative.hypotheses import LEVELS, STEPS, actions, allowed_ids
@@ -27,7 +29,7 @@ from insights.narrative.llm import LLMClient, LLMUnavailable, LLMUsage
 from insights.narrative.prompt import PROMPT_VERSION, SYSTEM_PROMPT, TOOL_SPEC, user_message
 from insights.narrative.template import build_template
 from insights.narrative.validator import citations, validate
-from insights.redis import narrative_key, narrative_lock_key
+from insights.redis import llm_error_key, narrative_key, narrative_lock_key
 from insights.snapshots.caching import Reply, cache_ttl, matches_etag
 from insights.snapshots.service import SnapshotService, not_found
 
@@ -47,6 +49,9 @@ logger = structlog.get_logger(__name__)
 class NarrativeResult:
     payload: dict[str, Any]
     persist: bool
+    # Bedrock error code when a call failed; llm_reached means Bedrock returned an answer.
+    llm_error: str | None = None
+    llm_reached: bool = False
 
 
 def assemble(
@@ -186,6 +191,8 @@ async def generate(
     }
     output = build_template(pack, snapshot)
     persist = llm is None and fallback_reason is None
+    llm_error = "client_unavailable" if fallback_reason == "llm_error" else None
+    llm_reached = False
     usage = LLMUsage()
     if llm is not None:
         messages = [user_message(pack)]
@@ -199,11 +206,14 @@ async def generate(
                 )
             except TimeoutError:
                 meta.update(fallback_reason="llm_error", validation="not_run")
+                llm_error = "timeout"
                 break
             except LLMUnavailable as exc:
                 meta.update(fallback_reason="llm_error", validation="not_run")
                 logger.warning("llm_unavailable", reason=exc.reason)
+                llm_error = exc.reason
                 break
+            llm_reached = True
             usage.record(reply)
             violations = validate(reply.tool_input, pack, snapshot, audience=audience)
             if not violations and reply.tool_input is not None:
@@ -262,7 +272,7 @@ async def generate(
         output_tokens=usage.output_tokens,
         duration_ms=round((perf_counter() - started) * 1000, 2),
     )
-    return NarrativeResult(payload, persist)
+    return NarrativeResult(payload, persist, llm_error, llm_reached)
 
 
 def narrative_reply(body: bytes, tag: str, conditional: str | None, persist: bool) -> Reply:
@@ -278,10 +288,60 @@ def narrative_reply(body: bytes, tag: str, conditional: str | None, persist: boo
     )
 
 
+async def store_llm_status(
+    redis: Redis, settings: Settings, now: datetime, *, error: str | None, reached: bool
+) -> None:
+    """Record a Bedrock failure code for the setup hint, or clear it once Bedrock answered."""
+    if error:
+        value = orjson.dumps(
+            {
+                "code": error,
+                "at": iso(now),
+                # The setup hint ignores errors recorded under a different model or region.
+                "model_id": settings.bedrock_model_id,
+                "region": settings.aws_region,
+            }
+        )
+        await redis.set(llm_error_key(), value, ex=7 * 86400)
+    elif reached:
+        await redis.delete(llm_error_key())
+
+
+async def check_llm(llm: LLMClient, redis: Redis, settings: Settings, now: datetime) -> None:
+    """Ping Bedrock once at API start and record the result for the setup hint.
+
+    Cached narratives need no Bedrock call, so without this check a bad key, model or region
+    would stay hidden until a new snapshot needs wording. Failures never stop the API.
+    """
+    error = None
+    try:
+        await asyncio.wait_for(llm.ping(), settings.llm_timeout_seconds + 10)
+    except LLMUnavailable as exc:
+        error = exc.reason
+    except TimeoutError:
+        error = "timeout"
+    with suppress(RedisError, OSError, TimeoutError):
+        await store_llm_status(redis, settings, now, error=error, reached=error is None)
+    logger.info("llm_check", ok=error is None, error=error)
+
+
 class NarrativeService:
     def __init__(self, snapshots: SnapshotService, llm: LLMClient | None) -> None:
         """Bind snapshot/cache access and an optional LLM client for narrative orchestration."""
         self.snapshots, self.llm = snapshots, llm
+
+    async def record_llm_status(self, result: NarrativeResult) -> None:
+        """Remember the latest Bedrock failure for the setup hint; clear it after a success."""
+        snapshots = self.snapshots
+        await snapshots.cache(
+            store_llm_status(
+                snapshots.redis,
+                snapshots.settings,
+                snapshots.now,
+                error=result.llm_error,
+                reached=result.llm_reached,
+            )
+        )
 
     async def cached(self, key: str, conditional: str | None) -> Reply | None:
         """Return a complete cached conditional reply, or None on a miss/cache failure."""
@@ -386,6 +446,7 @@ class NarrativeService:
                 prepared=prepared,
                 fallback_reason="llm_error" if settings.llm_enabled and self.llm is None else None,
             )
+            await self.record_llm_status(result)
             body = canonical(result.payload)
             tag = etag(body)
             if result.persist:

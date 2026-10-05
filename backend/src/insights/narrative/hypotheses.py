@@ -384,7 +384,7 @@ HYPOTHESES = {
     ),
     "H_pr_size_growth": Hypothesis(
         "Pull requests getting larger",
-        "Larger pull requests",
+        "Growing pull request size",
         "E1",
         1,
         lambda location: (
@@ -407,6 +407,30 @@ HYPOTHESES = {
         build_quality_tradeoff,
     ),
 }
+
+
+# The change each symptom records. A cause sentence names the changes it would explain, so a
+# hypothesis triggered by reviewer wait is not read as the cause of a cycle-time change.
+SYMPTOM_EFFECTS: dict[str, str | tuple[str, str]] = {
+    "E1": ("the slower cycle time", "the faster cycle time"),
+    "E8": "more review rounds per PR",
+    "E9": "more PRs with commits after the first review",
+    "E18": "the larger share of PR time waiting on reviewers",
+    "E20": "the larger share of PR time waiting on CI",
+}
+
+
+def explains(identifier: str, chain: Mapping[str, Any]) -> str:
+    """Name the changes a candidate would explain, from its present symptom evidence."""
+    effects = []
+    for evidence_id in chain.get("symptom", []):
+        effect = SYMPTOM_EFFECTS[evidence_id]
+        if isinstance(effect, tuple):
+            effect = effect[0] if HYPOTHESES[identifier].direction > 0 else effect[1]
+        effects.append(effect)
+    if len(effects) < 2:
+        return "".join(effects)
+    return ", ".join(effects[:-1]) + " and " + effects[-1]
 
 
 def actions(identifier: str, location: str | None) -> tuple[str, str]:

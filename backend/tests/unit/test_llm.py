@@ -85,3 +85,34 @@ async def test_sdk_errors_only_expose_codes(monkeypatch):
     with pytest.raises(LLMUnavailable, match=r"^ReadTimeoutError$"):
         await llm.submit(system=SYSTEM_PROMPT, messages=[], tool_spec=TOOL_SPEC)
     sdk.close()
+
+
+async def test_ping_requests_one_token_and_reports_only_the_error_code(monkeypatch):
+    llm, sdk = client(monkeypatch)
+    expected = {
+        "modelId": llm.model_id,
+        "messages": [{"role": "user", "content": [{"text": "ping"}]}],
+        "inferenceConfig": {"maxTokens": 1},
+    }
+    with Stubber(sdk) as stub:
+        stub.add_response(
+            "converse",
+            {
+                "output": {"message": {"role": "assistant", "content": [{"text": "p"}]}},
+                "stopReason": "max_tokens",
+                "usage": {"inputTokens": 8, "outputTokens": 1, "totalTokens": 9},
+                "metrics": {"latencyMs": 5},
+            },
+            expected,
+        )
+        stub.add_client_error(
+            "converse",
+            "UnrecognizedClientException",
+            "secret detail",
+            403,
+            expected_params=expected,
+        )
+        await llm.ping()
+        with pytest.raises(LLMUnavailable) as caught:
+            await llm.ping()
+    assert str(caught.value) == "UnrecognizedClientException"

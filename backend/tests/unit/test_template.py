@@ -76,3 +76,29 @@ def test_no_slowdown_template_states_it_and_shows_where_time_goes(audience):
         "There is no slowdown to explain this period", "Delivery was steady"
     )
     assert "V12:abstain" in [v.code for v in validate(output, pack, snapshot, audience=audience)]
+
+
+def test_explains_names_only_the_changes_each_symptom_records():
+    from insights.narrative.hypotheses import explains
+
+    assert explains("H_review_capacity", {"symptom": ["E18"]}) == (
+        "the larger share of PR time waiting on reviewers"
+    )
+    assert explains("H_quality_tradeoff", {"symptom": ["E1"]}) == "the faster cycle time"
+    assert explains("H_pr_size_growth", {"symptom": ["E1", "E8", "E9"]}) == (
+        "the slower cycle time, more review rounds per PR "
+        "and more PRs with commits after the first review"
+    )
+
+
+@pytest.mark.parametrize("name", ["review_capacity", "pr_size_growth", "ci_slowdown"])
+def test_cause_sentences_name_what_the_hypothesis_explains(name):
+    snapshot = snapshot_for(name)
+    pack, _ = build_evidence_pack(snapshot, "director", False)
+    output = build_template(pack, snapshot)
+    assert pack["hypotheses"]
+    for candidate, statement in zip(pack["hypotheses"], output["hypotheses"], strict=True):
+        assert candidate["explains"]
+        assert f"main cause of {candidate['explains']} [" in statement["statement"]
+        if "E1" not in candidate["chain"]["symptom"]:
+            assert "cycle time" not in statement["statement"]

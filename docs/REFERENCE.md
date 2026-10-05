@@ -63,7 +63,7 @@ OpenAPI is available at `/openapi.json` and `/docs`; the historical design is
 | GET | `/v1/insights/delivery/prs` | Filtered and paginated PR detail |
 | GET | `/v1/snapshots/{snapshot_id}` | Read a retained immutable snapshot |
 | GET | `/v1/snapshots/{snapshot_id}/narrative` | `audience=director\|manager`, `lang=en` only (default) |
-| GET | `/v1/repos` | Whitelist, freshness and sync status |
+| GET | `/v1/repos` | Whitelist, freshness, sync status and configuration health (`setup`) |
 | POST | `/v1/repos/{owner}/{name}/sync` | Enqueue a manual sync |
 | GET | `/v1/sync-jobs/{job_id}` | Inspect sync progress |
 | GET | `/healthz` | Process liveness |
@@ -88,8 +88,8 @@ curl -s "$API/v1/snapshots/$SID"
 curl -s "$API/v1/snapshots/$SID/narrative?audience=manager&lang=en"
 ```
 
-The conditional request returns `304` with no body. Insights have a 60-second private
-HTTP cache; snapshots by ID have a one-day immutable cache. Successful narratives and
+The conditional request returns `304` with no body. Insights and PR rows use `private, no-cache`,
+so browsers revalidate with the ETag and see new coverage as soon as a sync lands; snapshots by ID have a one-day immutable cache. Successful narratives and
 disabled-LLM templates have `private, max-age=3600`; failure fallbacks use `no-store`.
 Internal Redis TTLs are separate from HTTP cache directives.
 
@@ -166,6 +166,10 @@ score = 0.30*S + 0.20*E + 0.20*P + 0.15*N + 0.15*L - 0.15*C
 Example covered by tests: S=4/5, E=1, P=10/13, N=61/100, L=0.63, C=0
 gives 0.7798, rounded to **0.78 (high)**. One counter-evidence group yields **0.63 (medium)**.
 No mechanism signal means no hypothesis, even when symptoms look strong.
+Each candidate in the pack carries `explains`, the changes its present symptoms record, such
+as "the larger share of PR time waiting on reviewers". Cause sentences name that change
+(prompt v10 and the template), so a candidate triggered by reviewer wait is never presented
+as the cause of a cycle-time change it does not cover.
 CI confidence is capped at 0.50 unless CI is available, coverage is at least 0.50,
 and `CI_COMPLETE=true`. The default is false because Actions may be only partial CI.
 
@@ -213,6 +217,8 @@ Model availability and Bedrock access/billing must be verified in your AWS accou
 Set `CI_COMPLETE=true` only if Actions telemetry covers the CI you intend to measure.
 
 ## Operations
+
+`/v1/repos` also returns `setup`: whether `GITHUB_TOKEN` and `AWS_BEARER_TOKEN_BEDROCK` are set (never their values), sync statuses that point to configuration (`missing_token`, `auth_error`, `not_found`), the Bedrock region and model ID, and the latest Bedrock error code, cleared after the next successful call and ignored once `BEDROCK_MODEL_ID` or `AWS_REGION` changes. A connection error (`EndpointConnectionError`) means the endpoint was not reached, so the model ID was not checked; an invalid model ID returns `ValidationException`. The API checks these settings once at startup with a one-token Bedrock request, because cached narratives make no Bedrock call and would otherwise hide a bad key until a new snapshot needs wording. The dashboard turns these into a Configuration notice that names the `.env` variable to fix.
 
 Use `/healthz` for liveness and `/readyz` for dependency readiness. Read `/v1/repos`
 before judging missing data. Snapshots/narratives are retained for seven days and sync-job

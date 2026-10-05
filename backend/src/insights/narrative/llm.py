@@ -56,6 +56,10 @@ class LLMClient(Protocol):
         """Submit one tool-constrained request; return its reply or raise LLMUnavailable."""
         ...
 
+    async def ping(self) -> None:
+        """Send a minimal request that checks the key, model and region, or raise LLMUnavailable."""
+        ...
+
 
 class LLMUnavailable(Exception):  # noqa: N818 - public name required by the plan
     def __init__(self, reason: str) -> None:
@@ -87,22 +91,15 @@ class BedrockClient:
         checks those claims. Cancelling this coroutine need not stop the SDK thread, so SDK
         timeouts still bound its network waits. Only error codes/types cross this boundary.
         """
-        try:
-            response = await asyncio.to_thread(
-                self.client.converse,
-                modelId=self.model_id,
-                system=[{"text": system}],
-                messages=cast("list[MessageTypeDef]", messages),
-                inferenceConfig={"maxTokens": 1500, "temperature": 0.2},
-                toolConfig={
-                    "tools": [{"toolSpec": cast("ToolSpecificationTypeDef", tool_spec)}],
-                    "toolChoice": {"tool": {"name": "submit_narrative"}},
-                },
-            )
-        except ClientError as exc:
-            raise LLMUnavailable(exc.response["Error"]["Code"]) from None
-        except BotoCoreError as exc:
-            raise LLMUnavailable(type(exc).__name__) from None
+        response = await self.converse(
+            system=[{"text": system}],
+            messages=cast("list[MessageTypeDef]", messages),
+            inferenceConfig={"maxTokens": 1500, "temperature": 0.2},
+            toolConfig={
+                "tools": [{"toolSpec": cast("ToolSpecificationTypeDef", tool_spec)}],
+                "toolChoice": {"tool": {"name": "submit_narrative"}},
+            },
+        )
         message: dict[str, Any] = dict(response["output"]["message"])
         tool: dict[str, Any] = next(
             (
@@ -119,3 +116,19 @@ class BedrockClient:
             response["usage"]["inputTokens"],
             response["usage"]["outputTokens"],
         )
+
+    async def ping(self) -> None:
+        """Ask for a single output token, enough for Bedrock to check key, model and region."""
+        await self.converse(
+            messages=[{"role": "user", "content": [{"text": "ping"}]}],
+            inferenceConfig={"maxTokens": 1},
+        )
+
+    async def converse(self, **request: Any) -> Any:
+        """Call Converse off the event loop; only the error code or type crosses this boundary."""
+        try:
+            return await asyncio.to_thread(self.client.converse, modelId=self.model_id, **request)
+        except ClientError as exc:
+            raise LLMUnavailable(exc.response["Error"]["Code"]) from None
+        except BotoCoreError as exc:
+            raise LLMUnavailable(type(exc).__name__) from None

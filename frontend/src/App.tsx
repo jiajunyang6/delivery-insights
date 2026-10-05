@@ -16,6 +16,7 @@ import type {
   Pending,
   RepoStatus,
   RepoList,
+  SetupStatus,
   Snapshot,
 } from "./types";
 import { Controls } from "./components/Controls";
@@ -27,6 +28,7 @@ import { ReviewQueueChart } from "./components/ReviewQueueChart";
 import { LocationsTable } from "./components/LocationsTable";
 import { AtRiskTable } from "./components/AtRiskTable";
 import { NarrativePanel } from "./components/NarrativePanel";
+import { SetupNotice } from "./components/SetupNotice";
 
 const initial = new URLSearchParams(window.location.search);
 const defaults = dateRange(30);
@@ -37,7 +39,7 @@ export default function App() {
     to: initial.get("to") ?? defaults.to,
   });
   const [audience, setAudience] = useState<Audience>(
-    initial.get("audience") === "director" ? "director" : "manager",
+    initial.get("audience") === "manager" ? "manager" : "director",
   );
   const [repos, setRepos] = useState<RepoStatus[]>([]);
   const [dateLimits, setDateLimits] = useState<DateLimits | null>(null);
@@ -46,6 +48,8 @@ export default function App() {
   const [error, setError] = useState<ApiProblem | null>(null);
   const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  const [setup, setSetup] = useState<SetupStatus | null>(null);
+  const [setupCheck, setSetupCheck] = useState(0);
   const validationError = periodError(params, dateLimits);
   const invalid = validationError !== null;
   useAbortable((signal) => {
@@ -54,6 +58,7 @@ export default function App() {
         if (signal.aborted) return;
         setRepos(r.data.items);
         setDateLimits(r.data.date_limits);
+        setSetup(r.data.setup);
         setParams((p) => ({
           ...p,
           repo: r.data.items.some((repo) => repo.repo === p.repo)
@@ -73,6 +78,21 @@ export default function App() {
         if (!signal.aborted) setError(message(e));
       });
   }, [refresh]);
+  // Re-read setup and sync statuses (not the report) after a report loads or a narrative
+  // reports a Bedrock failure, so a sync that has since succeeded clears stale labels.
+  useAbortable(
+    (signal) => {
+      if (!setupCheck) return;
+      fetchJson<RepoList>("/v1/repos", signal)
+        .then((r) => {
+          if (signal.aborted) return;
+          setSetup(r.data.setup);
+          setRepos(r.data.items);
+        })
+        .catch(() => undefined);
+    },
+    [setupCheck],
+  );
   useEffect(() => {
     const query = new URLSearchParams({ ...params, audience });
     window.history.replaceState(null, "", "?" + query);
@@ -99,6 +119,8 @@ export default function App() {
         if (!signal.aborted) {
           setSnapshot(s);
           setPending(null);
+          // A finished sync may have resolved configuration problems shown earlier.
+          setSetupCheck((n) => n + 1);
         }
       })
       .catch((e) => {
@@ -138,6 +160,7 @@ export default function App() {
           validationError={validationError}
           refresh={() => setRefresh((r) => r + 1)}
         />
+        <SetupNotice setup={setup} />
         {error && (
           <div className="error-banner" role="alert">
             <strong>{error.title}</strong>
@@ -188,7 +211,11 @@ export default function App() {
           <div className="report">
             <Headline snapshot={snapshot} />
             <KpiGrid snapshot={snapshot} />
-            <NarrativePanel snapshot={snapshot} audience={audience} />
+            <NarrativePanel
+              snapshot={snapshot}
+              audience={audience}
+              onLlmError={() => setSetupCheck((n) => n + 1)}
+            />
             <TimeLedgerChart snapshot={snapshot} />
             <Bottlenecks snapshot={snapshot} audience={audience} />
             {audience === "manager" && (

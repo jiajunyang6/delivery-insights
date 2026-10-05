@@ -90,7 +90,8 @@ class SnapshotService:
         Pending reasons, checked in order: never_synced, backfill (coverage starts after the
         period), open_sweep, rederive (derive key changed), stale (no sync since period start).
         Raises 503 when a repo pending for any reason but rederive has a missing_token,
-        auth_error or not_found sync status.
+        auth_error or not_found sync status and no queued or running sync job; with an active
+        job (for example after the configuration was fixed) the reply stays 202 with progress.
         """
         repositories = {
             r.full_name_lower: r
@@ -120,9 +121,6 @@ class SnapshotService:
                 reason = "stale"
             if reason:
                 status = repo.last_sync_status if repo else "never"
-                # Rederive works from stored data, so GitHub access problems do not block it.
-                if reason != "rederive" and status in {"missing_token", "auth_error", "not_found"}:
-                    blocked.append({"repo": name, "last_sync_status": status})
                 job = None
                 if repo is not None:
                     kinds = (
@@ -140,6 +138,14 @@ class SnapshotService:
                         .order_by(SyncJob.created_at.desc(), SyncJob.id.desc())
                         .limit(1)
                     )
+                # Rederive works from stored data, so GitHub access problems do not block it.
+                # A queued or running sync may already use fixed settings, so report progress.
+                if (
+                    reason != "rederive"
+                    and job is None
+                    and status in {"missing_token", "auth_error", "not_found"}
+                ):
+                    blocked.append({"repo": name, "last_sync_status": status})
                 pending.append(
                     {
                         "repo": name,
@@ -364,4 +370,5 @@ class SnapshotService:
         page = page_rows(
             cast(list[dict[str, Any]], rows), sid, metadata.as_of, filters, limit, cursor
         )
-        return Reply(canonical(rounded(page)), 200, {"Cache-Control": "private, max-age=60"})
+        # Param-addressed like the delivery reply, so the browser must not reuse it after a sync.
+        return Reply(canonical(rounded(page)), 200, {"Cache-Control": "private, no-cache"})

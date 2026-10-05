@@ -1,7 +1,9 @@
 """FastAPI application factory; request handlers read Postgres and Redis, never GitHub."""
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
+from datetime import UTC, datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +17,7 @@ from insights.config import Settings, get_settings, split_list
 from insights.db.engine import create_database
 from insights.logging import configure_logging
 from insights.narrative.llm import BedrockClient
+from insights.narrative.service import check_llm
 from insights.redis import connect_arq, create_redis
 
 
@@ -35,12 +38,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.redis = redis
         app.state.arq = None
         app.state.llm = BedrockClient(configuration) if configuration.llm_enabled else None
+        # Check the Bedrock settings in the background so the setup notice reflects them
+        # right after a restart, even when every narrative is served from cache.
+        llm_check = (
+            asyncio.create_task(check_llm(app.state.llm, redis, configuration, datetime.now(UTC)))
+            if app.state.llm is not None
+            else None
+        )
         # The queue is only needed for manual syncs; deps.get_arq reconnects lazily.
         with suppress(RedisError, OSError, TimeoutError):
             app.state.arq = await connect_arq(configuration.redis_url)
         try:
             yield
         finally:
+            if llm_check is not None:
+                llm_check.cancel()
+                with suppress(asyncio.CancelledError):
+                    await llm_check
             if app.state.arq is not None:
                 await app.state.arq.aclose()
             await redis.aclose()

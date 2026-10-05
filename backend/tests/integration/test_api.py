@@ -3,7 +3,9 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import httpx
+import orjson
 import pytest
+from pydantic import SecretStr
 from redis.exceptions import ConnectionError as RedisConnectionError
 from sqlalchemy import func, select, update
 from tests.factories import at
@@ -23,7 +25,7 @@ from insights.api.schemas import (
 )
 from insights.db.models import PrFact, PrInterval, PullRequest, Repository, Snapshot, SyncJob
 from insights.main import create_app
-from insights.redis import snapshot_key, sync_cooldown_key
+from insights.redis import llm_error_key, snapshot_key, sync_cooldown_key
 from insights.sync.derive import current_key
 from insights.sync.queue import enqueue_sync
 
@@ -62,7 +64,7 @@ async def test_snapshot_caches_etags_and_schema(api, monkeypatch):
     first = await client.get(DELIVERY, headers={"X-Request-ID": "api-check"})
     assert first.status_code == 200, first.text
     SnapshotSchema.model_validate(first.json())
-    assert first.headers["cache-control"] == "private, max-age=60"
+    assert first.headers["cache-control"] == "private, no-cache"
     assert first.headers["x-request-id"] == "api-check"
     assert first.headers["content-location"].endswith(first.json()["snapshot_id"])
     assert first.headers["x-snapshot-id"] == first.json()["snapshot_id"]
@@ -143,6 +145,21 @@ async def test_unavailable_vs_local_rederive(api, values, status):
     assert response.status_code == status
     if status == 503:
         assert response.json()["type"] == "/problems/data-unavailable"
+
+
+async def test_sync_after_configuration_fix_reports_progress_not_unavailable(api):
+    client, _, _, ctx = api
+    async with ctx["session_factory"]() as session:
+        await session.execute(
+            update(Repository).values(last_sync_status="missing_token", covered_since=None)
+        )
+        await session.commit()
+        job, _ = await enqueue_sync(ctx["redis"], session, "a/b", "manual", now=NOW)
+    result = await client.get(DELIVERY)
+    assert result.status_code == 202, result.text
+    assert result.json()["repos"][0]["job"]["id"] == str(job.id)
+    problems = (await client.get("/v1/repos")).json()["setup"]["github"]["problems"]
+    assert problems == [{"repo": "a/b", "status": "missing_token", "syncing": True}]
 
 
 async def test_partial_watermark(api):
@@ -318,3 +335,41 @@ async def test_org_alias_and_complete_openapi_models(api):
     ):
         assert paths[path]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
     assert "post" in paths["/v1/repos/{owner}/{name}/sync"]
+
+
+async def test_repos_report_setup_problems_without_secret_values(api):
+    client, _, _, ctx = api
+    ctx["settings"].github_token = SecretStr("github-secret-value")
+    ctx["settings"].aws_bearer_token_bedrock = None
+    ctx["settings"].tracked_repos = "a/b,c/d"
+    setup = (await client.get("/v1/repos")).json()["setup"]
+    assert setup["github"] == {"token_configured": True, "problems": []}
+    assert setup["llm"]["key_configured"] is False and setup["llm"]["last_error"] is None
+    assert setup["llm"]["region"] == ctx["settings"].aws_region
+    async with ctx["session_factory"]() as session, session.begin():
+        await session.execute(update(Repository).values(last_sync_status="auth_error"))
+    ctx["settings"].github_token = None
+    ctx["settings"].aws_bearer_token_bedrock = SecretStr("bedrock-secret-value")
+    settings = ctx["settings"]
+    await ctx["redis"].set(
+        llm_error_key(),
+        orjson.dumps(
+            {
+                "code": "AccessDeniedException",
+                "at": "2026-01-02T03:04:05Z",
+                "model_id": settings.bedrock_model_id,
+                "region": settings.aws_region,
+            }
+        ),
+    )
+    response = await client.get("/v1/repos")
+    RepoList.model_validate(response.json())
+    setup = response.json()["setup"]
+    assert setup["github"] == {
+        "token_configured": False,
+        "problems": [{"repo": "a/b", "status": "auth_error", "syncing": False}],
+    }
+    assert setup["llm"]["key_configured"] is True
+    assert setup["llm"]["last_error"] == "AccessDeniedException"
+    assert setup["llm"]["last_error_at"] == "2026-01-02T03:04:05Z"
+    assert "secret-value" not in response.text

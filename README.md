@@ -85,7 +85,7 @@ Dates are inclusive UTC dates. Errors use RFC 9457 `application/problem+json`. C
 ## Configuration
 
 Settings come from `.env`; never commit it. Without `.env`, code defaults apply (`backend/src/insights/config.py`):
-`TRACKED_REPOS=dotnet/runtime` and `BACKFILL_DAYS=120`.
+`TRACKED_REPOS=bevyengine/bevy` and `BACKFILL_DAYS=120`.
 
 | Variable | `.env.example` | Purpose |
 |---|---|---|
