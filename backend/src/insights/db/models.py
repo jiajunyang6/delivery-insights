@@ -1,4 +1,4 @@
-"""SQLAlchemy schema for synced source data, derived facts, snapshots and the job ledger."""
+"""SQLAlchemy schema for synced data, derived facts, snapshots and jobs; engine factory."""
 
 from datetime import date, datetime
 from typing import Any
@@ -20,7 +20,15 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from insights.config import Settings
 
 
 class Base(DeclarativeBase):
@@ -221,3 +229,10 @@ class SyncJob(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     __table_args__ = (Index("ix_sync_jobs_repo_created", "repo_id", created_at.desc()),)
+
+
+def create_database(settings: Settings) -> tuple[AsyncEngine, async_sessionmaker[AsyncSession]]:
+    """Create an async engine and session factory that retains loaded attributes after commit."""
+    engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+    # Jobs keep reading ORM rows, such as Repository, after their session commits.
+    return engine, async_sessionmaker(engine, expire_on_commit=False)

@@ -8,8 +8,8 @@ from pydantic import SecretStr
 
 from insights.config import Settings
 from insights.domain import RepoRef
-from insights.sources.github.adapter import GitHubAdapter
 from insights.sources.github.client import (
+    GitHubAdapter,
     GitHubAuthError,
     GitHubClient,
     GitHubNotFoundError,

@@ -13,8 +13,7 @@ from testcontainers.redis import RedisContainer
 
 from insights.config import Settings
 from insights.db.models import Base
-from insights.sources.github.adapter import GitHubAdapter
-from insights.sources.github.client import GitHubClient
+from insights.sources.github.client import GitHubAdapter, GitHubClient
 
 
 @pytest.fixture(scope="session")

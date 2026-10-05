@@ -11,8 +11,8 @@ from insights.db.models import Repository, Snapshot, SyncJob
 from insights.redis import snapshot_key
 from insights.snapshots.service import SnapshotService
 from insights.sync.derive import current_key
-from insights.sync.maintenance import housekeeping, precompute_snapshots
 from insights.sync.queue import enqueue_sync
+from insights.sync.worker import housekeeping, precompute_snapshots
 
 pytestmark = pytest.mark.integration
 
