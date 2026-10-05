@@ -280,7 +280,7 @@ make eval-offline
 make eval
 ```
 
-Current checks: 316 backend tests (63 integration), 15 frontend tests,
+Current checks: 318 backend tests (63 integration), 15 frontend tests,
 Ruff/strict mypy, typecheck/build and all eight offline narrative gates pass. Browser
 verification uses synthetic data on the newly built UI, including 7/30/60 days, a custom
 period, pending, configuration notice, narrative and the three-state ledger. After the user's
@@ -305,10 +305,10 @@ Those analytics 1.2/1.3 measurements and npm ci/audit checks were not repeated h
 The original 90-day performance gate remains excluded; three upstream deprecation warnings remain.
 
 The current harness runs three planted scenarios (review capacity, PR size growth and
-no signal) with five seeds: 15 English narratives. CI slowdown is retired. Current offline
-and real Bedrock results are in [EVALUATION.md](EVALUATION.md). The real run still falls
-back on pr_size_growth seed 303 with `V8:invalid_downgrade`; its low-band candidate does
-not demonstrate successful real-model low-band wording.
+no signal) with five seeds: 15 English narratives. CI slowdown is retired. On prompt v13
+both suites pass all gates: offline 15/15 first-attempt valid; real Bedrock 14/15
+first-attempt valid, every case answered by the LLM after at most one repair, fallback
+0/15. Per-case results are in [EVALUATION.md](EVALUATION.md).
 The following offline and Bedrock results are historical runs with CI analysis enabled.
 Numeric/citation/hedge denominators include final LLM outputs, excluding fallback.
 

@@ -126,7 +126,7 @@ checkpoints under the default configuration. Wait for repository `last_sync_stat
 and full coverage before checking the dashboard. Keep `BACKFILL_DAYS=120` for the 60-day
 view and its comparison period.
 
-Local checks: **316 backend tests** (253 unit, 63 integration), **15 frontend tests**,
+Local checks: **318 backend tests** (255 unit, 63 integration), **15 frontend tests**,
 strict lint/types/build and all eight offline and real Bedrock narrative gates pass. The
 current real run is first-valid in 14/15 cases; one invalid downgrade causes template
 fallback. Numeric, citation and hedge consistency are 14/14 each for final LLM outputs.

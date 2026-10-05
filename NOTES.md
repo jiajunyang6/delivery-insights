@@ -122,11 +122,12 @@ I would do one of the followings if I had one more day:
 - **Claude Sonnet 4.6 on Bedrock** is part of the product: it writes narrative wording only,
   and the deterministic validator decides whether it is shown.
 - **How the output was checked:**
-  - 316 backend tests, 63 of them on real Postgres 16 and Redis 7, plus 15 frontend tests.
+  - 318 backend tests, 63 of them on real Postgres 16 and Redis 7, plus 15 frontend tests.
   - Strict ruff/mypy and the frontend typecheck and build.
-  - The current 15-case offline and real Bedrock evaluations pass all eight gates. The real
-    run is first-valid in 14/15 cases; one invalid downgrade still causes template fallback.
-    Numeric, citation and hedge consistency are 14/14 each for final LLM outputs.
+  - The current 15-case offline and real Bedrock evaluations on prompt v13 pass all eight
+    gates. The real run is first-valid in 14/15 cases, the one invalid first answer is
+    fixed by its repair, and no case falls back to the template; numeric, citation and
+    hedge consistency are 15/15 each for final LLM outputs.
   - Real GitHub sync and browser checks.
   - CI removal checked field by field: every retained golden snapshot value is unchanged;
     synthetic browser checks cover presets, a custom period, pending, configuration, narrative
