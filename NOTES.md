@@ -7,8 +7,7 @@
 - Docker with Compose v2 (Docker Desktop on Windows/macOS).
 - A GitHub fine-grained personal access token for live data: Settings → Developer settings → Fine-grained tokens,
   **Repository access: Public repositories**, no extra permissions.
-- A Bedrock API key is required
-for LLM-generated narratives.
+- A Bedrock API key is required for LLM-generated narratives.
 
 **Steps:**
 
@@ -49,6 +48,7 @@ for LLM-generated narratives.
 
     Expected status: `migrate` has exited with code `0`; `api`, `worker`, `web`,
     `postgres` and `redis` are running.
+    It might take up to 5 minutes to prepare the reports.
 
 - Dashboard: <http://localhost:5173>. API docs: <http://localhost:8000/docs>. Both bind to localhost only.
 - The worker starts syncing `bevyengine/bevy` immediately: 7 days first, then 30, then
@@ -90,14 +90,18 @@ Main decisions:
   complexity.
 
 ## 3. With one more day
-
+I would do one of the followings if I had one more day: 
 1. **Add a "Sync now" button** for tracked repositories in the dashboard. The API
    (`POST /v1/repos/{owner}/{name}/sync` plus job polling) already exists.
 2. **Add a point-in-time "all open PRs" view** for backlog and at-risk stock, beside the
    period-active view.
 3. **Harden sync:** reconcile jobs killed mid-run at startup, and retry GraphQL throttling
    returned with HTTP 200 and dropped connections.
-4. **Scale linking for 180+ day backfills on large repos**.
+4. **Speed up the first sync:** split the initial time window into date ranges and fetch them 
+   in parallel using GraphQL search with updated: filters, instead of fetching one page at a time. 
+   Also sync tracked repositories in parallel while staying within the shared GitHub rate limit. 
+   Snapshot analytics already runs outside the event loop. If it becomes slow on large repositories, 
+   move it to a process pool, because threads do not speed up CPU-heavy Python work.
 
 ## 4. How AI was used
 
@@ -113,12 +117,13 @@ Main decisions:
 - **Claude Sonnet 4.6 on Bedrock** is part of the product: it writes narrative wording only,
   and the deterministic validator decides whether it is shown.
 - **How the output was checked:**
-  - 402 automated tests, 69 of them on real Postgres 16 and Redis 7.
+  - 424 backend tests, 73 of them on real Postgres 16 and Redis 7, plus 15 frontend tests.
   - Strict ruff/mypy and the frontend typecheck and build.
-  - The 20-case narrative evaluation (stub and real Bedrock on final prompt v8; rejected v8 trials retained).
+  - The 20-case narrative evaluation: the offline stub on the current prompt v10; the last
+    real Bedrock run used prompt v8 (rejected trials retained).
   - Real GitHub sync and browser checks.
   - Refactor equivalence across golden, ten planted datasets and an ownership fixture;
     synthetic browser checks for both views, presets, Load more, cards and abstentions.
 
-The other details: [trade-offs](docs/REFERENCE.md#trade-offs-and-limitations),
+The other details: [trade-offs](docs/REFERENCE.md),
 [evaluation](docs/EVALUATION.md) and [decision log](docs/DECISIONS.md).
