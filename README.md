@@ -10,8 +10,8 @@ evidence chain. Every number comes from code, and each claim in the narrative li
 number behind it.
 
 Sections 1–4 are the submission notes. The sections after them cover how the output was
-checked, the product, configuration and development; [docs/REFERENCE.md](docs/REFERENCE.md)
-has the details.
+checked, the product, configuration and development;
+[docs/TECHNICAL_DETAILS.md](docs/TECHNICAL_DETAILS.md) has the details.
 
 ## 1. How to run it locally
 
@@ -89,7 +89,7 @@ has the details.
    `If-None-Match` with `304`. A `202` carries `Retry-After` and per-repository sync progress.
    Errors use RFC 9457 `application/problem+json`; error codes are `422` for invalid input,
    `403` for an untracked repository and `429` for the rate limit. A script that derives the
-   dates and snapshot ID is in [REFERENCE.md](docs/REFERENCE.md#api).
+   dates and snapshot ID is in [TECHNICAL_DETAILS.md](docs/TECHNICAL_DETAILS.md#api).
 
    Check status: `curl -s localhost:8000/readyz`, `curl -s localhost:8000/v1/repos` and
    `docker compose logs --tail=50 worker`.
@@ -137,7 +137,7 @@ Main decisions:
   cannot steer outbound calls; parameterized SQL; PR text and user names never reach the LLM.
 
 Trade-offs and what I chose not to do (more in
-[REFERENCE.md](docs/REFERENCE.md#trade-offs-and-limitations)):
+[TECHNICAL_DETAILS.md](docs/TECHNICAL_DETAILS.md#trade-offs-and-limitations)):
 
 - **Freshness:** reports lag GitHub by up to one sync interval, and the first sync takes a few
   minutes before every period is ready.
@@ -221,7 +221,7 @@ Settings come from `.env`; never commit it. Without `.env`, the code defaults in
 | `PRECOMPUTE_DAYS` | `7,30,60` | Report windows warmed after a sync changes repository data                            |
 | `LOCATION_DIMENSION` | `label:area-` | Area grouping: matching labels, otherwise directories                                 |
 
-Connection, CORS, rate-limit and logging settings are listed in [REFERENCE.md](docs/REFERENCE.md#additional-settings).
+Connection, CORS, rate-limit and logging settings are listed in [TECHNICAL_DETAILS.md](docs/TECHNICAL_DETAILS.md#additional-settings).
 
 ## Development
 
@@ -235,7 +235,7 @@ cd frontend && npm ci && npm test && npm run typecheck && npm run build
 ```
 
 Without Make (for example on Windows), run the `uv run` commands from the [Makefile](Makefile)
-in `backend/`. Test scope and evaluation results are in [REFERENCE.md](docs/REFERENCE.md#testing-and-evaluation).
+in `backend/`. Test scope and evaluation results are in [TECHNICAL_DETAILS.md](docs/TECHNICAL_DETAILS.md#testing-and-evaluation).
 
 The unreleased application keeps one migration, `0001_initial`, which is edited in place
 until release. A database created by an earlier version of that file must be deleted and
@@ -255,5 +255,5 @@ The worker then collects history again from an empty database. Wait for reposito
 
 | Document | Contents |
 |---|---|
-| [docs/REFERENCE.md](docs/REFERENCE.md) | Metric semantics, pipeline, API and insight contract, confidence scoring, operations, security, test and evaluation results, limitations |
+| [docs/TECHNICAL_DETAILS.md](docs/TECHNICAL_DETAILS.md) | Metric semantics, pipeline, API and insight contract, confidence scoring, operations, security, test and evaluation results, limitations |
 | [AGENTS.md](AGENTS.md) | Repository map, invariants and verification steps for coding agents |

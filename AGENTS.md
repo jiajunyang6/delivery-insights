@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Instructions for coding agents working in this repository. Read this file first; `README.md`
-describes the product and submission, `docs/REFERENCE.md` holds the current contracts.
+describes the product and submission, `docs/TECHNICAL_DETAILS.md` holds the current contracts.
 
 ## Ground rules
 
@@ -29,7 +29,7 @@ describes the product and submission, `docs/REFERENCE.md` holds the current cont
 | `backend/tests/` | Unit and integration tests, factories, golden snapshot (`tests/golden/`) |
 | `backend/eval/` | Synthetic scenarios and the narrative evaluation harness |
 | `frontend/src/` | React dashboard: components, `format.ts`, `api.ts` request cancellation |
-| `docs/` | `REFERENCE.md` contracts, evaluation results and trade-offs; `diagrams/how-it-works.svg` architecture diagram |
+| `docs/` | `TECHNICAL_DETAILS.md` contracts, evaluation results and trade-offs; `diagrams/how-it-works.svg` architecture diagram |
 
 ## Commands
 
@@ -98,7 +98,7 @@ Without Make (Windows), run the equivalent `uv run` commands from the Makefile.
 - Inline comments explain why, not what; do not restate names or types.
 - No change history, ticket numbers, authorship or commented-out code. Lines stay within 100
   characters. Update comments when behavior changes; long explanations belong in
-  `docs/REFERENCE.md`.
+  `docs/TECHNICAL_DETAILS.md`.
 
 ## Verification
 
@@ -107,7 +107,7 @@ Without Make (Windows), run the equivalent `uv run` commands from the Makefile.
 - Golden snapshot: regenerate with `UPDATE_GOLDEN=1 uv run pytest tests/unit/test_snapshot.py` (in `backend/`)
   and review the diff; it may contain only the intended changes.
 - Prompt changes need a real `make eval`: all gates pass, first-attempt validity at least 0.90
-  and numeric, citation and hedge consistency 1.00. Record results in the `docs/REFERENCE.md` testing section.
+  and numeric, citation and hedge consistency 1.00. Record results in the `docs/TECHNICAL_DETAILS.md` testing section.
 - UI changes: check 7/30/60-day and custom periods, the pending state, the configuration
   notice, the narrative panel and the time ledger in a browser.
 - Update the docs your change affects, keeping each fact in one place:
@@ -115,7 +115,7 @@ Without Make (Windows), run the equivalent `uv run` commands from the Makefile.
     architecture and decisions, one more day, AI use). Sections 3 and 4 are the owner's own
     account; change them only when asked. Later sections summarize checks, product,
     configuration and development; keep test counts in "How the output was checked" current.
-  - REFERENCE: contracts, metric semantics, scoring, operations, security, results and
-    trade-offs. Do not repeat what the README already says; link to it instead.
+  - TECHNICAL_DETAILS.md: contracts, metric semantics, scoring, operations, security, results
+    and trade-offs. Do not repeat what the README already says; link to it instead.
   - `docs/diagrams/how-it-works.svg`: update it when components, data flow or the narrative
     flow change, and render it to check that labels do not overlap.

@@ -1,4 +1,4 @@
-# Technical reference
+# Technical details
 
 Details behind the [README](../README.md), which covers running the stack, the architecture
 tour, the metric choice, the API overview and the main settings.
@@ -326,4 +326,4 @@ tests and the offline eval, and frontend tests, typecheck and build.
 | `backend/tests/` | Unit, integration, fixture and golden checks |
 | `backend/eval/` | Synthetic generator, scenarios and evaluation runner |
 | `frontend/` | React/TypeScript UI, shared abortable requests and formatting, Vite config and nginx image |
-| `docs/` | This technical reference and the architecture diagram |
+| `docs/` | These technical details and the architecture diagram |
