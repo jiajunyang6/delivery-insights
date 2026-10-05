@@ -290,23 +290,21 @@ Those analytics 1.2/1.3 measurements and npm ci/audit checks were not repeated h
 The original 90-day performance gate remains excluded; nine upstream deprecation warnings remain.
 
 The harness runs four planted scenarios × five seeds through the single English narrative.
-The offline suite passes all gates on analytics 1.6.0 and prompt v11. The table below is the
-last real Bedrock comparison (prompt v8, five scenarios × two seeds × two audiences) until a
-real v11 run is recorded.
+Offline and real Bedrock Sonnet 4.6 suites were run on analytics 1.6.0 and prompt v11.
 [Evaluation records](EVALUATION.md) retain every current and historical per-case outcome.
 Numeric/citation/hedge denominators include final LLM outputs, excluding fallback.
 
-| Metric | Offline (v8) | Real Bedrock (v8) | Required |
+| Metric | Offline (v11) | Real Bedrock (v11) | Required |
 |---|---|---|---|
-| First-attempt validity | 20/20 (1.00) | 20/20 (1.00) | ≥ 0.90 |
-| Numeric / citation / hedge consistency | 20/20 each | 20/20 each | 1.00 each |
-| Root-cause hit rate | 14/16 (0.875) | 14/16 (0.875) | ≥ 0.80 |
-| No-signal abstention | 4/4 (1.00) | 4/4 (1.00) | ≥ 0.80 |
+| First-attempt validity | 20/20 (1.00) | 19/20 (0.95) | ≥ 0.90 |
+| Numeric / citation / hedge consistency | 20/20 each | 19/19 each | 1.00 each |
+| Root-cause hit rate | 15/15 (1.00) | 15/15 (1.00) | ≥ 0.80 |
+| No-signal abstention | 5/5 (1.00) | 5/5 (1.00) | ≥ 0.80 |
 | High-confidence precision | 14/14 (1.00) | 14/14 (1.00) | ≥ 0.80 |
-| Fallback rate | 0/20 (0.00) | 0/20 (0.00) | ≤ 0.10 |
+| Fallback rate | 0/20 (0.00) | 1/20 (0.05) | ≤ 0.10 |
 
-The v8 offline and real-Bedrock suites passed all gates; their two misses came from the quality
-trade-off hypothesis, which analytics 1.6.0 removed.
+Both v11 suites pass all gates. The real fallback (pr_size_growth seed 303) is a low-band
+wording failure on a secondary hypothesis, also seen in live 60-day Bevy narratives.
 Medium/low precision is undefined. Failed v1/v2 and English v4/v5 trials remain
 recorded, together with rejected stage-8 candidates A/B. Earlier rebuilt-API English-only real-manager HTTP smoke is historical; the refactor UI check used synthetic fixtures.
 This small synthetic suite was used during prompt development; it is not a held-out

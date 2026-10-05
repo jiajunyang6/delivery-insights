@@ -119,8 +119,8 @@ I would do one of the followings if I had one more day:
 - **How the output was checked:**
   - 424 backend tests, 73 of them on real Postgres 16 and Redis 7, plus 15 frontend tests.
   - Strict ruff/mypy and the frontend typecheck and build.
-  - The 20-case narrative evaluation: the offline stub on the current prompt v10; the last
-    real Bedrock run used prompt v8 (rejected trials retained).
+  - The 20-case narrative evaluation: offline stub and real Bedrock runs on the current
+    prompt v11 both pass all gates (earlier and rejected trials retained).
   - Real GitHub sync and browser checks.
   - Refactor equivalence across golden, ten planted datasets and an ownership fixture;
     synthetic browser checks for both views, presets, Load more, cards and abstentions.
