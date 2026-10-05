@@ -24,7 +24,7 @@ describes the product and submission, `docs/REFERENCE.md` holds the current cont
 | `backend/src/insights/analytics/` | Pure computation of the snapshot: timeline, facts, efficiency, time ledger, attribution |
 | `backend/src/insights/snapshots/` | Snapshot orchestration, readiness (202 Pending), caching and domain errors |
 | `backend/src/insights/narrative/` | Evidence pack, hypothesis scoring, prompt, validator, template fallback, LLM client |
-| `backend/src/insights/api/` | FastAPI report routes in `routes/insights.py`, health/repos, params, strict schemas, errors, middleware |
+| `backend/src/insights/api/` | FastAPI report routes in `routes/insights.py`, health/repos, params, strict schemas, errors (`insights/main.py` builds the app and its request middleware) |
 | `backend/migrations/` | Alembic, currently one initial revision |
 | `backend/tests/` | Unit and integration tests, factories, golden snapshot (`tests/golden/`) |
 | `backend/eval/` | Synthetic scenarios and the narrative evaluation harness |
@@ -53,9 +53,10 @@ Without Make (Windows), run the equivalent `uv run` commands from the Makefile.
 - `analytics/` performs no database or HTTP I/O. API requests read local data only; workers
   are the only callers of GitHub.
 - `snapshots/`, `narrative/` and `sync/` never import `api.*`.
-- Keep `analytics/types.py`, `analytics/facts.py` and `analytics/pointer.py` as separate
-  modules; merging them creates import cycles. After moving code, import every module in a
-  fresh interpreter to catch cycles.
+- `analytics/__init__.py` (versions and thresholds) imports no analytics module, and
+  `analytics/facts.py` (`PrFacts`, flow eligibility, locations) imports only `timeline` and
+  `domain`; `dataset`, `db/records.py` and the eval depend on both, so anything more creates
+  import cycles. After moving code, import every module in a fresh interpreter to catch cycles.
 
 **Determinism and versions** (constants live in code; do not copy their values into docs)
 - Snapshots are pure functions of their inputs: the same data and parameters give the same
