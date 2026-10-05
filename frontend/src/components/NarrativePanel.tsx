@@ -303,9 +303,9 @@ export function NarrativePanel({
   // Bracketed citations in narrative text; bare IDs too in free-text reasons.
   const text = (value: string, bare = false) =>
     value
-      .split(bare ? /(\[?\bE\d+\b\]?)/ : /(\[E\d+\])/)
+      .split(bare ? /(\[?\bE\d+\b]?)/ : /(\[E\d+])/)
       .map((part, i) =>
-        /^\[?E\d+\]?$/.test(part) && (bare || part.startsWith("[")) ? (
+        /^\[?E\d+]?$/.test(part) && (bare || part.startsWith("[")) ? (
           tag(part.replace(/[[\]]/g, ""), String(i))
         ) : (
           <span key={i}>{part}</span>
