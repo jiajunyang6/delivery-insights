@@ -1,37 +1,17 @@
 from dataclasses import replace
-from datetime import date
 
-import pytest
 from tests.analytics_factory import dataset, pr
 from tests.factories import at
 from tests.unit.test_snapshot import params
 
-from insights.analytics.bottlenecks import at_risk, locations, review_queue, time_ledger, what_if
-from insights.analytics.dataset import Baseline, Review, Window
-from insights.analytics.efficiency import measures
+from insights.analytics.bottlenecks import locations, review_queue
+from insights.analytics.dataset import Review, Window
 from insights.analytics.snapshot import build_snapshot
 from insights.analytics.timeline import Interval
 
 
-def test_mature_cohort_includes_boundary_and_not_partial_followup():
-    prs = []
-    for i in range(30):
-        p = pr(i)
-        p = replace(p, facts=replace(p.facts, ready_at=at(0), merged_at=at(72)))
-        prs.append(p)
-    d = dataset(prs, period_from=date(2026, 1, 1), period_to=date(2026, 1, 3))
-    m = measures(d, d.current)["merged_within_n_days"]
-    assert m.value == 1 and m.n == 30
-    assert m.extra["n_days"] == 3
-    d = replace(d, repos=(replace(d.repos[0], last_synced_at=at(71)),))
-    assert measures(d, d.current)["merged_within_n_days"].n == 0
-
-
-def test_excluded_priority_and_zero_coding_waiting_share():
-    originals = [pr(i) for i in range(20)]
-    originals = [replace(p, facts=replace(p.facts, coding_hours=None)) for p in originals]
-    d = dataset(originals)
-    assert measures(d, d.current)["waiting_share"].value == pytest.approx(25 / 30)
+def test_bot_backport_and_draft_prs_are_excluded():
+    d = dataset([pr(i) for i in range(20)])
     bot = replace(pr(100), facts=replace(pr(100).facts, is_bot_author=True, is_backport=True))
     backport = replace(pr(101), facts=replace(pr(101).facts, is_backport=True, ready_at=None))
     draft = replace(
@@ -43,16 +23,13 @@ def test_excluded_priority_and_zero_coding_waiting_share():
     assert payload["time_ledger"]["total_pr_hours"] == 0
 
 
-def test_other_union_counts_inflow_outflow_and_risks_once():
-    originals = []
-    for i in range(5):
-        p = pr(i, offset=38, reviewer=5, author=1, merge=1, locations=("a", "b"))
-        originals.append(p)
-    d = dataset(originals)
-    risks = [{"repo": "a/b", "number": p.number, "locations": ["a", "b"]} for p in originals]
-    locs = locations(d, risks, time_ledger(d))
+def test_other_union_counts_multi_location_prs_once():
+    originals = [
+        pr(i, offset=38, reviewer=5, author=1, merge=1, locations=("a", "b")) for i in range(5)
+    ]
+    locs = locations(dataset(originals))
     assert len(locs) == 1
-    assert (locs[0]["inflow"], locs[0]["outflow"], locs[0]["at_risk_prs"]) == (5, 5, 5)
+    assert locs[0]["merged_prs"] == 5 and locs[0]["waiting_reviewer_pr_hours"] == 25
 
 
 def test_queue_ready_pre_review_and_paused_pr():
@@ -73,21 +50,6 @@ def test_queue_ready_pre_review_and_paused_pr():
         ),
     )
     d = dataset([p, no_review], reviews=(Review("a", at(40), 1),))
-    week = review_queue(d, Window(at(48), at(72)))["weeks"][0]
-    assert week["inflow"] == 2 and week["outflow"] == 1
-    assert week["open_at_week_end"] == 0
-
-
-def test_risk_90d_and_strict_percentile_threshold():
-    p = pr(1)
-    p = replace(
-        p,
-        facts=replace(p.facts, merged_at=None, end_at=None),
-        intervals=(Interval("waiting_reviewer", at(22), None),),
-    )
-    bases = tuple(Baseline("a/b", "waiting_reviewer", at(10), 50) for _ in range(30))
-    d = dataset([p], baselines=bases)
-    assert not at_risk(d, at=at(72))
-    risk = at_risk(d, at=at(72.1))[0]
-    assert risk["baseline_source"] == "90d" and risk["severity"] == "critical"
-    assert what_if(dataset([pr(i) for i in range(30)]), "merge")["affected_prs"] == 0
+    # Two ready arrivals, one first review clamped to the ready time: inflow exceeds outflow.
+    queue = review_queue(d, Window(at(48), at(72)))
+    assert queue == {"weeks_total": 1, "weeks_inflow_exceeds_outflow": 1}

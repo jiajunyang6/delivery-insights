@@ -65,78 +65,71 @@ class TracedClient:
 async def evaluate(
     client: LLMClient, *, seeds: list[int], scenarios: list[str]
 ) -> list[dict[str, Any]]:
-    """Run each scenario/seed for both English audiences through production narrative generation.
+    """Run each scenario/seed through production narrative generation.
 
-    Each audience gets a fresh trace over the same snapshot. A top hit requires the expected
-    ID and any specified location; no-signal cases require abstention with no hypotheses.
-    Recheck final wording separately so successful repair cannot mask an invalid first reply.
+    A top hit requires the expected ID and any specified location; no-signal cases require
+    abstention with no hypotheses. Recheck final wording separately so successful repair
+    cannot mask an invalid first reply.
     """
     runs = []
-    print("scenario          seed audience/lang top hypothesis         level   hit fallback")
+    print("scenario          seed top hypothesis         level   hit fallback")
     for scenario in scenarios:
         for seed in seeds:
             snapshot = build_snapshot_from_repo(generate(SCENARIOS[scenario], seed))
             expected_id, expected_location = EXPECTED[scenario]
-            for audience in ("director", "manager"):
-                started = perf_counter()
-                traced = TracedClient(client)
-                pack, _ = build_evidence_pack(snapshot, audience, True)
-                result = await narrate(
-                    snapshot, audience=audience, llm=traced, ci_complete=True, now=AS_OF
+            started = perf_counter()
+            traced = TracedClient(client)
+            pack, _ = build_evidence_pack(snapshot, True)
+            result = await narrate(snapshot, llm=traced, ci_complete=True, now=AS_OF)
+            payload, meta = result.payload, result.payload["meta"]
+            hypotheses = payload["hypotheses"]
+            top = hypotheses[0] if hypotheses else {}
+            hit = (
+                (
+                    top.get("id") == expected_id
+                    and (expected_location is None or top.get("location") == expected_location)
                 )
-                payload, meta = result.payload, result.payload["meta"]
-                hypotheses = payload["hypotheses"]
-                top = hypotheses[0] if hypotheses else {}
-                hit = (
-                    (
-                        top.get("id") == expected_id
-                        and (expected_location is None or top.get("location") == expected_location)
-                    )
-                    if expected_id
-                    else payload["abstained"] and not hypotheses
-                )
-                # Generation may repair or fall back; score its original reply separately so
-                # final validation success does not inflate first-attempt validity.
-                first_errors = (
-                    validate(traced.first.tool_input, pack, snapshot, audience=audience)
-                    if traced.first is not None
-                    else []
-                )
-                row = {
-                    "scenario": scenario,
-                    "seed": seed,
-                    "audience": audience,
-                    "lang": "en",
-                    "expected": {"id": expected_id, "location": expected_location},
-                    "generated_by": meta["generated_by"],
-                    "validation": meta["validation"],
-                    "attempts": meta["attempts"],
-                    "fallback_reason": meta["fallback_reason"],
-                    "violations": meta["violations"],
-                    "top_hypothesis": top.get("id"),
-                    "top_level": top.get("confidence_level"),
-                    "abstained": payload["abstained"],
-                    "hit": hit,
-                    "duration_ms": round((perf_counter() - started) * 1000, 2),
-                    "input_tokens": traced.input_tokens,
-                    "output_tokens": traced.output_tokens,
-                    "narrative": payload["narrative"],
-                    "hypotheses": [
-                        {"id": h["id"], "level": h["confidence_level"], "location": h["location"]}
-                        for h in hypotheses
-                    ],
-                    "first_attempt_valid": traced.first is not None and not first_errors,
-                    "first_attempt_violations": [
-                        {"code": v.code, "message": v.message} for v in first_errors
-                    ],
-                    "recheck_violations": recheck(payload, pack, snapshot),
-                }
-                runs.append(row)
-                print(
-                    f"{scenario:17} {seed:4} {audience + '/en':13} "
-                    f"{top.get('id', '-')!s:22} {top.get('confidence_level', '-')!s:7} "
-                    f"{hit!s:5} {meta['generated_by'] == 'template'}"
-                )
+                if expected_id
+                else payload["abstained"] and not hypotheses
+            )
+            # Generation may repair or fall back; score its original reply separately so
+            # final validation success does not inflate first-attempt validity.
+            first_errors = (
+                validate(traced.first.tool_input, pack) if traced.first is not None else []
+            )
+            row = {
+                "scenario": scenario,
+                "seed": seed,
+                "expected": {"id": expected_id, "location": expected_location},
+                "generated_by": meta["generated_by"],
+                "validation": meta["validation"],
+                "attempts": meta["attempts"],
+                "fallback_reason": meta["fallback_reason"],
+                "violations": meta["violations"],
+                "top_hypothesis": top.get("id"),
+                "top_level": top.get("confidence_level"),
+                "abstained": payload["abstained"],
+                "hit": hit,
+                "duration_ms": round((perf_counter() - started) * 1000, 2),
+                "input_tokens": traced.input_tokens,
+                "output_tokens": traced.output_tokens,
+                "narrative": payload["narrative"],
+                "hypotheses": [
+                    {"id": h["id"], "level": h["confidence_level"], "location": h["location"]}
+                    for h in hypotheses
+                ],
+                "first_attempt_valid": traced.first is not None and not first_errors,
+                "first_attempt_violations": [
+                    {"code": v.code, "message": v.message} for v in first_errors
+                ],
+                "recheck_violations": recheck(payload, pack),
+            }
+            runs.append(row)
+            print(
+                f"{scenario:17} {seed:4} "
+                f"{top.get('id', '-')!s:22} {top.get('confidence_level', '-')!s:7} "
+                f"{hit!s:5} {meta['generated_by'] == 'template'}"
+            )
     return runs
 
 
@@ -218,14 +211,14 @@ async def run(mode: str, seeds: list[int], scenarios: list[str], out: Path) -> i
 def main() -> int:
     """Parse CLI options, deduplicate seeds/scenarios in input order and start the async runner.
 
-    Defaults cover five scenarios, two seeds and both audiences (20 cases). Argument errors
+    Defaults cover four scenarios and five seeds (20 cases). Argument errors
     exit through argparse; reports go to --out, relative to the process working directory.
     """
     parser = argparse.ArgumentParser(
         description="Evaluate evidence-grounded narratives on synthetic data."
     )
     parser.add_argument("--llm", choices=("stub", "bedrock"), required=True)
-    parser.add_argument("--seeds", default="101,202")
+    parser.add_argument("--seeds", default="101,202,303,404,505")
     parser.add_argument("--scenarios", default=",".join(SCENARIOS))
     parser.add_argument("--out", type=Path, default=Path("reports"))
     args = parser.parse_args()

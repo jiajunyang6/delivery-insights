@@ -15,13 +15,11 @@ const hypothesisTitles: Record<string, string> = {
   H_review_capacity: "Limited review capacity",
   H_ci_bottleneck: "Slow or congested CI",
   H_pr_size_growth: "Pull requests getting larger",
-  H_quality_tradeoff: "Speed gained by lighter review",
 };
 const openReasons: Record<string, string> = {
   insufficient_sample: "too few PRs to judge",
   no_data: "no data for this check",
   below_threshold: "evidence too weak",
-  not_selected: "weaker than the top three",
 };
 const stepLabels: Record<string, string> = {
   symptom: "What changed",
@@ -69,18 +67,6 @@ function change(e: Evidence): string {
 }
 
 function LookFirst({ snapshot }: { snapshot: Snapshot }) {
-  const top = snapshot.bottlenecks[0];
-  if (top) {
-    return (
-      <aside className="look-first" aria-label="Where to look first">
-        <span className="eyebrow">WHERE TO LOOK FIRST</span>
-        <h3>{top.title}</h3>
-        <p>
-          <b>{percent(top.impact_share)} of finished PR waiting time</b> · {top.recommendation}
-        </p>
-      </aside>
-    );
-  }
   const ledger = snapshot.time_ledger.states;
   const largest = states
     .filter((s) => ledger[s])
@@ -89,10 +75,10 @@ function LookFirst({ snapshot }: { snapshot: Snapshot }) {
   return (
     <aside className="look-first" aria-label="Where to look first">
       <span className="eyebrow">WHERE TO LOOK FIRST</span>
-      <h3>No single bottleneck stands out</h3>
+      <h3>Most PR time is spent {waitingOn[largest]}</h3>
       <p>
-        The largest share of PR time,{" "}
-        <b>{percent(ledger[largest].share)}</b>, is spent {waitingOn[largest]}.
+        <b>{percent(ledger[largest].share)}</b> of post-ready waiting time in merged PRs; see
+        where PR time goes below.
       </p>
     </aside>
   );

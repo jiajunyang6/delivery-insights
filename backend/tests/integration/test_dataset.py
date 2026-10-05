@@ -60,8 +60,6 @@ async def test_metadata_reuse_retains_codeowners_and_area_owner_counts(context):
         reused = await load_dataset(session, params, now=NOW, metadata=metadata)
     assert reused == direct
     assert reused.repos[0].owners == (("area-A", 2), ("codeowners:src/*", 1))
-    snapshot = build_snapshot(reused, params=params)
-    assert snapshot["bottleneck_analysis"]["locations"][0]["owners_count"] == 2
 
 
 async def test_readonly_repeatable_snapshot_matches_pure_pipeline(context):

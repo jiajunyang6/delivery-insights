@@ -1,4 +1,4 @@
-"""Deterministic scoring of the four library hypotheses against evidence items.
+"""Deterministic scoring of the three library hypotheses against evidence items.
 
 Code decides which hypotheses qualify and their confidence band; the LLM only words them.
 """
@@ -33,8 +33,9 @@ LEVELS = {
 LEVEL_ORDER = {name: index for index, name in enumerate(LEVELS)}
 STEPS = ("symptom", "stage", "location", "mechanism")
 CI_RUN_IDS = frozenset({"E44", "E45", "E46"})
-CI_EVIDENCE_IDS = CI_RUN_IDS | {"E20", "E39", "E47"}
-LOCATION_SLOTS = {"pickup_ratio": 0, "waiting_share": 1, "added_wait_share": 2, "owners": 3}
+CI_EVIDENCE_IDS = CI_RUN_IDS | {"E20", "E39"}
+# Each location reserves four IDs; slots 1 and 3 are retired, so existing IDs stay stable.
+LOCATION_SLOTS = {"pickup_ratio": 0, "added_wait_share": 2}
 DEFAULT_ABSTAIN_REASON = "insufficient_signal"
 
 
@@ -75,7 +76,6 @@ SERIES_KEYS = {
     "E20": "waiting_ci_share",
     "E30": "pr_size_p50_lines",
 }
-SLOWDOWN_HYPOTHESES = ("H_review_capacity", "H_ci_bottleneck", "H_pr_size_growth")
 # A stage or location item belongs in the displayed chain only when it shows the added time.
 ATTRIBUTION_MIN_SHARE = REVIEW_CAPACITY_MIN_WAIT_SHARE
 
@@ -93,16 +93,15 @@ def changed(
     threshold: float,
     *,
     field: str = "change_rel",
-    direction: int = 1,
 ) -> bool:
-    """Whether field moved by at least threshold in direction.
+    """Whether field increased by at least threshold.
 
     Only an explicit significant=False rejects the change; items without the flag pass.
     """
     return bool(
         entry
         and entry.get(field) is not None
-        and entry[field] * direction >= threshold
+        and entry[field] >= threshold
         and entry.get("significant") is not False
     )
 
@@ -202,11 +201,6 @@ class SignalContext:
             and evidence["E31"].get("change_pp") is not None
             and abs(evidence["E31"]["change_pp"]) < 2
         )
-        revert_flat = bool(
-            e("E10")
-            and evidence["E10"].get("change_pp") is not None
-            and abs(evidence["E10"]["change_pp"]) < 0.5
-        )
         self.available = available
         self.ci = ci
         self.ci_counter = ci_counter
@@ -215,7 +209,6 @@ class SignalContext:
         self.localized = localized
         self.location = location
         self.location_index = location_index
-        self.revert_flat = revert_flat
         self.signal = signal
         self.size_counter = size_counter
         self.size_flat = size_flat
@@ -232,7 +225,7 @@ def build_review_capacity(context: SignalContext) -> dict[str, Any]:
         ),
         "location_ids": tuple(
             location_id(context.location_index, slot)
-            for slot in ("pickup_ratio", "added_wait_share", "owners")
+            for slot in ("pickup_ratio", "added_wait_share")
         )
         if context.location_index is not None
         else (),
@@ -252,7 +245,6 @@ def build_review_capacity(context: SignalContext) -> dict[str, Any]:
                     )
                 ),
             ),
-            context.signal("mechanism", ("E26",), at_least(context.e("E26"), 0.5)),
             context.signal(
                 "mechanism",
                 ("E24",),
@@ -317,26 +309,6 @@ def build_pr_size_growth(context: SignalContext) -> dict[str, Any]:
     }
 
 
-def build_quality_tradeoff(context: SignalContext) -> dict[str, Any]:
-    """Define faster-delivery symptoms and revert/approval mechanisms suggesting a trade-off."""
-    return {
-        "localization": (context.e("E43") or {}).get("value", 0),
-        "location": None,
-        "stage": stage_ids(
-            ("E43", at_least(context.e("E43"), ATTRIBUTION_MIN_SHARE)),
-            ("E15", changed(context.e("E15"), 0.1, direction=-1)),
-        ),
-        "location_ids": (),
-        "signals": [
-            context.signal("symptom", ("E1",), changed(context.e("E1"), 0.1, direction=-1)),
-            context.signal("mechanism", ("E10",), changed(context.e("E10"), 1, field="change_pp")),
-            context.signal("mechanism", ("E32",), changed(context.e("E32"), 5, field="change_pp")),
-            context.signal("mechanism", ("E33",), changed(context.e("E33"), 2, field="change_pp")),
-        ],
-        "counter": [("E10",)] if context.revert_flat else [],
-    }
-
-
 def review_actions(location: str | None) -> tuple[str, str]:
     """Return reviewer-capacity action and follow-up wording, optionally scoped to a location."""
     return (
@@ -357,7 +329,6 @@ class Hypothesis:
     title: str
     subject: str
     main: str
-    direction: int
     action: Callable[[str | None], tuple[str, str]]
     build: Callable[[SignalContext], dict[str, Any]]
 
@@ -367,7 +338,6 @@ HYPOTHESES = {
         "Limited review capacity",
         "Limited review capacity",
         "E15",
-        1,
         review_actions,
         build_review_capacity,
     ),
@@ -375,7 +345,6 @@ HYPOTHESES = {
         "Slow or congested CI",
         "Slow or congested CI",
         "E20",
-        1,
         lambda location: (
             "Add CI capacity or speed up the slowest workflows, and fix flaky tests.",
             "After the change, check whether the share of PR time waiting on CI falls.",
@@ -386,7 +355,6 @@ HYPOTHESES = {
         "Pull requests getting larger",
         "Growing pull request size",
         "E1",
-        1,
         lambda location: (
             "Split large changes into smaller PRs and agree on the approach before coding.",
             "Over the next month, check whether the share of PRs with 500+ lines "
@@ -394,25 +362,13 @@ HYPOTHESES = {
         ),
         build_pr_size_growth,
     ),
-    "H_quality_tradeoff": Hypothesis(
-        "Speed gained by lighter review",
-        "Lighter review in exchange for speed",
-        "E1",
-        -1,
-        lambda location: (
-            "Keep the faster flow but restore review depth for large or risky changes.",
-            "Watch the revert rate over the next two periods; "
-            "it should return to its previous level.",
-        ),
-        build_quality_tradeoff,
-    ),
 }
 
 
 # The change each symptom records. A cause sentence names the changes it would explain, so a
 # hypothesis triggered by reviewer wait is not read as the cause of a cycle-time change.
-SYMPTOM_EFFECTS: dict[str, str | tuple[str, str]] = {
-    "E1": ("the slower cycle time", "the faster cycle time"),
+SYMPTOM_EFFECTS = {
+    "E1": "the slower cycle time",
     "E8": "more review rounds per PR",
     "E9": "more PRs with commits after the first review",
     "E18": "the larger share of PR time waiting on reviewers",
@@ -420,14 +376,9 @@ SYMPTOM_EFFECTS: dict[str, str | tuple[str, str]] = {
 }
 
 
-def explains(identifier: str, chain: Mapping[str, Any]) -> str:
+def explains(chain: Mapping[str, Any]) -> str:
     """Name the changes a candidate would explain, from its present symptom evidence."""
-    effects = []
-    for evidence_id in chain.get("symptom", []):
-        effect = SYMPTOM_EFFECTS[evidence_id]
-        if isinstance(effect, tuple):
-            effect = effect[0] if HYPOTHESES[identifier].direction > 0 else effect[1]
-        effects.append(effect)
+    effects = [SYMPTOM_EFFECTS[evidence_id] for evidence_id in chain.get("symptom", [])]
     if len(effects) < 2:
         return "".join(effects)
     return ", ".join(effects[:-1]) + " and " + effects[-1]
@@ -469,16 +420,12 @@ def evaluate_candidate(
     present = sum(s.present for s in signals)
     agreement = present / total if total else 0
     effect, _ = effect_size(main, snapshot) if main else (0.0, False)
-    direction = hypothesis.direction
-    if main.get("change_abs") is None or main["change_abs"] * direction <= 0:
+    # Every library hypothesis explains a slowdown, so only an increase counts as effect.
+    if main.get("change_abs") is None or main["change_abs"] <= 0:
         effect = 0
     series_key = SERIES_KEYS[main_id]
     values = [w[series_key] for w in snapshot["series"]["current"] if w.get(series_key) is not None]
-    holding = (
-        sum((v - main["previous"]) * direction > 0 for v in values)
-        if main.get("previous") is not None
-        else 0
-    )
+    holding = sum(v > main["previous"] for v in values) if main.get("previous") is not None else 0
     persistence = holding / len(values) if values else 0
     sample = min(1, (main.get("n") or 0) / 100)
     localization = min(1, max(0, float(definition["localization"])))
@@ -563,7 +510,7 @@ def evaluate_candidate(
 def score_hypotheses(
     snapshot: Mapping[str, Any], evidence: Mapping[str, dict[str, Any]], *, ci_complete: bool
 ) -> tuple[list[dict[str, Any]], str | None]:
-    """Return up to three qualifying candidates, or none and an abstain reason.
+    """Return the qualifying candidates by confidence, or none and an abstain reason.
 
     Without a previous period the result is no_comparison straight away, because every
     symptom is a change against that period.
@@ -583,16 +530,16 @@ def score_hypotheses(
 def select_candidates(
     evidence: Mapping[str, dict[str, Any]], evaluated: Mapping[str, dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], str | None]:
-    """Pick the top three eligible candidates by confidence and explain the alternatives.
+    """Select every eligible candidate by confidence and explain the alternatives.
 
     Each other hypothesis that showed a symptom is either ruled out with cited evidence
     (counter-evidence, or mechanisms checked and absent) or left open with a reason
-    (no_data, insufficient_sample, not_selected, below_threshold).
+    (no_data, insufficient_sample, below_threshold).
     """
     selected = sorted(
         (item["candidate"] for item in evaluated.values() if item["eligible"]),
         key=lambda c: (-c["confidence"], c["id"]),
-    )[:3]
+    )
     selected_ids = {c["id"] for c in selected}
     for candidate in selected:
         for identifier, other in sorted(evaluated.items()):
@@ -621,7 +568,8 @@ def select_candidates(
                 else:
                     reason = "no_data"
             else:
-                reason = "not_selected" if other["eligible"] else "below_threshold"
+                # Symptom, mechanism and sample are all present, so the score was too low.
+                reason = "below_threshold"
             if reason:
                 candidate["alternatives_open"].append({"hypothesis": identifier, "reason": reason})
     return selected, None if selected else abstain_reason(evidence, evaluated)
@@ -632,8 +580,7 @@ def abstain_reason(
 ) -> str:
     """Return no_slowdown when cycle time is comparable and no slowdown symptom is present.
 
-    Otherwise insufficient_signal. H_quality_tradeoff is ignored here: its symptom is a
-    speed-up, which is not a slowdown.
+    Otherwise insufficient_signal.
     """
     cycle = evidence.get("E1")
     comparable = bool(
@@ -642,7 +589,7 @@ def abstain_reason(
         and cycle.get("previous") is not None
         and (cycle.get("n") or 0) >= MIN_SAMPLES_P50
     )
-    slowing = any(evaluated[i]["symptom"] for i in SLOWDOWN_HYPOTHESES)
+    slowing = any(item["symptom"] for item in evaluated.values())
     return "no_slowdown" if comparable and not slowing else "insufficient_signal"
 
 

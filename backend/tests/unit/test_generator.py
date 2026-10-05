@@ -15,7 +15,6 @@ def test_generator_deterministic_bounded_and_legal():
         "review_capacity",
         "ci_slowdown",
         "pr_size_growth",
-        "quality_tradeoff",
         "no_signal",
     }
 

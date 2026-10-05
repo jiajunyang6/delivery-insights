@@ -1,9 +1,8 @@
-"""Percentiles, seeded bootstrap intervals and Kaplan-Meier; deterministic for a given seed."""
+"""Percentiles and seeded bootstrap intervals; deterministic for a given seed."""
 
 import hashlib
 from collections.abc import Sequence
-from itertools import groupby
-from typing import Any, Literal
+from typing import Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -75,24 +74,3 @@ def bootstrap_diff(
 def ratio(numerator: float, denominator: float) -> float:
     """Divide numerator by denominator, returning 0.0 when the denominator is zero."""
     return numerator / denominator if denominator else 0.0
-
-
-def kaplan_meier(samples: Sequence[tuple[float, bool]]) -> dict[str, Any]:
-    """Estimate time-to-event survival; tied events precede censoring.
-
-    Samples are (duration, event_observed). median_hours is None if survival never reaches 0.5.
-    """
-    survival = 1.0
-    at_risk = len(samples)
-    median: float | None = None
-    for duration, group in groupby(sorted(samples), key=lambda item: item[0]):
-        outcomes = list(group)
-        events = sum(event for _, event in outcomes)
-        survival *= 1 - events / at_risk
-        if median is None and survival <= 0.5:
-            median = duration
-        at_risk -= len(outcomes)
-    return {
-        "n": len(samples),
-        "median_hours": median,
-    }

@@ -20,11 +20,9 @@ def snapshot_key(snapshot_id: str) -> str:
     return f"di:snap:{snapshot_id}"
 
 
-def narrative_key(
-    snapshot_id: str, audience: str, lang: str, prompt_version: str, model_id: str, pack_hash: str
-) -> str:
-    """Redis key scoped by snapshot, audience, language, prompt, model and evidence content."""
-    return f"di:narr:{snapshot_id}:{audience}:{lang}:{prompt_version}:{model_id}:{pack_hash}"
+def narrative_key(snapshot_id: str, prompt_version: str, model_id: str, pack_hash: str) -> str:
+    """Redis key scoped by snapshot, prompt, model and evidence content."""
+    return f"di:narr:{snapshot_id}:{prompt_version}:{model_id}:{pack_hash}"
 
 
 def llm_error_key() -> str:
@@ -37,9 +35,9 @@ def sync_lock_key(repo: str) -> str:
     return f"di:lock:sync:{repo.lower()}"
 
 
-def narrative_lock_key(snapshot_id: str, audience: str, lang: str) -> str:
-    """Generation mutex for one snapshot/audience/language, shared across prompt/model variants."""
-    return f"di:lock:narr:{snapshot_id}:{audience}:{lang}"
+def narrative_lock_key(snapshot_id: str) -> str:
+    """Generation mutex for one snapshot, shared across prompt/model variants."""
+    return f"di:lock:narr:{snapshot_id}"
 
 
 def rate_limit_key(client_ip: str, epoch_minute: int) -> str:

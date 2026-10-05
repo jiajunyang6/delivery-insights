@@ -179,7 +179,6 @@ class SnapshotService:
             tuple(repo_data),
             (),
             (),
-            (),
             params.period_from,
             params.period_to,
             current_day=params.period_to == self.now.date(),

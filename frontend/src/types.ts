@@ -45,7 +45,6 @@ export interface Pending {
 }
 export interface Snapshot {
   snapshot_id: string;
-  bottlenecks: { title: string; impact_share: number; recommendation: string }[];
   time_ledger: {
     ci_data_available: boolean;
     total_pr_hours: number;

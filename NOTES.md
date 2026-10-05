@@ -76,7 +76,7 @@ comments and user names are never sent to the LLM.
 Main decisions:
 
 - **Metric:** cycle time and where PRs wait, measured in UTC elapsed time. PR-hours describe
-  waiting; finding ranks do not establish a cause or measure engineering effort.
+  waiting; a large waiting share does not establish a cause or measure engineering effort.
 - **Scope:** every section uses PRs opened or with human activity in the selected period.
   Older idle PRs may require a longer window to appear.
 - **Reproducibility:** background sync keeps GitHub I/O off the request path. Pure analytics

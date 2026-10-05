@@ -48,44 +48,15 @@ class Period(DateRange):
     compared_to: DateRange
 
 
-class StageMetrics(Contract):
-    coding: Metric
-    pickup: Metric
-    review: Metric
-    merge: Metric
-
-
-class Predictability(Contract):
-    within_hist_p85: Metric
-    weekly_throughput_cv: Metric
-
-
-class KM(Contract):
-    n: int
-    median_hours: float | None
-
-
-class Survival(Contract):
-    current: KM | None
-    previous: KM | None
-
-
 class Efficiency(Contract):
     merged_prs: Metric
-    effective_throughput: Metric
     cycle_time_p50_hours: Metric
-    cycle_time_p90_hours: Metric
-    stage_p50_hours: StageMetrics
-    merged_within_n_days: Metric
-    waiting_share: Metric
-    waste_share: Metric
+    pickup_p50_hours: Metric
     avg_review_rounds: Metric
     post_review_commit_share: Metric
     review_concentration_top_k: Metric
-    revert_rate: Metric
     pr_size_p50_lines: Metric
-    predictability: Predictability | None
-    survival: Survival | None
+    large_pr_share: Metric
 
 
 class StateLedger(Contract):
@@ -104,60 +75,9 @@ class TimeLedger(Contract):
     ci_data_available: bool
 
 
-class WhatIf(Contract):
-    stage: Literal["pickup", "merge", "ci"]
-    location: str | None
-    target_hours: float
-    affected_prs: int
-    cycle_p50_before_hours: float
-    cycle_p50_after_hours: float
-    change_rel: float
-
-
-class FindingEvidence(Contract):
-    label: str
-    value: float | int | None
-    unit: Unit
-    ref: str
-
-
-class Finding(Contract):
-    id: str
-    rank: int
-    type: Literal[
-        "review_capacity",
-        "review_queue_growth",
-        "review_concentration",
-        "merge_blocked",
-        "ci_wait",
-        "rework_high",
-        "waste_high",
-        "quality_guardrail",
-        "external_contributor_wait",
-    ]
-    severity: Literal["high", "medium", "low"]
-    title: str
-    location: str | None
-    impact_pr_hours: float
-    impact_share: float
-    evidence: list[FindingEvidence]
-    recommendation: str
-    what_if: WhatIf | None
-
-
-class QueueWeek(Contract):
-    week_start: date
-    days: float
-    inflow: int
-    outflow: int
-    open_at_week_end: int
-
-
 class ReviewQueue(Contract):
-    weeks: list[QueueWeek]
     weeks_total: int
     weeks_inflow_exceeds_outflow: int
-    net_inflow_share: float | None
 
 
 class Location(Contract):
@@ -167,28 +87,6 @@ class Location(Contract):
     pickup_ratio_vs_rest: float | None
     waiting_reviewer_pr_hours: float
     previous_waiting_reviewer_pr_hours: float | None
-    waiting_reviewer_share: float
-    inflow: int
-    outflow: int
-    at_risk_prs: int
-    owners_count: int | None
-
-
-class MergeBlockers(Contract):
-    second_approval_share: float | None
-    post_approval_update_share: float | None
-
-
-class Reviewer(Contract):
-    reviewer: str
-    reviews: int
-    share: float
-
-
-class ReviewLoad(Contract):
-    reviewers: int
-    reviews: int
-    distribution: list[Reviewer]
 
 
 class CI(Contract):
@@ -200,93 +98,11 @@ class CI(Contract):
 class BottleneckAnalysis(Contract):
     review_queue: ReviewQueue
     locations: list[Location]
-    merge_blockers: MergeBlockers
-    review_load: ReviewLoad
     ci: CI | None
 
 
-class PickupGroup(Contract):
-    n: int
-    pickup_p50_hours: float | None
-
-
-class Assignment(Contract):
-    assigned: PickupGroup
-    unassigned: PickupGroup
-    ratio: float | None
-
-
-class ReviewRoundCost(Contract):
-    re_review_wait_p50_hours: float | None
-
-
-class SlowFeature(Contract):
-    feature: Literal[
-        "size_lines_p50",
-        "external_share",
-        "multi_location_share",
-        "review_rounds_p50",
-        "unrequested_share",
-    ]
-    slowest: float | None
-    rest: float | None
-    ratio: float | None
-
-
-class SlowestDecile(Contract):
-    n: int
-    features: list[SlowFeature]
-
-
 class Drivers(Contract):
-    assignment: Assignment
-    review_round_cost: ReviewRoundCost
-    slowest_decile: SlowestDecile | None
-
-
-class AtRiskPr(Contract):
-    repo: str
-    number: int
-    title: str
-    url: str
-    author: str | None
-    state: State
-    age_hours: float
-    threshold_hours: float
-    critical_threshold_hours: float
-    severity: Literal["critical", "warning"]
-    baseline_source: Literal["90d", "180d", "default"]
-    locations: list[str]
-
-
-class AtRiskSummary(Contract):
-    total: int
-    critical: int
-
-
-class Waste(Contract):
-    lost_while_waiting: int
-    late_rejections: int
-    wasted_pr_hours: float
-
-
-class PrLink(Contract):
-    number: int
-    url: str
-
-
-class RevertChain(Contract):
-    revert: PrLink
-
-
-class Rework(Contract):
-    revert_chains: list[RevertChain]
-
-
-class Guardrail(Contract):
-    cycle_time_p50_change_rel: float | None
-    revert_rate: float | None
-    verdict: Literal["ok", "watch", "tradeoff_suspected"]
+    slowest_decile_size_ratio: float | None
 
 
 class Change(Contract):
@@ -297,7 +113,6 @@ class Change(Contract):
 
 class StateAttribution(Change):
     share_of_increase: float
-    share_of_decrease: float
 
 
 class LocationAttribution(Contract):
@@ -306,31 +121,18 @@ class LocationAttribution(Contract):
     share_of_increase: float
 
 
-class LargePrAttribution(Change):
-    share_of_increase: float
-
-
 class Attribution(Contract):
     basis: Literal["mean_hours_per_merged_pr"]
-    cycle_mean_hours: Change
     states: dict[
         Literal["coding", "waiting_reviewer", "waiting_author", "waiting_ci", "waiting_merge"],
         StateAttribution,
     ]
     locations: list[LocationAttribution]
-    large_prs: LargePrAttribution
+    large_prs: StateAttribution
 
 
 class Trend(Contract):
     attribution: Attribution | None
-
-
-class Signals(Contract):
-    large_pr_share: Metric
-    merged_without_approval_share: Metric
-    fast_large_approval_share: Metric
-    external_pickup_ratio: Metric
-    at_risk_reviewer_top_location_share: Metric
 
 
 class Week(Contract):
@@ -348,33 +150,16 @@ class Series(Contract):
     previous: list[Week]
 
 
-class Links(Contract):
-    self: str
-    narrative: str
-
-
-class DataFreshness(Contract):
-    repo: str
-    data_version: int
-    covered_since: datetime
-    last_synced_at: datetime
-    last_sync_status: str
-
-
 class Sample(Contract):
     merged_prs: int
-    open_prs_at_as_of: int
 
 
 class Meta(Contract):
-    schema_version: Literal["1"]
     analytics_version: str
     thresholds_version: str
     location_dimension: str
-    time_basis: Literal["utc_wall_clock"]
     comparison_available: bool
     ci_source: Literal["none", "actions"]
-    data_freshness: list[DataFreshness]
     sample: Sample
 
 
@@ -383,21 +168,12 @@ class Snapshot(Contract):
     repos: list[str]
     period: Period
     as_of: datetime
-    headline: str
     efficiency: Efficiency
     time_ledger: TimeLedger
-    bottlenecks: list[Finding]
     bottleneck_analysis: BottleneckAnalysis
-    drivers: Drivers | None
-    at_risk_prs: list[AtRiskPr]
-    at_risk_summary: AtRiskSummary
-    waste: Waste
-    rework: Rework
-    guardrail: Guardrail
+    drivers: Drivers
     trend: Trend
-    signals: Signals
     series: Series
-    links: Links
     meta: Meta
 
 
@@ -502,7 +278,7 @@ class RuledOut(Contract):
 
 class OpenAlternative(Contract):
     hypothesis: str
-    reason: Literal["no_data", "insufficient_sample", "below_threshold", "not_selected"]
+    reason: Literal["no_data", "insufficient_sample", "below_threshold"]
 
 
 class NarrativeHypothesis(Contract):
@@ -539,7 +315,6 @@ class EvidenceEntry(Contract):
     location: str | None
     extra: dict[str, int | float | None]
     ref: str
-    examples: list[str]
 
 
 class NarrativeMeta(Contract):
@@ -557,8 +332,6 @@ class NarrativeMeta(Contract):
 
 class Narrative(Contract):
     snapshot_id: str
-    audience: Literal["director", "manager"]
-    lang: Literal["en"]
     narrative: str
     abstained: bool
     abstain_reason: Literal["no_comparison", "no_slowdown", "insufficient_signal"] | None

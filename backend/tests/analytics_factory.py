@@ -73,7 +73,6 @@ def dataset(prs, *, repos=None, reviews=None, **changes):
                 if p.facts.first_review_at
             ]
         ),
-        (),
         date(2026, 1, 3),
         date(2026, 1, 3),
     )

@@ -26,7 +26,5 @@ async def narrative(
     sid = validate_snapshot_id(snapshot_id)
     llm = cast(LLMClient | None, getattr(request.app.state, "llm", None))
     return response(
-        await NarrativeService(service, llm).get(
-            sid, "director", request.headers.get("if-none-match")
-        )
+        await NarrativeService(service, llm).get(sid, request.headers.get("if-none-match"))
     )

@@ -7,9 +7,7 @@ from typing import Any
 from insights.narrative.validator import validate
 
 
-def recheck(
-    payload: Mapping[str, Any], pack: dict[str, Any], snapshot: Mapping[str, Any]
-) -> list[str]:
+def recheck(payload: Mapping[str, Any], pack: dict[str, Any]) -> list[str]:
     """Reconstruct tool-shaped output from the final payload and return validator error codes.
 
     Use assembled confidence bands, including accepted downgrades, so hedging is checked
@@ -33,7 +31,7 @@ def recheck(
             "statement": outside["statement"],
             "evidence_ids": [i for step in outside["evidence_chain"] for i in step["evidence"]],
         }
-    return [v.code for v in validate(output, final_pack, snapshot, audience=payload["audience"])]
+    return [v.code for v in validate(output, final_pack)]
 
 
 def metrics(runs: Sequence[dict[str, Any]]) -> dict[str, Any]:

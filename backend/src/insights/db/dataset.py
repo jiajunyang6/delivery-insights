@@ -2,14 +2,14 @@
 
 from collections import defaultdict
 from dataclasses import replace
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from insights.analytics.classify import ownership_counts
-from insights.analytics.dataset import Baseline, Dataset, PrData, RepoData, Review, SnapshotParams
-from insights.analytics.timeline import WAITING_STATES, Interval
+from insights.analytics.dataset import Dataset, PrData, RepoData, Review, SnapshotParams
+from insights.analytics.timeline import Interval
 from insights.db.ci import load_ci_data
 from insights.db.models import OwnershipRule as StoredRule
 from insights.db.models import PrEvent, PrFact, PrInterval, PullRequest, Repository
@@ -20,7 +20,7 @@ from insights.domain import OwnershipRule
 async def load_dataset(
     session: AsyncSession, params: SnapshotParams, *, now: datetime, metadata: Dataset | None = None
 ) -> Dataset:
-    """Load PRs, intervals, reviews, baselines, merge history and CI for one snapshot.
+    """Load PRs, intervals, reviews and CI for one snapshot.
 
     Caller owns a REPEATABLE READ, READ ONLY transaction so every query sees one view. A given
     `metadata` skips reloading repository readiness and versions.
@@ -52,7 +52,6 @@ async def load_dataset(
             raise ValueError("Repository is missing")
         metadata = Dataset(
             tuple(repo_data),
-            (),
             (),
             (),
             params.period_from,
@@ -162,23 +161,6 @@ async def load_dataset(
         ~PrFact.is_backport,
         PrFact.ready_at.is_not(None),
     )
-    baseline_rows = (
-        await session.execute(
-            select(PrInterval.repo_id, PrInterval.state, PrInterval.end_at, PrInterval.start_at)
-            .join(PrFact, PrFact.pr_id == PrInterval.pr_id)
-            .where(
-                *flow_filter,
-                PrInterval.state.in_(WAITING_STATES),
-                PrInterval.end_at >= start - timedelta(days=180),
-                PrInterval.end_at < as_of,
-            )
-        )
-    ).all()
-    baselines = tuple(
-        Baseline(names[repo_id], state, ended, (ended - began).total_seconds() / 3600)
-        for repo_id, state, ended, began in baseline_rows
-        if ended is not None
-    )
     reviews = tuple(
         Review(login.lower(), at, pr_id)
         for login, at, pr_id in (
@@ -202,20 +184,6 @@ async def load_dataset(
         ).all()
         if login is not None
     )
-    history = tuple(
-        (names[repo_id], at, cycle)
-        for repo_id, at, cycle in (
-            await session.execute(
-                select(PrFact.repo_id, PrFact.merged_at, PrFact.cycle_hours).where(
-                    *flow_filter,
-                    PrFact.merged_at >= previous_start - timedelta(days=90),
-                    PrFact.merged_at < start,
-                    PrFact.cycle_hours.is_not(None),
-                )
-            )
-        ).all()
-        if at is not None and cycle is not None
-    )
     period_ci = await load_ci_data(
         session, list(names), created_from=previous_start, created_to=as_of, flow_only=True
     )
@@ -223,10 +191,8 @@ async def load_dataset(
         tuple(repo_data),
         prs,
         reviews,
-        baselines,
         params.period_from,
         params.period_to,
         ci_runs=tuple((names[repo_id], run) for repo_id, run in period_ci.runs),
-        history=history,
         current_day=params.period_to == now.date(),
     )

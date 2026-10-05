@@ -107,9 +107,9 @@ make eval          # same against real Bedrock (reads the key from .env)
 cd frontend && npm ci && npm test && npm run typecheck && npm run build
 ```
 
-Analytics version **1.5.0** trims unused snapshot diagnostics while retaining dashboard,
-narrative and drilldown fields. Snapshot/cache identities use 1.5.0; statistical sampling
-keeps the original 1.4.0 seed parameters.
+Analytics version **1.6.0** keeps only the time ledger and the metrics behind the narrative
+evidence; retained values are unchanged. Snapshot/cache identities use 1.6.0; statistical
+sampling keeps the original 1.4.0 seed parameters.
 
 The unreleased application's migrations are now consolidated into `0001_initial`.
 Upgrading from the earlier three-migration schema requires deleting the local database

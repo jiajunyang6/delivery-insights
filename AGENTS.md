@@ -21,7 +21,7 @@ and `NOTES.md` describe the product, `docs/REFERENCE.md` holds the current contr
 | `backend/src/insights/sources/github/` | GraphQL/REST client, queries and normalization (the only GitHub I/O) |
 | `backend/src/insights/sync/` | arq jobs: `queue.py` job lifecycle and locks, `jobs.py` sync runs, `store.py` writes, `derive.py` timelines/facts/links and rederivation, `enrichment.py` CI and CODEOWNERS |
 | `backend/src/insights/db/` | SQLAlchemy models and loaders that turn rows into immutable records |
-| `backend/src/insights/analytics/` | Pure computation of the snapshot: timeline, facts, efficiency, bottlenecks, findings, headline |
+| `backend/src/insights/analytics/` | Pure computation of the snapshot: timeline, facts, efficiency, time ledger, attribution, CI |
 | `backend/src/insights/snapshots/` | Snapshot orchestration, caching, filters and domain errors |
 | `backend/src/insights/narrative/` | Evidence pack, hypothesis scoring, prompt, validator, template fallback, LLM client |
 | `backend/src/insights/api/` | FastAPI routes, params, schemas (strict OpenAPI contract), errors, middleware |
@@ -72,12 +72,11 @@ Without Make (Windows), run the equivalent `uv run` commands from the Makefile.
 **Metric semantics**
 - Every section uses the period-active cohort: PRs opened, or with identified human activity,
   in the period. Comparisons apply the same rule to the previous period.
-- The time ledger covers merged PRs only. Finding `impact_share` divides by finished PR waiting
-  time: post-ready waiting time of eligible PRs merged or closed unmerged in the period (no open,
-  bot or backport PRs, no pre-ready coding time).
-- Wording must match what is measured: PR-hours are elapsed waiting, not effort; the top finding
-  is ranked by waiting time, not a proven cause; a large change can still be within normal
-  variation. Keep the frontend guides, narrative template and headline consistent.
+- The time ledger covers the post-ready waiting time of merged PRs only (no bot or backport
+  PRs, no pre-ready coding time).
+- Wording must match what is measured: PR-hours are elapsed waiting, not effort; a large
+  waiting share is not a proven cause; a large change can still be within normal variation.
+  Keep the frontend guides and the narrative template consistent.
 
 **Narrative**
 - Code computes every number; the LLM only writes wording. Outputs must pass the validator

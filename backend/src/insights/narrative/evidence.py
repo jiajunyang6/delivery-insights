@@ -1,5 +1,5 @@
-"""Evidence pack construction: numbered evidence items, observations, top bottlenecks and
-scored hypotheses. The pack is the only snapshot data the LLM receives.
+"""Evidence pack construction: numbered evidence items, observations and scored hypotheses.
+The pack is the only snapshot data the LLM receives.
 """
 
 import re
@@ -23,18 +23,11 @@ SAFE_LOCATION = re.compile(r"^[A-Za-z0-9._:/+#-]{1,120}$")
 WEIGHTS = {
     "E1": 1.0,
     "E15": 0.9,
-    "E10": 0.9,
     "E18": 0.8,
-    "E5": 0.8,
-    "E6": 0.8,
-    "E4": 0.8,
-    "E7": 0.7,
     "E20": 0.7,
     "E3": 0.6,
-    "E2": 0.6,
     "E8": 0.6,
     "E30": 0.6,
-    "E17": 0.6,
     "E19": 0.6,
     "E21": 0.6,
     "E24": 0.5,
@@ -50,12 +43,12 @@ def read(snapshot: Mapping[str, Any], pointer: str) -> Any:
 
 
 def extract_evidence(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Resolve catalog, location and top-finding items from the snapshot.
+    """Resolve catalog and location items from the snapshot.
 
     Items whose pointer is missing or whose value is None are skipped, so IDs can be sparse.
-    E20, E39 and E47 are omitted when the snapshot has no CI data. Up to five locations other
-    than "other" get four slots each (see location_id); the top three findings become E71-E73.
-    Entries keep their pointer and example URLs for the API response; the pack strips both.
+    E20 and E39 are omitted when the snapshot has no CI data. Up to five locations other than
+    "other" get a first-review ratio and an added-wait share (see location_id). Entries keep
+    their pointer for the API response; the pack strips it.
     """
     entries: list[dict[str, Any]] = []
 
@@ -68,7 +61,7 @@ def extract_evidence(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
         side: str = "bottleneck",
         location: str | None = None,
     ) -> None:
-        """Append a catalog item with normalized values and safe examples; skip absent values."""
+        """Append a catalog item with normalized values; skip absent values."""
         raw = read(snapshot, ref)
         if raw is None:
             return
@@ -89,7 +82,6 @@ def extract_evidence(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
             "location": location,
             "extra": {},
             "ref": ref,
-            "examples": [],
         }
         if isinstance(raw, dict):
             if "share" in raw:
@@ -120,42 +112,16 @@ def extract_evidence(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
         }
         if entry["value"] is None:
             return
-        if identifier == "E13":
-            entry.update(
-                previous=read(snapshot, "/efficiency/survival/previous/median_hours"),
-                n=read(snapshot, "/efficiency/survival/current/n"),
-            )
-        elif identifier == "E22":
+        if identifier == "E22":
             entry["extra"] = {
                 "weeks_total": snapshot["bottleneck_analysis"]["review_queue"]["weeks_total"]
             }
-        elif identifier == "E25":
-            entry["extra"] = {"critical": snapshot["at_risk_summary"]["critical"]}
-        elif identifier == "E36":
-            entry.update(
-                previous=read(snapshot, "/trend/attribution/cycle_mean_hours/previous"),
-                change_abs=read(snapshot, "/trend/attribution/cycle_mean_hours/change"),
-            )
         if unit == "share" and entry["change_abs"] is not None:
             entry["change_pp"] = round(entry["change_abs"] * 100, 2)
         if entry["previous"] is not None:
             entry["baseline"] = "previous_period"
         if key == "loc_pickup_ratio":
             entry["baseline"] = "rest_of_repo"
-        elif identifier in {"E11", "E25"}:
-            entry["baseline"] = "team_history"
-        elif identifier == "E27":
-            entry["baseline"] = "internal_contributors"
-        examples: list[str] = []
-        if location is not None or identifier == "E25":
-            examples = [
-                p["url"]
-                for p in snapshot["at_risk_prs"]
-                if location is None or location in p["locations"]
-            ][:3]
-        elif identifier in {"E10", "E4"}:
-            examples = [c["revert"]["url"] for c in snapshot["rework"]["revert_chains"][:3]]
-        entry["examples"] = [url for url in examples if url.startswith("https://github.com/")]
         entries.append(entry)
 
     for identifier, key, label, ref, unit, side in CATALOG:
@@ -164,14 +130,6 @@ def extract_evidence(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
             and not snapshot["time_ledger"]["ci_data_available"]
         ):
             continue
-        if identifier == "E48":
-            features = read(snapshot, "/drivers/slowest_decile/features") or []
-            index = next(
-                (i for i, f in enumerate(features) if f["feature"] == "size_lines_p50"), None
-            )
-            if index is None:
-                continue
-            ref = f"/drivers/slowest_decile/features/{index}/ratio"
         add(identifier, key, label, ref, unit, side)
     locations = [
         (i, loc)
@@ -190,14 +148,6 @@ def extract_evidence(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
             location=name,
         )
         add(
-            location_id(i, "waiting_share"),
-            "loc_waiting_share",
-            f"Share of reviewer-waiting time in {name}",
-            f"{root}/waiting_reviewer_share",
-            "share",
-            location=name,
-        )
-        add(
             location_id(i, "added_wait_share"),
             "loc_added_wait_share",
             f"Share of the added time that is reviewer wait in {name}",
@@ -205,30 +155,13 @@ def extract_evidence(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
             "share",
             location=name,
         )
-        add(
-            location_id(i, "owners"),
-            "loc_owners",
-            f"Owners for {name}",
-            f"{root}/owners_count",
-            "count",
-            location=name,
-        )
-    for i, finding in enumerate(snapshot["bottlenecks"][:3]):
-        add(
-            f"E{71 + i}",
-            "finding_impact",
-            f"Share of finished PR waiting time (merged and closed unmerged): {finding['id']}",
-            f"/bottlenecks/{i}/impact_share",
-            "share",
-            location=finding["location"],
-        )
     return entries
 
 
 def observations(
     snapshot: Mapping[str, Any], evidence: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Rank notable changes and two fixed contradictions into at most eight observations.
+    """Rank notable changes and one fixed contradiction into at most eight observations.
 
     Salience is effect size x per-metric weight (WEIGHTS, default 0.4) x sample factor
     (n / 100 capped at 1, or 0.5 when n is unknown). Items without a previous value or flagged
@@ -257,28 +190,17 @@ def observations(
                     "salience": score,
                 }
             )
-    for kind, ids, condition in (
-        (
-            "throughput_up_cycle_up",
-            ["E3", "E1"],
-            changed(entries.get("E3"), 0.1) and changed(entries.get("E1"), 0.1),
-        ),
-        (
-            "faster_but_more_reverts",
-            ["E1", "E10"],
-            changed(entries.get("E1"), 0.1, direction=-1)
-            and changed(entries.get("E10"), 1, field="change_pp"),
-        ),
-    ):
-        if condition:
-            candidates.append(
-                {
-                    "kind": f"contradiction:{kind}",
-                    "evidence_ids": ids,
-                    "direction": "mixed",
-                    "salience": min(1, max(scores.get(i, 0) for i in ids) + 0.2),
-                }
-            )
+    # More merged PRs alongside a slower cycle time reads as mixed, not as a plain slowdown.
+    if changed(entries.get("E3"), 0.1) and changed(entries.get("E1"), 0.1):
+        ids = ["E3", "E1"]
+        candidates.append(
+            {
+                "kind": "contradiction:throughput_up_cycle_up",
+                "evidence_ids": ids,
+                "direction": "mixed",
+                "salience": min(1, max(scores.get(i, 0) for i in ids) + 0.2),
+            }
+        )
     order = {"contradiction": 0, "anomaly": 1, "change": 2}
     candidates.sort(
         key=lambda o: (
@@ -295,14 +217,13 @@ def observations(
 
 def build_evidence_pack(
     snapshot: Mapping[str, Any],
-    audience: str,
     ci_complete: bool,
     *,
     evidence: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Return the LLM-facing pack and the full hypothesis candidates.
 
-    The pack drops pointers and example URLs, replaces location names outside SAFE_LOCATION
+    The pack drops pointers, replaces location names outside SAFE_LOCATION
     with placeholders, and gives hypotheses only their level band, not the numeric confidence.
     The candidates keep the scoring detail that assemble() needs. Pass evidence to reuse an
     earlier extract_evidence() result.
@@ -330,33 +251,11 @@ def build_evidence_pack(
         sanitize(loc["location"])
     safe_evidence = []
     for e in evidence:
-        safe = {k: v for k, v in e.items() if k not in {"ref", "examples"}}
+        safe = {k: v for k, v in e.items() if k != "ref"}
         safe["location"] = sanitize(e["location"])
         if e["location"]:
             safe["label"] = safe["label"].replace(e["location"], safe["location"])
         safe_evidence.append(safe)
-    available_ids = {e["id"] for e in evidence}
-    top = []
-    selected_locs = [
-        loc["location"]
-        for loc in snapshot["bottleneck_analysis"]["locations"]
-        if loc["location"] != "other"
-    ][:5]
-    for i, finding in enumerate(snapshot["bottlenecks"][:3]):
-        name = finding["location"]
-        ids = [f"E{71 + i}"]
-        if name in selected_locs:
-            idx = selected_locs.index(name)
-            ids += [location_id(idx, "pickup_ratio"), location_id(idx, "waiting_share")]
-        top.append(
-            {
-                "id": finding["id"].replace(name, sanitize(name)) if name else finding["id"],
-                "type": finding["type"],
-                "severity": finding["severity"],
-                "location": sanitize(name),
-                "evidence_ids": [i for i in ids if i in available_ids],
-            }
-        )
     gaps = []
     if not snapshot["meta"]["comparison_available"]:
         gaps.append("no_comparison")
@@ -370,7 +269,6 @@ def build_evidence_pack(
         gaps.append("few_samples")
     pack = {
         "pack_version": "1",
-        "audience": audience,
         "lang": "en",
         "period": {k: snapshot["period"][k] for k in ("from", "to", "days", "compared_to")},
         "scope": {
@@ -381,14 +279,13 @@ def build_evidence_pack(
         "data_gaps": gaps,
         "evidence": safe_evidence,
         "observations": observations(snapshot, evidence),
-        "top_bottlenecks": top,
         "hypotheses": [
             {
                 "id": c["id"],
                 "title": c["title"],
                 "level": c["confidence_level"],
                 "location": sanitize(c["location"]),
-                "explains": explains(c["id"], c["chain"]),
+                "explains": explains(c["chain"]),
                 "chain": c["chain"],
                 "counter_evidence": c["counter_evidence"],
                 "persistence": c["persistence"],

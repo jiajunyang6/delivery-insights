@@ -9,7 +9,6 @@ from tests.factories import at
 
 from insights.analytics import ANALYTICS_VERSION, derive_key
 from insights.analytics.dataset import SnapshotParams
-from insights.analytics.pointer import resolve_pointer
 from insights.analytics.snapshot import build_snapshot, canonical, etag, identifiers, rounded
 from insights.api.schemas import Snapshot
 from insights_eval.generator import ScenarioSpec, generate
@@ -61,12 +60,6 @@ def test_golden_determinism_contract_and_independent_accounting(synthetic):
     assert allocated == pytest.approx(
         payload["time_ledger"]["states"]["waiting_reviewer"]["pr_hours"], abs=0.04
     )
-    for finding in payload["bottlenecks"]:
-        for evidence in finding["evidence"]:
-            resolved = resolve_pointer(payload, evidence["ref"])
-            assert evidence["value"] == (
-                resolved["value"] if isinstance(resolved, dict) else resolved
-            )
 
 
 def test_identity_and_rounding():
@@ -97,7 +90,6 @@ def test_partial_period_and_multi_repo_watermark():
     payload = build_snapshot(d, params=params(d))
     assert not payload["period"]["complete"]
     assert payload["efficiency"]["merged_prs"]["value"] == 0
-    assert payload["meta"]["sample"]["open_prs_at_as_of"] == 30
     second = replace(d.repos[0], repo="c/d", last_synced_at=at(65))
     d = replace(d, repos=(d.repos[0], second))
     payload = build_snapshot(d, params=params(d))

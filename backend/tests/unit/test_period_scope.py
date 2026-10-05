@@ -6,11 +6,9 @@ from tests.analytics_factory import dataset, pr
 from tests.factories import at, event, record
 from tests.unit.test_ci import run
 
-from insights.analytics.bottlenecks import at_risk, series
+from insights.analytics.bottlenecks import series
 from insights.analytics.dataset import RepoData, SnapshotParams, Window, active_in
 from insights.analytics.snapshot import build_snapshot
-from insights.analytics.timeline import Interval
-from insights.narrative.evidence import extract_evidence
 from insights_eval.generator import SyntheticRepo
 from insights_eval.pipeline import dataset_from_repo
 
@@ -46,20 +44,12 @@ def period_repo():
     )
 
 
-def test_human_activity_union_flows_through_all_dashboard_outputs():
+def test_human_activity_union_selects_the_period_cohort():
     d = dataset_from_repo(period_repo(), covered_since=at(-5000))
+    # Bot and anonymous activity, or activity outside the period, does not make a PR active.
     assert {p.number for p in d.flow} == {2, 5, 8}
     snapshot = build_snapshot(d, params=SnapshotParams(("a/b",), d.period_from, d.period_to))
-    assert snapshot["meta"]["sample"]["open_prs_at_as_of"] == 3
-    assert snapshot["bottleneck_analysis"]["review_load"]["reviews"] == 1
-    assert snapshot["bottleneck_analysis"]["review_queue"]["weeks"][0]["open_at_week_end"] == 2
-    assert snapshot["at_risk_summary"]["total"] == 1
-    assert {p["number"] for p in snapshot["at_risk_prs"]} == {2}
-    evidence = next(e for e in extract_evidence(snapshot) if e["id"] == "E25")
-    assert evidence["value"] == 1
-    assert set(evidence["examples"]) == {
-        "https://github.com/a/b/pull/2",
-    }
+    assert snapshot["efficiency"]["review_concentration_top_k"]["n"] == 1
 
 
 @pytest.mark.parametrize(
@@ -78,22 +68,6 @@ def test_human_activity_union_flows_through_all_dashboard_outputs():
 def test_period_boundaries_do_not_leak_future_activity(created, activity, expected):
     p = replace(pr(1), created_at=at(created), human_activity_at=tuple(at(t) for t in activity))
     assert active_in(p, dataset([p]).current) is expected
-
-
-def test_previous_risk_uses_previous_activity_and_partial_day_uses_watermark():
-    def waiting(number, activity):
-        p = pr(number, ready_at=at(-200), merged_at=None, end_at=None)
-        return replace(
-            p,
-            created_at=at(-210),
-            human_activity_at=(at(activity),),
-            intervals=(Interval("waiting_reviewer", at(-200), None),),
-        )
-
-    d = dataset([waiting(1, 30), waiting(2, 55), waiting(3, 65)])
-    assert {r["number"] for r in at_risk(d, at=d.start, window=d.previous)} == {1}
-    d = replace(d, repos=(replace(dataset([]).repos[0], last_synced_at=at(60)),))
-    assert {r["number"] for r in at_risk(d, at=d.as_of)} == {2}
 
 
 def test_inactive_bot_merged_pr_and_ci_are_excluded_with_consistent_totals():

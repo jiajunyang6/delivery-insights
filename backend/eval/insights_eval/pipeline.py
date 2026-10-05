@@ -8,10 +8,10 @@ from typing import Any
 
 from insights.analytics.ci import union_intervals
 from insights.analytics.classify import LinkInput, is_flow, link_prs
-from insights.analytics.dataset import Baseline, Dataset, PrData, RepoData, Review, SnapshotParams
+from insights.analytics.dataset import Dataset, PrData, RepoData, Review, SnapshotParams
 from insights.analytics.facts import compute_facts
 from insights.analytics.snapshot import build_snapshot
-from insights.analytics.timeline import WAITING_STATES, build_timeline, human_event, pr_input
+from insights.analytics.timeline import build_timeline, human_event, pr_input
 from insights.domain import CiRun, EventKind, PullRequestRecord
 from insights_eval.generator import START, SyntheticRepo
 
@@ -26,13 +26,11 @@ def dataset_from_repo(
 
     PR numbers serve as local identifiers in this synthetic repo. covered_since overrides the
     reported history coverage (START by default), allowing comparison-availability checks.
-    Waiting baselines use elapsed hours; linked facts replace provisional per-PR facts.
+    Linked facts replace provisional per-PR facts.
     """
     prs: list[PrData] = []
     reviews: list[Review] = []
-    baselines: list[Baseline] = []
     links: list[LinkInput] = []
-    history: list[tuple[str, datetime, float]] = []
     mapped = map_runs({p.number: p for p in syn.records}, syn.ci_runs)
     for record in syn.records:
         ci_intervals = union_intervals(mapped.get(record.number, ()))
@@ -72,15 +70,6 @@ def dataset_from_repo(
                 and e.actor.login
                 and human_event(e, record.author.login)
             )
-            baselines.extend(
-                Baseline(
-                    syn.repo, i.state, i.end_at, (i.end_at - i.start_at).total_seconds() / 3600
-                )
-                for i in result.intervals
-                if i.state in WAITING_STATES and i.end_at is not None
-            )
-            if facts.merged_at and facts.cycle_hours is not None:
-                history.append((syn.repo, facts.merged_at, facts.cycle_hours))
     # Revert, reland and supersession classification requires the complete repository view,
     # not just the PR currently being derived in the loop above.
     linked = link_prs(links, repo_full_name=syn.repo, default_branch=syn.default_branch)
@@ -88,7 +77,6 @@ def dataset_from_repo(
         (RepoData(syn.repo, 1, covered_since or START, syn.as_of),),
         tuple(replace(p, facts=linked[p.pr_id]) for p in prs),
         tuple(reviews),
-        tuple(baselines),
         syn.period_from,
         syn.period_to,
         tuple(
@@ -97,7 +85,6 @@ def dataset_from_repo(
                 mapped, {p.pr_id: p.number for p in prs if is_flow(p.facts)}
             )
         ),
-        tuple(history),
     )
 
 

@@ -1,8 +1,6 @@
-"""Bottleneck analyses: time ledger, review queue, locations, at-risk PRs and what-if; no I/O."""
+"""Bottleneck analyses: time ledger, review queue, locations and change attribution; no I/O."""
 
-from collections import Counter, defaultdict
-from collections.abc import Sequence
-from datetime import datetime, timedelta
+from collections import defaultdict
 from typing import Any
 
 from insights.analytics import thresholds as t
@@ -10,17 +8,14 @@ from insights.analytics.dataset import (
     Dataset,
     PrData,
     Window,
-    closed,
     effective_review,
     hours,
     merged,
-    open_at,
-    reverted,
     weeks,
 )
-from insights.analytics.efficiency import Measure, compare, rate, values
+from insights.analytics.efficiency import values
 from insights.analytics.stats import percentile, ratio
-from insights.analytics.timeline import WAITING_STATES, state_at
+from insights.analytics.timeline import WAITING_STATES
 
 
 def location_names(pr: PrData, dataset: Dataset) -> tuple[str, ...]:
@@ -28,91 +23,6 @@ def location_names(pr: PrData, dataset: Dataset) -> tuple[str, ...]:
     return tuple(
         f"{pr.repo}:{name}" if len(dataset.repos) > 1 else name for name in pr.facts.locations
     )
-
-
-def at_risk(
-    dataset: Dataset,
-    *,
-    at: datetime,
-    exclude_current_drafts: bool = False,
-    window: Window | None = None,
-) -> list[dict[str, Any]]:
-    """Open flow PRs whose current waiting state has outlasted its warning threshold.
-
-    Point-in-time at `at`: only state intervals that ended before it form the baselines.
-    Sorted most overdue first (age / warning threshold).
-    """
-    completed: dict[tuple[str, str], list[tuple[datetime, float]]] = defaultdict(list)
-    for baseline in dataset.baselines:
-        if at - timedelta(days=t.AT_RISK_FALLBACK_DAYS) <= baseline.end_at < at:
-            completed[baseline.repo, baseline.state].append((baseline.end_at, baseline.hours))
-    thresholds: dict[tuple[str, str], tuple[float, float, str]] = {}
-    for repo in dataset.repos:
-        for state in WAITING_STATES:
-            completed_values = completed[repo.repo, state]
-            recent = [
-                h
-                for end, h in completed_values
-                if end >= at - timedelta(days=t.AT_RISK_BASELINE_DAYS)
-            ]
-            # Per-repo history reflects each repo's normal pace: prefer the recent window,
-            # widen to the fallback window, and use fixed defaults only when history is thin.
-            fallback = [h for _, h in completed_values]
-            sample = recent if len(recent) >= t.AT_RISK_MIN_BASELINE else fallback
-            source = "90d" if len(recent) >= t.AT_RISK_MIN_BASELINE else "180d"
-            warning = percentile(sample, t.AT_RISK_WARNING_PERCENTILE, t.AT_RISK_MIN_BASELINE)
-            critical = percentile(sample, t.AT_RISK_CRITICAL_PERCENTILE, t.AT_RISK_MIN_BASELINE)
-            if warning is None or critical is None:
-                warning, critical, source = (
-                    t.AT_RISK_DEFAULT_HOURS[state],
-                    t.AT_RISK_DEFAULT_HOURS[state] * 2,
-                    "default",
-                )
-            thresholds[repo.repo, state] = warning, critical, source
-    result = []
-    for pr in dataset.flow_in(window or dataset.current):
-        # is_draft is the latest synced flag, so callers apply it only when the period ends today.
-        if not open_at(pr, at) or (exclude_current_drafts and pr.is_draft):
-            continue
-        interval = state_at(pr.intervals, at)
-        if interval is None:
-            continue
-        age = (at - interval.start_at).total_seconds() / 3600
-        warning, critical, source = thresholds[pr.repo, interval.state]
-        if age <= warning:
-            continue
-        result.append(
-            {
-                "repo": pr.repo,
-                "number": pr.number,
-                "title": pr.title,
-                "url": pr.url,
-                "author": pr.author,
-                "state": interval.state,
-                "age_hours": age,
-                "threshold_hours": warning,
-                "critical_threshold_hours": critical,
-                "severity": "critical" if age > critical else "warning",
-                "baseline_source": source,
-                "locations": list(location_names(pr, dataset)),
-            }
-        )
-    return sorted(
-        result,
-        key=lambda p: (
-            -ratio(p["age_hours"], p["threshold_hours"]) if p["threshold_hours"] else float("-inf"),
-            p["repo"],
-            p["number"],
-        ),
-    )
-
-
-def risk_summary(risks: Sequence[dict[str, Any]]) -> dict[str, Any]:
-    """Count all at-risk PRs and the subset classified as critical."""
-    return {
-        "total": len(risks),
-        "critical": sum(p["severity"] == "critical" for p in risks),
-    }
 
 
 def time_ledger(dataset: Dataset) -> dict[str, Any]:
@@ -150,39 +60,21 @@ def time_ledger(dataset: Dataset) -> dict[str, Any]:
 
 
 def review_queue(dataset: Dataset, window: Window) -> dict[str, Any]:
-    """Track weekly ready arrivals, first-review departures and unreviewed open PRs.
+    """Count weeks in which ready arrivals outnumber first-review departures.
 
-    Weekly counts use this window's active cohort; net inflow share is None without arrivals.
+    Weekly counts use this window's active cohort.
     """
-    result: list[dict[str, Any]] = []
-    for week in weeks(window):
-        result.append(
-            {
-                "week_start": week.start.date().isoformat(),
-                "days": (week.end - week.start).total_seconds() / 86400,
-                "inflow": sum(week.contains(p.facts.ready_at) for p in dataset.flow_in(window)),
-                "outflow": sum(week.contains(effective_review(p)) for p in dataset.flow_in(window)),
-                "open_at_week_end": sum(
-                    open_at(p, week.end)
-                    and ((review_at := effective_review(p)) is None or review_at >= week.end)
-                    for p in dataset.flow_in(window)
-                ),
-            }
-        )
-    inflow = sum(week["inflow"] for week in result)
-    outflow = sum(week["outflow"] for week in result)
-    return {
-        "weeks": result,
-        "weeks_total": len(result),
-        "weeks_inflow_exceeds_outflow": sum(w["inflow"] > w["outflow"] for w in result),
-        "net_inflow_share": (inflow - outflow) / inflow if inflow else None,
-    }
+    flow = dataset.flow_in(window)
+    imbalanced = [
+        sum(week.contains(p.facts.ready_at) for p in flow)
+        > sum(week.contains(effective_review(p)) for p in flow)
+        for week in weeks(window)
+    ]
+    return {"weeks_total": len(imbalanced), "weeks_inflow_exceeds_outflow": sum(imbalanced)}
 
 
-def locations(
-    dataset: Dataset, risks: Sequence[dict[str, Any]], ledger: dict[str, Any]
-) -> list[dict[str, Any]]:
-    """Allocate merged-PR reviewer wait to locations while retaining active-cohort queue/risk data.
+def locations(dataset: Dataset) -> list[dict[str, Any]]:
+    """Allocate merged-PR reviewer wait to locations and compare their first-review wait.
 
     Multi-location hours are split evenly, but a PR can belong to several location counts.
     Small or excess locations are pooled into other, preserving their allocated waiting hours.
@@ -215,15 +107,6 @@ def locations(
     groups = [(name, {name}) for name in large]
     if other:
         groups.append(("other", other))
-    risks_by_location: dict[str, set[tuple[str, int]]] = defaultdict(set)
-    for risk in risks:
-        for name in risk["locations"]:
-            risks_by_location[name].add((risk["repo"], risk["number"]))
-    owner_counts = {
-        f"{r.repo}:{name}" if len(dataset.repos) > 1 else name: count
-        for r in dataset.repos
-        for name, count in r.owners
-    }
     result = []
     for name, grouped in groups:
         ids = set().union(*(memberships[n] for n in grouped))
@@ -231,8 +114,6 @@ def locations(
         rest = [pr for i, pr in current.items() if i not in ids]
         pickup = percentile(values(group, "pickup_hours"), 50, t.MIN_SAMPLES_LOCATION_P50)
         rest_pickup = percentile(values(rest, "pickup_hours"), 50, t.MIN_SAMPLES_LOCATION_P50)
-        wait = sum(allocated[n] for n in grouped)
-        group_risks = set().union(*(risks_by_location[n] for n in grouped))
         result.append(
             {
                 "location": name,
@@ -241,223 +122,13 @@ def locations(
                 "pickup_ratio_vs_rest": pickup / rest_pickup
                 if pickup is not None and rest_pickup
                 else None,
-                "waiting_reviewer_pr_hours": wait,
+                "waiting_reviewer_pr_hours": sum(allocated[n] for n in grouped),
                 "previous_waiting_reviewer_pr_hours": sum(old_allocated[n] for n in grouped)
                 if dataset.comparison_available
                 else None,
-                "waiting_reviewer_share": ratio(
-                    wait, ledger["states"]["waiting_reviewer"]["pr_hours"]
-                ),
-                "inflow": sum(
-                    dataset.current.contains(all_prs[i].facts.ready_at)
-                    for i in ids & all_prs.keys()
-                ),
-                "outflow": sum(
-                    dataset.current.contains(effective_review(all_prs[i]))
-                    for i in ids & all_prs.keys()
-                ),
-                "at_risk_prs": len(group_risks),
-                "owners_count": owner_counts.get(name) if name != "other" else None,
             }
         )
     return result
-
-
-def what_if(dataset: Dataset, stage: str, location: str | None = None) -> dict[str, Any] | None:
-    """Illustrative median cycle time if a stage were capped at WHAT_IF_TARGET_HOURS[stage].
-
-    Subtracts each merged PR's excess over the target from its cycle time, assuming nothing else
-    changes; with location, only that location's PRs are capped. Returns None when either median
-    lacks MIN_SAMPLES_P50 samples or the current median is 0.
-    """
-    prs = [p for p in merged(dataset, dataset.current) if p.facts.cycle_hours is not None]
-    before, after, affected = [], [], 0
-    target = t.WHAT_IF_TARGET_HOURS[stage]
-    for pr in prs:
-        cycle = pr.facts.cycle_hours
-        if cycle is None:
-            continue
-        value = (
-            hours(pr, end=dataset.as_of)["waiting_ci"]
-            if stage == "ci"
-            else getattr(pr.facts, stage + "_hours") or 0
-        )
-        if location is not None and location not in location_names(pr, dataset):
-            value = 0
-        before.append(cycle)
-        after.append(cycle - max(0, value - target))
-        affected += value > target
-    old, new = percentile(before, 50, t.MIN_SAMPLES_P50), percentile(after, 50, t.MIN_SAMPLES_P50)
-    if old is None or old == 0 or new is None:
-        return None
-    return {
-        "stage": stage,
-        "location": location,
-        "target_hours": target,
-        "affected_prs": affected,
-        "cycle_p50_before_hours": old,
-        "cycle_p50_after_hours": new,
-        "change_rel": new / old - 1,
-    }
-
-
-def merge_blockers(dataset: Dataset) -> dict[str, Any]:
-    """Summarize multiple approvals and post-approval updates among approved merged PRs.
-
-    Each share is None when fewer than ten PRs qualify.
-    """
-    prs = [p for p in merged(dataset, dataset.current) if p.facts.approved_at is not None]
-    return {
-        "second_approval_share": sum(p.facts.distinct_approvers >= 2 for p in prs) / len(prs)
-        if len(prs) >= 10
-        else None,
-        "post_approval_update_share": sum(p.facts.updates_after_approval > 0 for p in prs)
-        / len(prs)
-        if len(prs) >= 10
-        else None,
-    }
-
-
-def review_load(dataset: Dataset) -> dict[str, Any]:
-    """Count review events by reviewer and return the ten largest shares in stable order."""
-    counts = Counter(r.reviewer for r in dataset.reviews_in(dataset.current))
-    total = sum(counts.values())
-    return {
-        "reviewers": len(counts),
-        "reviews": total,
-        "distribution": [
-            {"reviewer": name, "reviews": count, "share": ratio(count, total)}
-            for name, count in sorted(counts.items(), key=lambda p: (-p[1], p[0]))[:10]
-        ],
-    }
-
-
-def waste_rework(dataset: Dataset) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Describe unmerged/reverted outcomes and their accumulated waiting, not engineering effort.
-
-    Superseded closures are excluded from wasted_pr_hours because a merged successor is linked.
-    Reverts are observed only before as_of; future reverts cannot alter a historical outcome.
-    """
-    prs, lost = merged(dataset, dataset.current), closed(dataset, dataset.current)
-    wasted = [p for p in lost if p.facts.close_class != "superseded"]
-    reverted_prs = [p for p in prs if reverted(p, dataset.as_of)]
-    waste = {
-        "lost_while_waiting": sum(
-            p.facts.close_class in {"no_review", "abandoned"}
-            and p.facts.state_at_close == "waiting_reviewer"
-            for p in lost
-        ),
-        "late_rejections": sum(p.facts.late_rejection for p in lost),
-        "wasted_pr_hours": sum(
-            sum(hours(p, end=dataset.as_of).values()) for p in [*wasted, *reverted_prs]
-        ),
-    }
-    by_id = {p.pr_id: p for p in dataset.flow}
-    chains = []
-    for original in sorted(
-        reverted_prs, key=lambda p: (p.facts.reverted_at or dataset.as_of, p.pr_id), reverse=True
-    ):
-        revert = by_id.get(original.facts.reverted_by_pr_id or -1)
-        if revert is None or revert.facts.merged_at is None or original.facts.merged_at is None:
-            continue
-        chains.append(
-            {
-                "revert": {"number": revert.number, "url": revert.url},
-            }
-        )
-    return waste, {
-        "revert_chains": chains[:10],
-    }
-
-
-def guardrail(efficiency: dict[str, Any]) -> dict[str, Any]:
-    """Flag increased reverts, with a suspected trade-off when cycle time also improves.
-
-    This combines observed signals; the verdict does not establish that speed caused reverts.
-    """
-    cycle, revert = efficiency["cycle_time_p50_hours"], efficiency["revert_rate"]
-    delta = (
-        (revert["value"] - revert["previous"])
-        if revert["value"] is not None and revert["previous"] is not None
-        else None
-    )
-    increased = delta is not None and delta >= t.GUARDRAIL_REVERT_RATE_DELTA
-    faster = (
-        cycle["significant"] is True
-        and cycle["change_rel"] is not None
-        and cycle["change_rel"] <= -0.10
-    )
-    return {
-        "cycle_time_p50_change_rel": cycle["change_rel"],
-        "revert_rate": revert["value"],
-        "verdict": "tradeoff_suspected"
-        if increased and faster
-        else ("watch" if increased else "ok"),
-    }
-
-
-def signal_measures(
-    dataset: Dataset, window: Window, risks: Sequence[dict[str, Any]]
-) -> dict[str, Measure]:
-    """Collect PR-size, approval and review-wait signals using each metric's own sample."""
-    prs = merged(dataset, window)
-    internal = percentile(
-        values([p for p in prs if not p.facts.external_contributor], "pickup_hours"), 50, 10
-    )
-    external = percentile(
-        values([p for p in prs if p.facts.external_contributor], "pickup_hours"), 50, 10
-    )
-    waiting = [p for p in risks if p["state"] == "waiting_reviewer"]
-    counts = Counter(location for p in waiting for location in p["locations"])
-    return {
-        "large_pr_share": rate([float(p.facts.size_lines >= t.LARGE_PR_LINES) for p in prs]),
-        "merged_without_approval_share": rate(
-            [float(p.facts.merged_without_approval) for p in prs]
-        ),
-        "fast_large_approval_share": rate(
-            [
-                float(
-                    p.facts.size_lines >= t.FAST_APPROVAL_MIN_LINES
-                    and p.facts.first_approval_at is not None
-                    and p.facts.ready_at is not None
-                    and p.facts.first_approval_at - p.facts.ready_at
-                    <= timedelta(minutes=t.FAST_APPROVAL_MINUTES)
-                    and p.facts.feedback_before_approval == 0
-                )
-                for p in prs
-            ]
-        ),
-        "external_pickup_ratio": Measure(
-            external / internal if external is not None and internal else None, len(prs)
-        ),
-        "at_risk_reviewer_top_location_share": Measure(
-            max(counts.values(), default=0) / len(waiting) if len(waiting) >= 4 else None,
-            len(waiting),
-        ),
-    }
-
-
-def signals(dataset: Dataset, risks: Sequence[dict[str, Any]], params_hash: str) -> dict[str, Any]:
-    """Compare current signals to the previous cohort and its risks at the previous period end."""
-    current = signal_measures(dataset, dataset.current, risks)
-    # Previous-period risks are taken at the previous period's end, mirroring as_of.
-    previous = (
-        signal_measures(
-            dataset, dataset.previous, at_risk(dataset, at=dataset.start, window=dataset.previous)
-        )
-        if dataset.comparison_available
-        else {}
-    )
-    return {
-        name: compare(
-            measure,
-            previous.get(name),
-            unit="ratio" if name == "external_pickup_ratio" else "share",
-            name=name,
-            params_hash=params_hash,
-        )
-        for name, measure in current.items()
-    }
 
 
 def series(dataset: Dataset, window: Window) -> list[dict[str, Any]]:
@@ -500,8 +171,8 @@ def attribution(
 ) -> dict[str, Any] | None:
     """Decompose mean hours per merged PR; this is accounting, not a causal explanation.
 
-    Positive and negative component changes have separate gross totals. Their shares do not
-    divide by the net cycle-time change, which could be small or cancelled by other components.
+    Each component's share of increase divides by the gross total of positive changes, not by the
+    net cycle-time change, which could be small or cancelled by other components.
     """
     current, previous = merged(dataset, dataset.current), merged(dataset, dataset.previous)
     if not dataset.comparison_available or min(len(current), len(previous)) < t.MIN_SAMPLES_P50:
@@ -524,12 +195,8 @@ def attribution(
             "change": new / len(current) - old / len(previous),
         }
     increase = sum(max(0, c["change"]) for c in components.values())
-    decrease = sum(max(0, -c["change"]) for c in components.values())
     for c in components.values():
-        c.update(
-            share_of_increase=ratio(max(0, c["change"]), increase),
-            share_of_decrease=ratio(max(0, -c["change"]), decrease),
-        )
+        c["share_of_increase"] = ratio(max(0, c["change"]), increase)
     locs = [
         {
             "location": p["location"],
@@ -561,11 +228,6 @@ def attribution(
     cycle_delta = cycle_current - cycle_previous
     return {
         "basis": "mean_hours_per_merged_pr",
-        "cycle_mean_hours": {
-            "current": cycle_current,
-            "previous": cycle_previous,
-            "change": cycle_delta,
-        },
         "states": components,
         "locations": locs,
         "large_prs": {

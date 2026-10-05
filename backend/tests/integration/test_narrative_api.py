@@ -26,8 +26,8 @@ pytestmark = pytest.mark.integration
 async def prepare(api, *, enabled=False, bad=False):
     client, app, _, ctx = api
     snapshot = (await client.get(DELIVERY)).json()
-    pack, _ = build_evidence_pack(snapshot, "director", False)
-    valid = build_template(pack, snapshot)
+    pack, _ = build_evidence_pack(snapshot, False)
+    valid = build_template(pack)
     if enabled:
         ctx["settings"].aws_bearer_token_bedrock = SecretStr("test")
         app.state.llm = FakeLLMClient(
@@ -55,8 +55,6 @@ async def test_narrative_persistence_cache_pack_identity_and_conditional(api, en
     model_key = ctx["settings"].bedrock_model_id if enabled else "template"
     key = narrative_key(
         snapshot["snapshot_id"],
-        "director",
-        "en",
         PROMPT_VERSION,
         model_key,
         payload["meta"]["pack_hash"],
@@ -87,8 +85,6 @@ async def test_validation_failure_is_short_lived_and_not_persisted(api):
     assert len(app.state.llm.calls) == 2
     key = narrative_key(
         snapshot["snapshot_id"],
-        "director",
-        "en",
         PROMPT_VERSION,
         ctx["settings"].bedrock_model_id,
         payload["meta"]["pack_hash"],
@@ -118,7 +114,6 @@ async def test_narrative_is_the_english_director_view(api):
     assert response.status_code == ignored.status_code == 200
     assert response.content == ignored.content
     payload = response.json()
-    assert payload["lang"] == "en" and payload["audience"] == "director"
     assert payload["meta"]["prompt_version"] == PROMPT_VERSION
     NarrativeSchema.model_validate(payload)
     contract = (await client.get("/openapi.json")).json()
@@ -129,13 +124,11 @@ async def test_narrative_is_the_english_director_view(api):
 async def test_current_prompt_never_reuses_legacy_language_or_prompt_caches(api):
     client, app, clock, ctx = api
     snapshot, _, url = await prepare(api, enabled=True)
-    pack, _ = build_evidence_pack(snapshot, "director", False)
+    pack, _ = build_evidence_pack(snapshot, False)
     pack_hash = digest(pack)[:16]
     model = ctx["settings"].bedrock_model_id
     for language, version in (("en", "v3"), ("zh", "v3"), ("en", "v4"), ("en", "v6"), ("en", "v7")):
-        key = narrative_key(
-            snapshot["snapshot_id"], "director", language, version, model, pack_hash
-        )
+        key = narrative_key(snapshot["snapshot_id"], version, model, pack_hash)
         await ctx["redis"].hset(
             key, mapping={"body": b'{"narrative":"legacy"}', "etag": '"legacy"', "persist": "1"}
         )
@@ -158,9 +151,7 @@ async def test_current_prompt_never_reuses_legacy_language_or_prompt_caches(api)
     fresh = await client.get(url)
     assert fresh.status_code == 200 and fresh.json()["meta"]["prompt_version"] == PROMPT_VERSION
     assert fresh.json()["narrative"] != "legacy" and len(app.state.llm.calls) == 1
-    current_key = narrative_key(
-        snapshot["snapshot_id"], "director", "en", PROMPT_VERSION, model, pack_hash
-    )
+    current_key = narrative_key(snapshot["snapshot_id"], PROMPT_VERSION, model, pack_hash)
     await ctx["redis"].delete(current_key)
     restored = await client.get(url)
     assert restored.content == fresh.content and len(app.state.llm.calls) == 1
@@ -181,9 +172,7 @@ async def test_snapshot_deleted_during_generation_returns_404(api):
     app.state.llm = DeletingClient([valid])
     response = await client.get(url)
     assert response.status_code == 404, response.text
-    assert not await ctx["redis"].exists(
-        narrative_lock_key(snapshot["snapshot_id"], "director", "en")
-    )
+    assert not await ctx["redis"].exists(narrative_lock_key(snapshot["snapshot_id"]))
 
 
 async def test_concurrent_generation_is_deduplicated(api):
@@ -206,9 +195,7 @@ async def test_concurrent_generation_is_deduplicated(api):
     a, b = await asyncio.gather(first, second)
     assert a.status_code == b.status_code == 200
     assert a.content == b.content and len(app.state.llm.calls) == 1
-    assert not await ctx["redis"].exists(
-        narrative_lock_key(snapshot["snapshot_id"], "director", "en")
-    )
+    assert not await ctx["redis"].exists(narrative_lock_key(snapshot["snapshot_id"]))
 
 
 async def test_busy_and_deadline_fallbacks_release_only_owned_locks(api, monkeypatch):
@@ -217,7 +204,7 @@ async def test_busy_and_deadline_fallbacks_release_only_owned_locks(api, monkeyp
     import insights.narrative.service as service
 
     monkeypatch.setattr(service, "LOCK_WAIT_SECONDS", 0)
-    key = narrative_lock_key(snapshot["snapshot_id"], "director", "en")
+    key = narrative_lock_key(snapshot["snapshot_id"])
     await ctx["redis"].set(key, "other-owner", ex=180)
     busy = await client.get(url)
     assert busy.json()["meta"]["fallback_reason"] == "llm_busy"

@@ -5,29 +5,22 @@ Current contracts are in code and this reference; [the consolidated plan](PLAN.m
 
 ## The insight and why this metric
 
-The core metric is **PR cycle time and where it waits**: first commit to merge,
-split into coding, reviewer wait, author wait, observed CI wait and merge wait.
-Each report combines team outcomes with bottleneck analysis and the previous period.
-The headline connects the outcome, the largest bottleneck and an illustrative action.
+The core metric is **where PR time goes**: the post-ready waiting time of merged PRs, split
+into reviewer, author, observed CI and merge waiting, and compared with the previous period.
+A cited narrative explains a slowdown when the evidence supports one, and otherwise says where
+PR time goes now.
 
 | View | Question | Decision it supports |
 |---|---|---|
-| Cycle median and p90 | Is delivery slower, including the tail? | Investigate a change in the process |
-| Waiting share | How much of the whole cycle is waiting? | Separate active work from handoffs |
 | Time ledger | Who or what is the post-ready wait for? | Review capacity, CI or merge policy |
-| Location and queue | Where is demand exceeding capacity? | Add area reviewers or improve assignment |
-| Reverts and waste | Is apparent speed buying quality risk? | Review guardrails beside cycle time |
-| At-risk PRs | Which open changes exceed historical waits? | Triage concrete work |
+| Narrative | Did delivery slow down, and which supported cause fits? | Where to investigate first |
 
-Waiting share uses coding plus active post-ready time as its denominator.
-The time ledger uses only post-ready waiting states; its shares have a different denominator.
-Dashboard cards state their sample units: merged PRs, eligible ready-for-review PRs, closed or
-merged PRs, or review events. Review rounds counts feedback transitions back to the author,
-not individual reviews; averages display up to two decimal places. Relative changes use
-unrounded values, so recomputing them from displayed values can differ slightly. In-page
-guides explain sample sizes, statistical status, table columns and impact denominators.
-These are PR-flow signals, not deployment lead time, DORA change failure rate,
-individual productivity scores or causal proof. Workflow and timestamp changes affect them.
+The narrative draws on cycle time, first-review wait, review rounds, the review queue and
+review concentration, PR size, CI queue/run/rerun times, the weekly series and an accounting
+attribution of the added hours. They appear on the page only as cited evidence. Relative
+changes use unrounded values, so recomputing them from displayed values can differ slightly.
+These are PR-flow signals, not deployment lead time, DORA change failure rate, individual
+productivity scores or causal proof. Workflow and timestamp changes affect them.
 
 ## How it works
 
@@ -91,57 +84,47 @@ A `202` is a Pending object, not a snapshot. Respect `Retry-After`; inspect each
 `reason` and `job` (status and phase). The UI polls for at most five minutes, then asks for a
 later refresh.
 
-## Snapshot contract in analytics 1.5.3
+## Snapshot contract in analytics 1.6.0
 
-The strict `api/schemas.py` models are the current field contract (`extra="forbid"`).
-Retained metrics, samples, comparisons, significance, findings and their what-if estimates,
-risks, location rows including `owners_count`, headline and links retain their values.
-Only outputs without dashboard, narrative, finding or eval consumers were removed:
+The strict `api/schemas.py` models are the current field contract (`extra="forbid"`). The
+snapshot holds the time ledger shown on the dashboard and every metric the narrative evidence
+catalog reads, and nothing else.
 
-| Block | Removed outputs |
-|---|---|
-| Root / bottleneck summary | `per_repo`, `pareto`, the summary `what_if` list (finding-level `what_if` stays) |
-| Merge blockers / drivers | Unused approved-count/second-approval/CI-after-approval metrics; author-WIP, submit timing, review-round buckets/cost/first pickup (re-review wait stays) |
-| Waste / rework | Closed count, class/share diagnostics; revert/reland counters and chain original/reland/exposure/cycle fields (revert URL stays) |
-| Trend / CI | Bottleneck shift, attribution total-hours/reviewer-share diagnostics; rerun rate, runs per PR, workflow/source/coverage diagnostics (ledger CI availability/coverage stays) |
-| Metadata / risk | Exclusion/location-source diagnostics, extra sample counts, risk-by-state, risk PR size/external contributor |
-| Ledger / guardrail / series | Ledger scope/previous count/total, prior revert-rate/change-pp, queue growth, weekly days/reverts, KM step/events outputs |
+| Block | Contents | Consumers |
+|---|---|---|
+| `period`, `as_of`, `repos`, `meta` | Dates, comparison window, observation cutoff, versions, merged sample | Dashboard, evidence pack |
+| `time_ledger` | Waiting-state PR-hours and shares, current and previous; CI coverage | Where PR time goes, E18–E21 |
+| `efficiency` | Cycle p50, merged PRs, first-review p50, review rounds, post-review commits, review concentration, PR size p50, large-PR share | E1, E3, E8, E9, E15, E24, E30, E31 |
+| `bottleneck_analysis` | Review-queue imbalance weeks, location first-review ratios and reviewer wait, CI queue/run/rerun | E22, E44–E46, location items |
+| `drivers`, `trend` | Slowest-decile size ratio; attribution of added hours by state, location and large PRs | E37, E39, E42, E48, location items |
+| `series` | Weekly current and previous values | Effect size and persistence |
 
-Analytics 1.5.1 changed finding impact shares to use the post-ready waiting time of all
-eligible PRs finished in the period, merged or closed without merging. Analytics 1.5.2
-clarifies that PR-hours measure cumulative elapsed waiting, not labor effort. The waste
-finding includes non-superseded PRs closed without merging and merged PRs later reverted;
-its waiting-time rank does not establish a root cause of slower delivery. Metric values,
-ranking rules and hypothesis scores are unchanged by this wording update. Prompt v9
-applies the same distinction to generated narratives; the v8 evaluation below is historical.
+Analytics 1.6.0 removed the outputs that only the former dashboard sections or the removed
+quality hypothesis consumed: the headline, findings and what-if estimates, at-risk PRs, waste
+and revert chains, the guardrail, merge blockers, review load, predictability, Kaplan–Meier
+survival, the other drivers and the unused efficiency metrics and signals. Every retained value
+is unchanged; in the golden output only the snapshot ID and analytics version differ.
 
-Analytics 1.5.3 separates the cycle-time sentence from a type-specific finding phrase
-and quotes the top finding's share of finished PR waiting time. Findings without quantified
-waiting impact do not receive that sentence. A what-if sentence comes only from the top
-finding's own estimate; card titles do not supply headline prose.
-
-Identity and caches use analytics 1.5.3. Sampling uses `digest(seed_params)[:16]` with exactly
-the former canonical parameter structure and only `analytics_version` replaced by frozen
-`SAMPLING_SEED_VERSION="1.4.0"`. Existing snapshots and narrative caches remain isolated;
-HTTP conditional requests still return 304 for matching current ETags. Repositories with old
-derived versions enter the existing rederivation path. No schema reset is needed for stages 1–8.
+Sampling uses `digest(seed_params)[:16]` with exactly the former canonical parameter structure
+and only `analytics_version` replaced by frozen `SAMPLING_SEED_VERSION="1.4.0"`, so bootstrap
+significance does not change across analytics releases. Old snapshots and narrative caches stay
+isolated by version, and repositories with old derived versions are rederived in the background.
 
 ## Narrative, confidence and evidence chain
 
 Confidence is a **deterministic evidence-strength score**, not a probability.
 It has not been calibrated against real repository outcomes or hand-labeled causes.
-Correlations, queue pressure and what-if estimates are reasons to investigate, not proof.
+Correlations and queue pressure are reasons to investigate, not proof.
 
 The model sees structured numbers, evidence IDs and sanitized repository/location names.
 It never sees PR titles, bodies, comments or user names. Code supplies evidence references,
-sample counts, changes, guardrails and eligible hypotheses from this library:
+sample counts, changes and eligible hypotheses from this library:
 
 | Hypothesis | Symptom | Mechanism to look for |
 |---|---|---|
 | Review capacity | More time waiting for review | Demand, concentration and localized first-review delay |
 | CI bottleneck | More observed CI waiting | Queue/runtime increases or flaky reruns |
 | PR size growth | Longer cycle or author/review stages | Larger changes with extra review/rework |
-| Quality trade-off | Faster cycle | Reverts or unusually fast approval of large changes |
 
 ```text
 score = 0.30*S + 0.20*E + 0.20*P + 0.15*N + 0.15*L - 0.15*C
@@ -150,18 +133,19 @@ score = 0.30*S + 0.20*E + 0.20*P + 0.15*N + 0.15*L - 0.15*C
 | Factor | Meaning |
 |---|---|
 | S | Fraction of evaluable symptom/mechanism signals present |
-| E | Direction-aware effect size against previous weekly variability |
+| E | Effect size of the increase against previous weekly variability |
 | P | Fraction of current weeks supporting the change |
 | N | `min(1, main_metric_sample_size / 100)` |
 | L | Localization/concentration, defined for each hypothesis |
 | C | Number of counter-evidence groups present |
 
-Example covered by tests: S=4/5, E=1, P=10/13, N=61/100, L=0.63, C=0
-gives 0.7798, rounded to **0.78 (high)**. One counter-evidence group yields **0.63 (medium)**.
-No mechanism signal means no hypothesis, even when symptoms look strong.
+Example covered by tests: S=3/4, E=1, P=10/13, N=61/100, L=0.63, C=0
+gives 0.7648, rounded to **0.76 (high)**. One counter-evidence group yields **0.61 (medium)**.
+No mechanism signal means no hypothesis, even when symptoms look strong. Every eligible
+hypothesis is shown, ordered by score; a faster cycle time abstains with `no_slowdown`.
 Each candidate in the pack carries `explains`, the changes its present symptoms record, such
 as "the larger share of PR time waiting on reviewers". Cause sentences name that change
-(prompt v10 and the template), so a candidate triggered by reviewer wait is never presented
+(prompt v11 and the template), so a candidate triggered by reviewer wait is never presented
 as the cause of a cycle-time change it does not cover.
 CI confidence is capped at 0.50 unless CI is available, coverage is at least 0.50,
 and `CI_COMPLETE=true`. The default is false because Actions may be only partial CI.
@@ -274,7 +258,7 @@ There is no authenticated administrative UI or backup orchestration in this demo
 
 Tests focus on accounting boundaries and failure behavior, not only happy-path output.
 They cover 22 specified timeline cases plus 200 random invariant sequences, deterministic
-golden output under shuffled input, sample gates, observed CI waits, KM censoring/ties, drivers,
+golden output under shuffled input, sample gates, observed CI waits, drivers,
 resumable ingestion, snapshot identity/expiry, privacy, validators and fallback races.
 Integration tests use actual Postgres 16 and Redis 7 through Testcontainers; GitHub and
 Bedrock calls are mocked or SDK-stubbed. Docker must be running for the full suite.
@@ -305,8 +289,10 @@ Earlier acceptance measured 3,541 PRs with no invariant violations, three matchi
 Those analytics 1.2/1.3 measurements and npm ci/audit checks were not repeated here. They are local measurements, not production load evidence.
 The original 90-day performance gate remains excluded; nine upstream deprecation warnings remain.
 
-The harness runs five planted scenarios × two seeds × two English audience variants.
-Both offline and real Bedrock Sonnet 4.6 suites were run on analytics 1.5.0 and final prompt v8. The rejected v8 candidates are retained in the evaluation records.
+The harness runs four planted scenarios × five seeds through the single English narrative.
+The offline suite passes all gates on analytics 1.6.0 and prompt v11. The table below is the
+last real Bedrock comparison (prompt v8, five scenarios × two seeds × two audiences) until a
+real v11 run is recorded.
 [Evaluation records](EVALUATION.md) retain every current and historical per-case outcome.
 Numeric/citation/hedge denominators include final LLM outputs, excluding fallback.
 
@@ -319,8 +305,8 @@ Numeric/citation/hedge denominators include final LLM outputs, excluding fallbac
 | High-confidence precision | 14/14 (1.00) | 14/14 (1.00) | ≥ 0.80 |
 | Fallback rate | 0/20 (0.00) | 0/20 (0.00) | ≤ 0.10 |
 
-The final v8 offline and real-Bedrock suites pass all gates. Quality-tradeoff seed 101 abstains because its
-previous-period baseline fails the five-event gate; thresholds are unchanged.
+The v8 offline and real-Bedrock suites passed all gates; their two misses came from the quality
+trade-off hypothesis, which analytics 1.6.0 removed.
 Medium/low precision is undefined. Failed v1/v2 and English v4/v5 trials remain
 recorded, together with rejected stage-8 candidates A/B. Earlier rebuilt-API English-only real-manager HTTP smoke is historical; the refactor UI check used synthetic fixtures.
 This small synthetic suite was used during prompt development; it is not a held-out
@@ -359,15 +345,13 @@ waiting, cumulative-flow charts and release/deployment timing remain outside thi
 
 Implemented: deterministic evidence scoring and validation, repair/template fallback, immutable
 snapshots and ETags, staged backfill/open sweeps,
-four narrative variants, offline eval, React dashboard, CODEOWNERS/area-owner enrichment,
-Actions CI waiting, drivers, Kaplan–Meier survival, historical predictability, Docker and CI config.
+an English narrative with three scored hypotheses, offline eval, React dashboard,
+CODEOWNERS/area-owner enrichment, Actions CI waiting, Docker and CI config.
 
 ### Known limitations
 
 - PRs that have been open without human activity during the selected period are not listed;
   extend the date range to include them.
-- Stale PRs closed by a bot are not counted as waste unless they were opened or had human
-  activity in the period.
 - PRs opened before the selected period and merged by a bot with no human activity in
   the period are not counted in throughput.
 

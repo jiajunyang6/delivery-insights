@@ -9,7 +9,7 @@ from typing import Any
 from insights.analytics import ANALYTICS_VERSION
 from insights.analytics.classify import is_flow
 from insights.analytics.thresholds import THRESHOLDS_VERSION
-from insights.analytics.timeline import Interval, is_open_at, ledger_hours
+from insights.analytics.timeline import Interval, ledger_hours
 from insights.analytics.types import PrFacts
 from insights.domain import CiRun
 
@@ -75,14 +75,6 @@ class Review:
 
 
 @dataclass(frozen=True, slots=True)
-class Baseline:
-    repo: str
-    state: str
-    end_at: datetime
-    hours: float
-
-
-@dataclass(frozen=True, slots=True)
 class Window:
     start: datetime
     end: datetime
@@ -98,11 +90,9 @@ class Dataset:
     repos: tuple[RepoData, ...]
     prs: tuple[PrData, ...]
     reviews: tuple[Review, ...]
-    baselines: tuple[Baseline, ...]
     period_from: date
     period_to: date
     ci_runs: tuple[tuple[str, CiRun], ...] = ()
-    history: tuple[tuple[str, datetime, float], ...] = ()
     current_day: bool = False
     # init=False gives every dataclasses.replace() an empty, independent cache.
     cohort_cache: dict[Window, tuple[tuple[PrData, ...], tuple[Review, ...] | None]] = field(
@@ -192,30 +182,11 @@ def merged(dataset: Dataset, window: Window, *, scope: Window | None = None) -> 
     return tuple(p for p in dataset.flow_in(scope or window) if window.contains(p.facts.merged_at))
 
 
-def closed(dataset: Dataset, window: Window) -> tuple[PrData, ...]:
-    """Select active flow PRs closed without merging during this half-open window."""
-    return tuple(
-        p
-        for p in dataset.flow_in(window)
-        if p.facts.merged_at is None and window.contains(p.facts.closed_at)
-    )
-
-
-def open_at(pr: PrData, at: datetime) -> bool:
-    """Test whether a ready PR occupies a waiting state at this historical instant."""
-    return is_open_at(pr.facts.ready_at, pr.facts.end_at, pr.intervals, at)
-
-
 def hours(pr: PrData, *, end: datetime) -> dict[str, float]:
     """Sum post-ready elapsed waiting hours, clipped to lifecycle end and the supplied cutoff."""
     return ledger_hours(
         pr.intervals, start=pr.facts.ready_at or end, end=min(pr.facts.end_at or end, end)
     )
-
-
-def reverted(pr: PrData, at: datetime) -> bool:
-    """Test whether a linked revert was merged strictly before the supplied cutoff."""
-    return pr.facts.reverted_at is not None and pr.facts.reverted_at < at
 
 
 def effective_review(pr: PrData) -> datetime | None:

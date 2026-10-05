@@ -1,4 +1,4 @@
-"""Validation of LLM tool output against the evidence pack and snapshot.
+"""Validation of LLM tool output against the evidence pack.
 
 Checks schema, length, language (CJK characters), citations, numbers, hedge wording, personal
 names and abstention, and returns violations for the repair prompt; output is never modified.
@@ -338,13 +338,7 @@ def validate_hypotheses(
     return levels
 
 
-def validate(
-    output: dict[str, Any] | None,
-    pack: Mapping[str, Any],
-    snapshot: Mapping[str, Any],
-    *,
-    audience: str,
-) -> list[Violation]:
+def validate(output: dict[str, Any] | None, pack: Mapping[str, Any]) -> list[Violation]:
     """Return every violation in one tool output, deduplicated; an empty list means valid.
 
     Schema errors do not stop the semantic checks, so a single repair message can list all
@@ -396,8 +390,7 @@ def validate(
     candidates = {c["id"]: c for c in pack["hypotheses"]}
     evidence = {e["id"]: e for e in pack["evidence"]}
     body_sentences = sentences(body)
-    low = (2 if candidates else 1) if audience == "director" else (3 if candidates else 2)
-    high = 4 if audience == "director" else 6
+    low, high = (2 if candidates else 1), 4
     if len(body) > 1200:
         fail("V2:length", "Narrative exceeds 1200 characters.")
     if not low <= len(body_sentences) <= high:
@@ -415,10 +408,7 @@ def validate(
         if not citations(sentence):
             fail("V4:sentence_without_citation", f"Body sentence {i} needs evidence.")
     # Narratives discuss areas and teams, never individuals. Logins never enter the pack, so
-    # any match is a guessed or coincidental name; logins under three characters are skipped
-    # to avoid matching ordinary words.
-    logins = {r["reviewer"] for r in snapshot["bottleneck_analysis"]["review_load"]["distribution"]}
-    logins.update(p["author"] for p in snapshot["at_risk_prs"] if p["author"])
+    # an @mention can only be a guessed name.
     for text in texts:
         for identifier in sorted(citations(text) - evidence.keys()):
             fail("V4:unknown_citation", f"Unknown citation {identifier}.")
@@ -426,11 +416,7 @@ def validate(
             errors.extend(check_numbers(sentence, pack, evidence))
         if DEFINITE.search(text):
             fail("V7b:overclaim", "Definite causal language is not supported.")
-        if re.search(r"@[A-Za-z0-9]", text) or any(
-            re.search(r"(?<![A-Za-z0-9-])" + re.escape(name) + r"(?![A-Za-z0-9-])", text, re.I)
-            for name in logins
-            if len(name) >= 3
-        ):
+        if re.search(r"@[A-Za-z0-9]", text):
             fail("V10:personal_name", "Personal login names must not appear.")
     levels = validate_hypotheses(hypotheses, candidates, evidence, body, errors)
     if outside:

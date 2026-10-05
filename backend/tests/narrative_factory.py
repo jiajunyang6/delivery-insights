@@ -27,13 +27,11 @@ def entry(identifier, value, previous=None, *, unit="hours", n=100, significant=
         "location": None,
         "extra": {},
         "ref": "/test",
-        "examples": [],
         **extra,
     }
 
 
 def validation_fixture():
-    snapshot = golden()
     evidence = [
         entry("E1", 41.25, 35.1, n=512),
         entry("E15", 29, 20),
@@ -78,7 +76,7 @@ def validation_fixture():
             }
         ],
     }
-    return deepcopy(snapshot), deepcopy(pack), deepcopy(output)
+    return deepcopy(pack), deepcopy(output)
 
 
 def scoring_fixture():
@@ -92,7 +90,6 @@ def scoring_fixture():
         "E15": entry("E15", 29, 20, n=61),
         "E18": entry("E18", 0.43, 0.35, unit="share"),
         "E22": entry("E22", 9, unit="count", extra={"weeks_total": 13}),
-        "E26": entry("E26", 0.6, unit="share"),
         "E24": entry("E24", 0.2, 0.19, unit="share"),
         "E30": entry("E30", 100, 100, unit="lines"),
         "E31": entry("E31", 0.1, 0.1, unit="share"),

@@ -90,15 +90,12 @@ def test_ci_cohort_gates_comparison_and_workflow_sorting():
     assert ci["queue_p50_minutes"]["previous"] is None
 
 
-def test_ci_scenario_contract_finding_and_no_ci_mode():
+def test_ci_scenario_contract_and_no_ci_mode():
     snapshot = build_snapshot_from_repo(generate(SCENARIOS["ci_slowdown"], 101))
     Snapshot.model_validate(snapshot)
     assert snapshot["time_ledger"]["ci_data_available"]
     assert snapshot["time_ledger"]["ci_coverage"] > 0.9
     assert snapshot["bottleneck_analysis"]["ci"]["run_p50_minutes"]["n"] > 20
-    assert any(
-        f["type"] == "ci_wait" and f["what_if"]["stage"] == "ci" for f in snapshot["bottlenecks"]
-    )
     d = dataset([pr(i) for i in range(25)])
     empty = build_snapshot(
         d, params=SnapshotParams(("a/b",), d.period_from, d.period_to, ci_source="actions")

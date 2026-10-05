@@ -1,4 +1,4 @@
-"""Assemble the snapshot payload and PR rows from a Dataset; deterministic, no I/O."""
+"""Assemble the snapshot payload from a Dataset; deterministic, no I/O."""
 
 import hashlib
 import math
@@ -11,10 +11,9 @@ from insights.analytics import ANALYTICS_VERSION
 from insights.analytics import bottlenecks as b
 from insights.analytics import thresholds as t
 from insights.analytics.ci import build_ci
-from insights.analytics.dataset import Dataset, SnapshotParams, merged, open_at
-from insights.analytics.drivers import build_drivers
+from insights.analytics.dataset import Dataset, SnapshotParams, merged
+from insights.analytics.drivers import slowest_decile_size_ratio
 from insights.analytics.efficiency import build_efficiency
-from insights.analytics.findings import build_findings, headline
 from insights.analytics.stats import SAMPLING_SEED_VERSION
 
 
@@ -86,11 +85,6 @@ def rounded(value: Any, key: str = "", unit: str = "") -> Any:
     current, previous and delta values can differ from arithmetic on the displayed values.
     """
     if isinstance(value, dict):
-        if str(value.get("feature", "")).endswith("_share"):
-            return {
-                k: rounded(v, k, "share" if k in {"slowest", "rest"} else "")
-                for k, v in value.items()
-            }
         current_unit = value.get("unit", unit)
         return {
             k: rounded(v, k, current_unit if k in {"value", "previous", "change_abs"} else "")
@@ -125,19 +119,16 @@ def rounded(value: Any, key: str = "", unit: str = "") -> Any:
 def build_snapshot(dataset: Dataset, *, params: SnapshotParams) -> dict[str, Any]:
     """Build the JSON-ready snapshot payload; pure and deterministic for a dataset and params.
 
-    Findings and the headline are derived from the assembled snapshot before rounding.
+    It holds the time ledger shown on the dashboard and every metric the narrative evidence
+    catalog reads; values are rounded once, after computation.
     """
     snapshot_id, _, _ = identifiers(dataset, params)
     # Seed from the sampling hash, not the snapshot ID, so analytics-only releases keep the
     # same bootstrap seeds.
     params_hash = sampling_hash(params)
-    efficiency = build_efficiency(dataset, params_hash)
-    risks = b.at_risk(dataset, at=dataset.as_of, exclude_current_drafts=dataset.current_day)
     ledger = b.time_ledger(dataset)
     ledger["ci_data_available"] = params.ci_source != "none" and ledger["ci_coverage"] > 0
-    locations = b.locations(dataset, risks, ledger)
-    waste, rework = b.waste_rework(dataset)
-    current = merged(dataset, dataset.current)
+    locations = b.locations(dataset)
     snapshot: dict[str, Any] = {
         "snapshot_id": snapshot_id,
         "repos": sorted(r.repo for r in dataset.repos),
@@ -152,48 +143,26 @@ def build_snapshot(dataset: Dataset, *, params: SnapshotParams) -> dict[str, Any
             },
         },
         "as_of": dataset.as_of,
-        "headline": "",
-        "efficiency": efficiency,
+        "efficiency": build_efficiency(dataset, params_hash),
         "time_ledger": ledger,
-        "bottlenecks": [],
         "bottleneck_analysis": {
             "review_queue": b.review_queue(dataset, dataset.current),
             "locations": locations,
-            "merge_blockers": b.merge_blockers(dataset),
-            "review_load": b.review_load(dataset),
             "ci": build_ci(dataset, params_hash) if params.ci_source == "actions" else None,
         },
-        "drivers": build_drivers(dataset),
-        "at_risk_prs": risks[: t.AT_RISK_MAX_ITEMS],
-        "at_risk_summary": b.risk_summary(risks),
-        "waste": waste,
-        "rework": rework,
-        "guardrail": b.guardrail(efficiency),
+        "drivers": {"slowest_decile_size_ratio": slowest_decile_size_ratio(dataset)},
         "trend": b.trend(dataset, ledger, locations),
-        "signals": b.signals(dataset, risks, params_hash),
         "series": {
             "current": b.series(dataset, dataset.current),
             "previous": b.series(dataset, dataset.previous) if dataset.comparison_available else [],
         },
-        "links": {
-            "self": f"/v1/snapshots/{snapshot_id}",
-            "narrative": f"/v1/snapshots/{snapshot_id}/narrative",
-        },
         "meta": {
-            "schema_version": "1",
             "analytics_version": ANALYTICS_VERSION,
             "thresholds_version": t.THRESHOLDS_VERSION,
             "location_dimension": params.location_dimension,
-            "time_basis": "utc_wall_clock",
             "comparison_available": dataset.comparison_available,
             "ci_source": params.ci_source,
-            "data_freshness": freshness(dataset),
-            "sample": {
-                "merged_prs": len(current),
-                "open_prs_at_as_of": sum(open_at(p, dataset.as_of) for p in dataset.flow),
-            },
+            "sample": {"merged_prs": len(merged(dataset, dataset.current))},
         },
     }
-    snapshot["bottlenecks"] = build_findings(snapshot, dataset)
-    snapshot["headline"] = headline(snapshot)
     return dict(rounded(snapshot))
