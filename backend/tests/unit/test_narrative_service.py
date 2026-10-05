@@ -137,3 +137,16 @@ def test_assembly_resorts_after_downgrade_and_keeps_outside_score_fixed():
     )
     assert outside["action"] is None
     assert result["hypotheses"][1]["alternatives_open"] == candidates[0]["alternatives_open"]
+
+
+def test_low_candidates_are_marked_as_not_downgradable_in_the_request():
+    from insights.narrative.prompt import SYSTEM_PROMPT, user_message
+
+    pack, _ = validation_fixture()
+    pack.update(lang="en", abstain_reason=None)
+    pack["hypotheses"][0]["level"] = "low"
+    text = user_message(pack)["content"][0]["text"]
+    assert "H_review_capacity is optional and already low: omit downgrade." in text
+    pack["hypotheses"][0]["level"] = "high"
+    assert "already low" not in user_message(pack)["content"][0]["text"]
+    assert "never send a downgrade for a low candidate" in SYSTEM_PROMPT

@@ -309,3 +309,26 @@ def test_non_english_text_is_rejected_in_every_generated_field(field):
             "evidence_ids": ["E1", "E15"],
         }
     assert "V3:language" in codes(output, pack)
+
+
+def test_invalid_downgrades_explain_the_fix_for_repair():
+    pack, output = validation_fixture()
+
+    def messages(level, downgrade):
+        pack["hypotheses"][0]["level"] = level
+        output["hypotheses"][0]["downgrade"] = downgrade
+        return [v.message for v in validate(output, pack) if v.code == "V8:invalid_downgrade"]
+
+    # The reproduced Bedrock failure: a low candidate "downgraded" to low, uncited reason.
+    low = messages("low", {"level": "low", "reason": "Counter-evidence E30 explains it."})
+    assert low == [
+        "H_review_capacity is already low, the lowest band: remove its downgrade field and "
+        "cite any counter-evidence in the statement instead."
+    ]
+    same = messages("medium", {"level": "medium", "reason": "Limited signals [E15]."})
+    assert same == ["A downgrade for H_review_capacity must name a band below medium."]
+    uncited = messages("high", {"level": "medium", "reason": "E15 is limited."})
+    assert uncited == [
+        "The downgrade reason for H_review_capacity must cite pack evidence in brackets, "
+        "such as [E1]."
+    ]

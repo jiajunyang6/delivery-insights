@@ -320,13 +320,27 @@ def validate_hypotheses(
         if isinstance(downgrade, dict):
             proposed = downgrade.get("level")
             reason = downgrade.get("reason", "")
-            if (
+            # Messages name the fix, because they are the repair feedback; the rules are unchanged.
+            if final_level == "low":
+                fail(
+                    "V8:invalid_downgrade",
+                    f"{identifier} is already low, the lowest band: remove its downgrade field and "
+                    "cite any counter-evidence in the statement instead.",
+                )
+            elif (
                 proposed not in {"medium", "low"}
                 or LEVEL_ORDER[proposed] >= LEVEL_ORDER[final_level]
-                or not isinstance(reason, str)
-                or not citations(reason) & evidence.keys()
             ):
-                fail("V8:invalid_downgrade", f"Invalid downgrade for {identifier}.")
+                fail(
+                    "V8:invalid_downgrade",
+                    f"A downgrade for {identifier} must name a band below {final_level}.",
+                )
+            elif not isinstance(reason, str) or not citations(reason) & evidence.keys():
+                fail(
+                    "V8:invalid_downgrade",
+                    f"The downgrade reason for {identifier} must cite pack evidence in brackets, "
+                    "such as [E1].",
+                )
             else:
                 final_level = proposed
         levels.append(LEVEL_ORDER[final_level])

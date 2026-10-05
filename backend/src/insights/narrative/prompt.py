@@ -11,7 +11,7 @@ from insights.narrative.validator import ABSTAIN_SENTENCES
 
 # Bump on any prompt or tool-schema change: it is part of the narrative cache key and of the
 # stored narrative identity, so old wording is never served for a new prompt.
-PROMPT_VERSION = "v12"
+PROMPT_VERSION = "v13"
 SYSTEM_PROMPT = """Write concise English delivery narratives from the supplied structured evidence \
 pack.
 The pack contains computed metrics, observations and deterministically scored hypothesis
@@ -35,9 +35,11 @@ Avoid abbreviations such as e.g., i.e. and vs. that split sentences.
 Each candidate's explains field names the changes it would explain. Name them in its statement and \
 in any narrative cause sentence, for example 'may be the main cause of the larger share of PR time \
 waiting on reviewers'. Never present a candidate as the cause of a change it does not explain.
-Mention and cite counter-evidence when provided. You may lower a band, never raise it:
-include downgrade with the new level and a cited reason, and use that final band in both
-the statement and any narrative sentence about that hypothesis.
+Mention and cite counter-evidence when provided. You may lower a high or medium band, never
+raise it: include downgrade with a lower level and a reason citing evidence in brackets such
+as [E30], and use that final band in both the statement and any narrative sentence about that
+hypothesis. Low is the lowest band: never send a downgrade for a low candidate; put its
+doubts and counter-evidence in the statement.
 4. Wording bands: high uses likely; medium uses may, might, possibly or could; low uses
 only the exact phrase 'There are early signs that ...', with none of the higher-band
 words anywhere in that sentence: likely, may, might, possibly or could. A high/medium primary
@@ -148,9 +150,10 @@ def user_message(pack: dict[str, Any]) -> dict[str, Any]:
         )
         if candidate["level"] == "low":
             constraints.append(
-                f"  {candidate['id']} is optional. If included, start its statement with "
-                "'There are early signs that ' and use no likely/may/might/possibly/could "
-                "anywhere in that statement or its narrative cause sentence."
+                f"  {candidate['id']} is optional and already low: omit downgrade. If included, "
+                "start its statement with 'There are early signs that ' and use no "
+                "likely/may/might/possibly/could anywhere in that statement or its narrative "
+                "cause sentence."
             )
     reason, metric_id = abstention(pack)
     if not constraints:
