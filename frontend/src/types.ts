@@ -1,4 +1,3 @@
-export type Audience = "director" | "manager";
 export type State =
   "waiting_reviewer" | "waiting_author" | "waiting_ci" | "waiting_merge";
 export type Params = { repo: string; from: string; to: string };
@@ -29,16 +28,6 @@ export interface RepoList {
   date_limits: DateLimits;
   setup: SetupStatus;
 }
-export interface Metric {
-  value: number | null;
-  previous: number | null;
-  change_rel: number | null;
-  significant: boolean | null;
-  status: "ok" | "insufficient_sample";
-  unit: string;
-  n: number;
-  extra: Record<string, number | string>;
-}
 export interface RepoStatus {
   repo: string;
   last_sync_status: string;
@@ -54,88 +43,9 @@ export interface Pending {
   status: "pending";
   repos: PendingRepo[];
 }
-export interface WhatIf {
-  stage: string;
-  target_hours: number;
-  change_rel: number;
-  affected_prs: number;
-}
-export interface Finding {
-  id: string;
-  rank: number;
-  severity: string;
-  title: string;
-  impact_pr_hours: number;
-  impact_share: number;
-  recommendation: string;
-  what_if: WhatIf | null;
-  evidence: {
-    label: string;
-    value: number | null;
-    unit: string;
-    ref: string;
-  }[];
-}
-export interface Location {
-  location: string;
-  merged_prs: number;
-  pickup_p50_hours: number | null;
-  pickup_ratio_vs_rest: number | null;
-  waiting_reviewer_share: number;
-  inflow: number;
-  outflow: number;
-  at_risk_prs: number;
-  owners_count: number | null;
-}
-export interface RiskPr {
-  repo: string;
-  number: number;
-  title: string;
-  url: string;
-  author: string | null;
-  state: State;
-  age_hours: number;
-  threshold_hours: number;
-  severity: string;
-}
-export interface PrRow {
-  repo: string;
-  number: number;
-  title: string;
-  url: string;
-  author: string | null;
-  current_state: State | null;
-  current_state_age_hours: number | null;
-  at_risk: { threshold_hours: number; severity: string } | null;
-}
-export interface PrPage {
-  snapshot_id: string;
-  total: number;
-  items: PrRow[];
-  next_cursor: string | null;
-}
-export interface Week {
-  week_start: string;
-  inflow: number;
-  outflow: number;
-  open_at_week_end: number;
-}
 export interface Snapshot {
   snapshot_id: string;
-  headline: string;
-  as_of: string;
-  period: { from: string; to: string; days: number; complete: boolean };
-  efficiency: {
-    cycle_time_p50_hours: Metric;
-    cycle_time_p90_hours: Metric;
-    effective_throughput: Metric;
-    merged_within_n_days: Metric;
-    waiting_share: Metric;
-    waste_share: Metric;
-    avg_review_rounds: Metric;
-    review_concentration_top_k: Metric;
-    revert_rate: Metric;
-  };
+  bottlenecks: { title: string; impact_share: number; recommendation: string }[];
   time_ledger: {
     ci_data_available: boolean;
     total_pr_hours: number;
@@ -149,23 +59,8 @@ export interface Snapshot {
       }
     >;
   };
-  bottlenecks: Finding[];
-  bottleneck_analysis: {
-    locations: Location[];
-    review_queue: {
-      weeks: Week[];
-    };
-  };
-  at_risk_prs: RiskPr[];
-  at_risk_summary: { total: number; critical: number };
   meta: {
     comparison_available: boolean;
-    sample: { merged_prs: number; open_prs_at_as_of: number };
-    data_freshness: {
-      repo: string;
-      last_synced_at: string;
-      last_sync_status: string;
-    }[];
   };
 }
 export interface Evidence {
@@ -177,7 +72,6 @@ export interface Evidence {
   change_rel: number | null;
   change_pp: number | null;
   ref: string;
-  examples: string[];
 }
 export interface Hypothesis {
   id: string;

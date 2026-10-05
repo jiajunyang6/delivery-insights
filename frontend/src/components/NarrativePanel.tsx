@@ -1,11 +1,9 @@
 import { useState, type ReactNode } from "react";
 import { useAbortable } from "../hooks/useAbortable";
-import { GithubLink } from "./GithubLink";
 import { fetchJson, message } from "../api";
-import { format, percent, signed, capitalize, states, viewLabels } from "../format";
+import { format, percent, signed, capitalize, states } from "../format";
 import type {
   AbstainReason,
-  Audience,
   Evidence,
   Hypothesis,
   Narrative,
@@ -80,7 +78,6 @@ function LookFirst({ snapshot }: { snapshot: Snapshot }) {
         <p>
           <b>{percent(top.impact_share)} of finished PR waiting time</b> · {top.recommendation}
         </p>
-        <a href="#bottlenecks">See all bottlenecks ↓</a>
       </aside>
     );
   }
@@ -225,13 +222,6 @@ function EvidenceList({ evidence, highlight }: { evidence: Evidence[]; highlight
               )}
             </p>
             <code>{e.ref}</code>
-            <div className="example-links">
-              {e.examples.map((url) => (
-                <GithubLink key={url} url={url} fallback={url}>
-                  PR #{url.split("/").pop()}
-                </GithubLink>
-              ))}
-            </div>
           </div>
         </article>
       ))}
@@ -248,11 +238,9 @@ const fallbackText: Record<string, string> = {
 
 export function NarrativePanel({
   snapshot,
-  audience,
   onLlmError,
 }: {
   snapshot: Snapshot;
-  audience: Audience;
   onLlmError?: () => void;
 }) {
   const snapshotId = snapshot.snapshot_id;
@@ -264,7 +252,7 @@ export function NarrativePanel({
     setError("");
     setHighlight("");
     fetchJson<Narrative>(
-      "/v1/snapshots/" + snapshotId + "/narrative?audience=" + audience,
+      "/v1/snapshots/" + snapshotId + "/narrative?audience=director",
       signal,
     )
       .then((r) => {
@@ -283,7 +271,7 @@ export function NarrativePanel({
           );
         }
       });
-  }, [snapshotId, audience]);
+  }, [snapshotId]);
   function focus(id: string) {
     setHighlight(id);
     document
@@ -347,7 +335,6 @@ export function NarrativePanel({
           <h2 id="narrative-heading">The evidence, in words</h2>
           <p>Possible explanations grounded in this report; select a citation to inspect its metric.</p>
         </div>
-        <span className="badge neutral">{viewLabels[audience]}</span>
       </div>
       {error ? (
         <p role="alert" className="error-text">

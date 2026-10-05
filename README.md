@@ -53,15 +53,16 @@ Until a period is covered, the API returns `202` with `Retry-After` and the dash
 
 ## What you get
 
-- **Periods:** Last 7, 30 (default) or 60 days, compared with the preceding period of equal length.
-  Every section counts PRs opened, or with recorded human activity, during the period.
-- **Delivery Overview:** delivery outcomes (cycle time p50/p90, throughput, merged within 3 days,
-  waiting share, waste, review rounds and concentration, reverts), the evidence narrative,
-  the time ledger and the top three bottlenecks.
-- **PR & Review Details:** all bottlenecks, the review queue, a per-area table and at-risk PRs
-  (five rows, then **Load more**).
-- **Narrative:** root-cause hypotheses scored by fixed rules. When delivery did not slow down, or
-  evidence is too weak, it says so and points to where PR time goes now.
+- **Repository and period:** a tracked repository and the last 7, 30 (default) or 60 days, or
+  custom UTC dates, compared with the preceding period of equal length. Every section counts PRs
+  opened, or with recorded human activity, during the period.
+- **Sync progress:** until the period is covered, the page shows the sync stage and retries; a
+  configuration notice names the `.env` setting to fix.
+- **Narrative:** root-cause hypotheses scored by fixed rules, with every claim cited to its
+  metric. When delivery did not slow down, or evidence is too weak, it says so and points to
+  where PR time goes now.
+- **Where PR time goes:** the time ledger of merged PRs across reviewer, author, CI and merge
+  waiting, current period against the previous one.
 
 ## API
 

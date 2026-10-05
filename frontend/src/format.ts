@@ -1,4 +1,4 @@
-import type { Audience, State } from "./types";
+import type { State } from "./types";
 
 export const states: State[] = [
   "waiting_reviewer",
@@ -57,34 +57,6 @@ export function signed(
     ? "—"
     : (value > 0 ? "+" : "") + number(value * scale) + suffix;
 }
-export function timestamp(value: string): string {
-  return (
-    new Date(value).toLocaleString("en-US", {
-      timeZone: "UTC",
-      dateStyle: "medium",
-      timeStyle: "short",
-    }) + " UTC"
-  );
-}
-/**
- * Link targets come from API data, so only plain https://github.com URLs become anchors;
- * other schemes, look-alike hosts, credentials or ports are rendered as text.
- */
-export function safeGithubUrl(value: string): boolean {
-  if (!value.startsWith("https://github.com/")) return false;
-  try {
-    const url = new URL(value);
-    return (
-      url.protocol === "https:" &&
-      url.hostname === "github.com" &&
-      !url.username &&
-      !url.password &&
-      !url.port
-    );
-  } catch {
-    return false;
-  }
-}
 // Inclusive range of UTC calendar days, matching the API's UTC date handling.
 export function dateRange(days: number, to = new Date().toISOString().slice(0, 10)) {
   const from = new Date(Date.parse(to + "T00:00:00Z") - (days - 1) * 86_400_000)
@@ -93,24 +65,10 @@ export function dateRange(days: number, to = new Date().toISOString().slice(0, 1
   return { from, to };
 }
 
-
-export const viewLabels: Record<Audience, string> = {
-  director: "Delivery Overview",
-  manager: "PR & Review Details",
-};
-
-export const viewDescriptions: Record<Audience, string> = {
-  director: "Delivery outcomes and the top three bottlenecks",
-  manager: "All bottlenecks, review queues, areas, and at-risk pull requests",
-};
-
 export function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 export const chartColors = {
   grid: "#e4e9e7",
-  inflow: "#a3c4bd",
-  outflow: stateColors.waiting_reviewer,
-  queue: "#b17b28",
 };

@@ -10,7 +10,6 @@ import {
 import { dateRange } from "./format";
 import { periodError } from "./period";
 import type {
-  Audience,
   DateLimits,
   Params,
   Pending,
@@ -20,13 +19,7 @@ import type {
   Snapshot,
 } from "./types";
 import { Controls } from "./components/Controls";
-import { Headline } from "./components/Headline";
-import { KpiGrid } from "./components/KpiGrid";
 import { TimeLedgerChart } from "./components/TimeLedgerChart";
-import { Bottlenecks } from "./components/Bottlenecks";
-import { ReviewQueueChart } from "./components/ReviewQueueChart";
-import { LocationsTable } from "./components/LocationsTable";
-import { AtRiskTable } from "./components/AtRiskTable";
 import { NarrativePanel } from "./components/NarrativePanel";
 import { SetupNotice } from "./components/SetupNotice";
 
@@ -38,9 +31,6 @@ export default function App() {
     from: initial.get("from") ?? defaults.from,
     to: initial.get("to") ?? defaults.to,
   });
-  const [audience, setAudience] = useState<Audience>(
-    initial.get("audience") === "manager" ? "manager" : "director",
-  );
   const [repos, setRepos] = useState<RepoStatus[]>([]);
   const [dateLimits, setDateLimits] = useState<DateLimits | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -94,9 +84,8 @@ export default function App() {
     [setupCheck],
   );
   useEffect(() => {
-    const query = new URLSearchParams({ ...params, audience });
-    window.history.replaceState(null, "", "?" + query);
-  }, [params, audience]);
+    window.history.replaceState(null, "", "?" + new URLSearchParams(params));
+  }, [params]);
   useAbortable((signal) => {
     setSnapshot(null);
     setPending(null);
@@ -154,8 +143,6 @@ export default function App() {
           params={params}
           setParams={setParams}
           repos={repos}
-          audience={audience}
-          setAudience={setAudience}
           dateLimits={dateLimits}
           validationError={validationError}
           refresh={() => setRefresh((r) => r + 1)}
@@ -209,31 +196,11 @@ export default function App() {
         )}
         {snapshot && (
           <div className="report">
-            <Headline snapshot={snapshot} />
-            <KpiGrid snapshot={snapshot} />
             <NarrativePanel
               snapshot={snapshot}
-              audience={audience}
               onLlmError={() => setSetupCheck((n) => n + 1)}
             />
             <TimeLedgerChart snapshot={snapshot} />
-            <Bottlenecks snapshot={snapshot} audience={audience} />
-            {audience === "manager" && (
-              <>
-                <ReviewQueueChart
-                  weeks={snapshot.bottleneck_analysis.review_queue.weeks}
-                />
-                <LocationsTable
-                  locations={snapshot.bottleneck_analysis.locations}
-                />
-                <AtRiskTable
-                  key={snapshot.snapshot_id}
-                  snapshot={snapshot}
-                  params={params}
-                  onRefresh={() => setRefresh((r) => r + 1)}
-                />
-              </>
-            )}
             <footer className="report-footer">
               <span>Delivery Insights · Evidence before conclusions.</span>
               <code>{snapshot.snapshot_id}</code>

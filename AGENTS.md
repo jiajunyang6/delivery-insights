@@ -107,7 +107,7 @@ Without Make (Windows), run the equivalent `uv run` commands from the Makefile.
   and review the diff; it may contain only the intended changes.
 - Prompt changes need a real `make eval`: all gates pass, first-attempt validity at least 0.90
   and numeric, citation and hedge consistency 1.00. Record results in `docs/EVALUATION.md`.
-- UI changes: check both views, 7/30/60-day periods, the pending state, Load more and the
-  narrative panel in a browser.
+- UI changes: check 7/30/60-day and custom periods, the pending state, the configuration
+  notice, the narrative panel and the time ledger in a browser.
 - Update the docs your change affects: README (run), NOTES (submission), REFERENCE (contracts),
   DECISIONS (reasons).
