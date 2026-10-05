@@ -109,29 +109,19 @@ into this snapshot for audit; the dashboard does not display it.
 
 | Block | Contents | Consumers |
 |---|---|---|
-| `period`, `as_of`, `repos`, `meta` | Dates, comparison window, observation cutoff, versions, merged sample | Dashboard, evidence pack |
-| `time_ledger` | Reviewer/author/merge PR-hours and shares, current and previous | Where PR time goes, E18, E19, E21 |
-| `efficiency` | Cycle p50, merged PRs, first-review p50, review rounds, post-review commits, review concentration, PR size p50, large-PR share | E1, E3, E8, E9, E15, E24, E30, E31 |
+| `period`, `as_of`, `repos`, `meta` | Dates, comparison window, observation cutoff, versions, merged sample | Insight view, evidence pack |
+| `time_ledger` | Reviewer/author/merge PR-hours and shares, current and previous | Insight view, E18, E19, E21 |
+| `efficiency` | Cycle p50, merged PRs, first-review p50, review rounds, post-review commits, review concentration, PR size p50, large-PR share | Insight view (cycle, merged), E1, E3, E8, E9, E15, E24, E30, E31 |
 | `bottleneck_analysis` | Review-queue imbalance weeks, location first-review ratios and reviewer wait | E22, location items |
 | `drivers`, `trend` | Slowest-decile size ratio; attribution of added hours by state, location and large PRs | E37, E42, E48, location items |
 | `series` | Weekly current and previous values | Effect size and persistence |
-
-Analytics 1.6.0 removed the outputs that only the former dashboard sections or the removed
-quality hypothesis consumed: the headline, findings and what-if estimates, at-risk PRs, waste
-and revert chains, the guardrail, merge blockers, review load, predictability, Kaplan–Meier
-survival, the other drivers and the unused efficiency metrics and signals. Analytics 1.7.0
-stops deriving the per-PR facts, links and ownership counts those outputs needed. Every
-retained value is unchanged; in the golden output only the snapshot ID and analytics version
-differ. Analytics 1.9.0 changes only the API response to the insight view; snapshot
-contents are unchanged.
 
 Sampling uses the frozen seed version and the original canonical structure. The retired
 `ci_source` key is reconstructed only inside sampling identity; the internal profile
 replays the historical GitHub default or the direct/synthetic default. The CI setting
 is absent from configuration and API output. Existing GitHub-default and no-CI inputs
-keep their bootstrap draws. Removing observed CI intervals can change real-repository
-reviewer waiting shares, since timelines are now driven by PR events alone. Old snapshots
-and narrative caches stay isolated by version; workers rederive stored PRs in the background.
+keep their bootstrap draws. Old snapshots and narrative caches stay isolated by version;
+workers rederive stored PRs in the background.
 
 ## Narrative, confidence and evidence chain
 
@@ -258,13 +248,11 @@ Tokens, headers, raw upstream responses and prose are not logged; exceptions exp
 
 `docker compose down` stops the stack while preserving Postgres data.
 `docker compose down -v` intentionally deletes the local database volume; use only for reset.
-The unreleased storage schema is consolidated into `0001_initial`. Earlier three-migration
-databases require that confirmed reset and a new sync; applying this revision in place is
-unsupported. Raw GitHub node IDs and actor types remain in the query for timeline paging and
+The unreleased storage schema is consolidated into `0001_initial`. Databases created by an
+earlier version of it require that confirmed reset and a new sync. Raw GitHub node IDs and actor types remain in the query for timeline paging and
 bot detection. The schema stores only the PR fields and facts that analytics reads: no PR
 bodies, head branches, merge commits, author associations, ownership rules or link fields.
-Only the `ix_intervals_pr` index was removed, because `UNIQUE(pr_id, seq)` covers its prefix.
-Other indexes remain; no performance claim is made without representative EXPLAIN measurements.
+`UNIQUE(pr_id, seq)` also serves interval lookups by PR; no performance claim is made without representative EXPLAIN measurements.
 There is no authenticated administrative UI or backup orchestration in this demo.
 
 ## Security
@@ -299,7 +287,7 @@ make eval-offline
 make eval
 ```
 
-Current checks: 318 backend tests (63 integration) and 15 frontend tests pass, together with
+Current checks: 322 backend tests (63 integration) and 15 frontend tests pass, together with
 Ruff, strict mypy and the frontend typecheck and build.
 
 The evaluation harness runs three planted scenarios (review capacity, PR size growth and no
@@ -395,19 +383,12 @@ The delivery insight and narrative routes, including HTTP reply conversion, live
 `api/routes/insights.py`. The PR-size driver shares `analytics/efficiency.py`; the stable
 numbered catalog shares `narrative/evidence.py`; `sources/__init__.py` exports the source
 protocol. Health and repository routes remain separate. Analytics input records contain
-only consumed fields; the unused current-day marker is absent. Bootstrap supports the
-retained median and mean statistics. The loader does not select PR titles, URLs, authors
-or draft flags for snapshots. Raw source records and persistence retain their existing fields.
+only consumed fields; the loader does not select PR titles, URLs, authors or draft flags.
 
 Frontend `api.ts` owns fetch/polling and the `useAbortable` effect, which cancels superseded
 requests and requests still active on unmount. `format.ts` owns display and UTC date helpers.
 TypeScript rejects unused locals and parameters. Pure configuration-message logic stays
 separate from JSX so its Node tests need no browser or JSX loader.
-
-Cleanup verification: OpenAPI and 15 synthetic snapshots, evidence packs and template
-narratives match their pre-cleanup values exactly. All 57 backend modules import in separate
-fresh interpreters. The golden snapshot and analytics, sampling and prompt versions are
-unchanged. Full backend/frontend checks and all eight offline narrative gates pass.
 
 Vite proxies `/api` to the local API. Compose serves the built UI through nginx instead.
 Make targets: `up`, `down`, `logs`, `lint`, `fmt`, `test-unit`, `test`, `eval-offline`, `eval`.

@@ -51,7 +51,7 @@ const waitingOn: Record<State, string> = {
 };
 
 /** "dir:crates/bevy_pbr" → "crates/bevy_pbr (directory)". Labels stay as they are. */
-export function place(location: string): string {
+function place(location: string): string {
   if (location.startsWith("dir:")) return location.slice(4) + " (directory)";
   if (location.startsWith("codeowners:"))
     return location.slice(11) + " (CODEOWNERS)";

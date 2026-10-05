@@ -69,13 +69,8 @@ narrative written by Claude Sonnet 4.6 on Amazon Bedrock. Each claim in the narr
 ![How Delivery Insights works](docs/diagrams/how-it-works.svg)
 
 **01 — Local data and reporting:** the arq worker syncs GitHub history into Postgres and derives
-PR timelines. FastAPI serves snapshots from local data; Redis supports jobs, caches, locks and
+PR timelines. FastAPI serves insights and narratives from local data; Redis supports jobs, caches, locks and
 rate limits. The React dashboard accesses FastAPI through nginx.
-
-Report routes share one API module; evidence definitions live with extraction, and the
-PR-size comparison lives with efficiency metrics. Request cancellation shares the frontend
-API module. Before/after comparisons confirm the OpenAPI contract and 15 synthetic snapshots,
-evidence packs and template narratives are unchanged by this cleanup.
 
 **02 — Narrative generation:** code computes metrics, selects evidence and scores hypotheses.
 Bedrock writes the wording; local validation checks numbers, citations and uncertainty language,
@@ -143,7 +138,7 @@ I would do one of the followings if I had one more day:
 - **Claude Sonnet 4.6 on Bedrock** is part of the product: it writes narrative wording only,
   and the deterministic validator decides whether it is shown.
 - **How the output was checked:**
-  - 318 backend tests, 63 of them on real Postgres 16 and Redis 7, plus 15 frontend tests.
+  - 322 backend tests, 63 of them on real Postgres 16 and Redis 7, plus 15 frontend tests.
   - Strict ruff/mypy and the frontend typecheck and build.
   - The current 15-case offline and real Bedrock evaluations on prompt v13 pass all eight
     gates. The real run is first-valid in 14/15 cases, the one invalid first answer is
@@ -213,7 +208,7 @@ cd frontend && npm ci && npm test && npm run typecheck && npm run build
 ```
 
 The internal snapshot contains the time ledger and the metrics supporting the review-capacity
-and PR-size hypotheses; the API returns only its insight view. CI telemetry, its hypothesis and Actions collection have been removed.
+and PR-size hypotheses; the API returns only its insight view.
 Analytics and prompt versions isolate existing snapshots and narrative caches; workers
 rederive PR timelines from lifecycle events. Bootstrap sampling keeps its frozen identity.
 
@@ -232,15 +227,10 @@ checkpoints under the default configuration. Wait for repository `last_sync_stat
 and full coverage before checking the dashboard. Keep `BACKFILL_DAYS=120` for the 60-day
 view and its comparison period.
 
-Local checks: **318 backend tests** (255 unit, 63 integration), **15 frontend tests**,
+Local checks: **322 backend tests** (259 unit, 63 integration), **15 frontend tests**,
 strict lint/types/build and all eight offline and real Bedrock narrative gates pass on
 prompt v13 (no template fallback). Results are in
 [REFERENCE.md](docs/REFERENCE.md#testing-and-evaluation).
-
-The module cleanup preserves the OpenAPI contract and computed/narrative outputs. Request
-cancellation now lives in `frontend/src/api.ts`; frontend type checking also rejects unused
-locals and parameters. Current module boundaries are described in
-[REFERENCE.md](docs/REFERENCE.md#development).
 
 ## Documentation
 
