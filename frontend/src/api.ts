@@ -1,3 +1,4 @@
+/** API access for the dashboard: JSON fetching, problem errors, polling and cancellation. */
 import { useEffect, type DependencyList } from "react";
 import type { Insight, Params, Pending } from "./types";
 
@@ -13,7 +14,10 @@ export function useAbortable(
   }, dependencies);
 }
 
+// Same-origin by default: nginx (and the Vite dev server) proxy /api to FastAPI.
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
+
+/** An RFC 9457 problem from the API, or a client-side failure shaped like one. */
 export class ApiProblem extends Error {
   constructor(
     public title: string,
@@ -25,6 +29,7 @@ export class ApiProblem extends Error {
     super(detail);
   }
 }
+/** Normalize any thrown value to an ApiProblem the UI can display. */
 export function message(error: unknown): ApiProblem {
   return error instanceof ApiProblem
     ? error
@@ -34,6 +39,10 @@ export function message(error: unknown): ApiProblem {
         0,
       );
 }
+/**
+ * GET a JSON resource from the API. Throws ApiProblem for problem+json, non-2xx or non-JSON
+ * replies; returns the status and headers too, because 202 Pending is a success status.
+ */
 export async function fetchJson<T>(
   path: string,
   signal: AbortSignal,
@@ -75,9 +84,12 @@ export async function fetchJson<T>(
     headers: response.headers,
   };
 }
+/** Encode report parameters as a query string. */
 function query(params: Params): string {
   return new URLSearchParams(params).toString();
 }
+
+/** Sleep for the given time; reject with AbortError as soon as the signal aborts. */
 function wait(milliseconds: number, signal: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
     const stop = () => {
@@ -131,6 +143,7 @@ export async function loadInsights(
     202,
   );
 }
+/** Describe why one repository's data is not ready yet, in user-facing words. */
 export function pendingText(repo: Pending["repos"][number]): string {
   const text = {
     never_synced: "Not synced yet",

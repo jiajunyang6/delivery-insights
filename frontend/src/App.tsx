@@ -1,3 +1,4 @@
+/** Dashboard shell: report settings, sync progress, errors and the report itself. */
 import { useEffect, useState } from "react";
 import {
   ApiProblem,
@@ -22,8 +23,14 @@ import { TimeLedgerChart } from "./components/TimeLedgerChart";
 import { NarrativePanel } from "./components/NarrativePanel";
 import { SetupNotice } from "./components/SetupNotice";
 
+// The URL carries repo/from/to, so a report link can be shared or reloaded.
 const initial = new URLSearchParams(window.location.search);
 const defaults = dateRange(30);
+
+/**
+ * Load tracked repositories and date limits, then the insight for the selected period. While
+ * the API answers 202 the page shows sync progress and keeps polling.
+ */
 export default function App() {
   const [params, setParams] = useState<Params>({
     repo: initial.get("repo") ?? "",
@@ -41,6 +48,8 @@ export default function App() {
   const [setupCheck, setSetupCheck] = useState(0);
   const validationError = periodError(params, dateLimits);
   const invalid = validationError !== null;
+  // Repositories, date limits and setup health; reloaded by "Refresh report". An unknown
+  // repo from the URL falls back to the first tracked one.
   useAbortable((signal) => {
     fetchJson<RepoList>("/v1/repos", signal)
       .then((r) => {
@@ -85,6 +94,8 @@ export default function App() {
   useEffect(() => {
     window.history.replaceState(null, "", "?" + new URLSearchParams(params));
   }, [params]);
+  // The report: waits for a repo, valid dates and the date limits, then polls through 202s.
+  // A manual refresh bypasses the browser cache so a just-finished sync shows at once.
   useAbortable((signal) => {
     setInsight(null);
     setPending(null);

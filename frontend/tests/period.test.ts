@@ -1,3 +1,4 @@
+/** Period presets and validation against the API's UTC date limits. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { dateRange, isPeriodSelected, periodError } from "../src/format.ts";

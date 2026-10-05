@@ -1,3 +1,4 @@
+/** Display helpers: number, unit and signed-change formatting. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { format, signed } from "../src/format.ts";

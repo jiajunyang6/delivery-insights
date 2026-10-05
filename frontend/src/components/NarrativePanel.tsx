@@ -58,12 +58,14 @@ function place(location: string): string {
   return location;
 }
 
+/** The change to show on an evidence chip: points for shares, relative change otherwise. */
 function change(e: Evidence): string {
   if (e.change_pp != null) return signed(e.change_pp, " pp", 1);
   if (e.change_rel != null) return signed(e.change_rel);
   return "";
 }
 
+/** Evidence label, with clearer wording for the queue (E22) and concentration (E24) items. */
 function evidenceLabel(e: Evidence): string {
   if (e.id === "E22")
     return "Weeks with more PRs ready for review than receiving a first review";
@@ -76,6 +78,7 @@ function evidenceLabel(e: Evidence): string {
   return e.label;
 }
 
+/** Formatted evidence value; the queue item reads as "N of M weeks". */
 function evidenceValue(e: Evidence): string {
   const total = e.extra?.weeks_total;
   if (e.id === "E22" && total != null)
@@ -83,6 +86,7 @@ function evidenceValue(e: Evidence): string {
   return format(e.value, e.unit);
 }
 
+/** How to read the two evidence items most often misread; null for the rest. */
 function evidenceDetail(e: Evidence): string | null {
   if (e.id === "E22")
     return "Counts weeks when more PRs became ready for review than received their first review. " +
@@ -94,6 +98,7 @@ function evidenceDetail(e: Evidence): string | null {
   return null;
 }
 
+/** When the narrative abstains, point to the largest waiting share as the place to start. */
 function LookFirst({ insight }: { insight: Insight }) {
   const ledger = insight.time_ledger.states;
   const largest = states
@@ -112,6 +117,10 @@ function LookFirst({ insight }: { insight: Insight }) {
   );
 }
 
+/**
+ * One hypothesis: evidence strength, statement, evidence chain, counter-evidence, alternatives
+ * checked and the suggested next step with its check.
+ */
 function HypothesisCard({ h, text, chip }: {
   h: Hypothesis;
   text: (value: string, bare?: boolean) => ReactNode;
@@ -206,6 +215,7 @@ function HypothesisCard({ h, text, chip }: {
   );
 }
 
+/** Every cited evidence item; the one selected from a citation is highlighted. */
 function EvidenceList({ evidence, highlight }: { evidence: Evidence[]; highlight: string }) {
   return (
     <div className="evidence-list">
@@ -243,6 +253,7 @@ function EvidenceList({ evidence, highlight }: { evidence: Evidence[]; highlight
   );
 }
 
+// Why a template was shown instead of LLM wording, keyed by meta.fallback_reason.
 const fallbackText: Record<string, string> = {
   llm_disabled: "LLM narratives are off; set AWS_BEARER_TOKEN_BEDROCK in .env to enable them",
   llm_error: "the Bedrock request failed; see the Configuration notice above",
@@ -250,6 +261,10 @@ const fallbackText: Record<string, string> = {
   llm_busy: "another request is generating this narrative",
 };
 
+/**
+ * Load and render the narrative for the insight's snapshot. Citations become buttons that
+ * scroll to their evidence; a Bedrock failure asks the app to refresh the setup notice.
+ */
 export function NarrativePanel({
   insight,
   onLlmError,
@@ -283,12 +298,14 @@ export function NarrativePanel({
         }
       });
   }, [snapshotId]);
+  /** Highlight an evidence item and scroll it into view. */
   function focus(id: string) {
     setHighlight(id);
     document
       .getElementById("evidence-" + id)
       ?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
+  /** Inline citation button for an evidence ID inside running text. */
   const tag = (id: string, key?: string) => (
     <button
       key={key ?? id}
@@ -299,7 +316,10 @@ export function NarrativePanel({
       {id}
     </button>
   );
-  // Bracketed citations in narrative text; bare IDs too in free-text reasons.
+  /**
+   * Split text into spans and citation buttons: bracketed [E..] citations in narrative text,
+   * and bare IDs too in free-text downgrade reasons.
+   */
   const text = (value: string, bare = false) =>
     value
       .split(bare ? /(\[?\bE\d+\b]?)/ : /(\[E\d+])/)
@@ -311,6 +331,7 @@ export function NarrativePanel({
         ),
       );
   const byId = new Map((data?.evidence ?? []).map((e) => [e.id, e]));
+  /** Evidence chip showing an item's label, value and change, for evidence chains. */
   const chip = (id: string) => {
     const e = byId.get(id);
     return (

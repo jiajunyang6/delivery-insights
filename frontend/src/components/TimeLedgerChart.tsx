@@ -1,3 +1,4 @@
+/** "Where PR time goes": the time ledger as stacked shares, previous period against current. */
 import {
   Bar,
   BarChart,
@@ -9,6 +10,10 @@ import {
 } from "recharts";
 import type { Insight, State } from "../types";
 import { hours, percent, stateColors, stateLabels, states } from "../format";
+/**
+ * Plot each period as one 100% bar split by waiting state; the tooltip adds PR-hours. The
+ * previous bar is shown only when a full comparison period exists.
+ */
 export function TimeLedgerChart({ insight: s }: { insight: Insight }) {
   const data = (
     s.comparison_available ? ["Previous", "Current"] : ["Current"]

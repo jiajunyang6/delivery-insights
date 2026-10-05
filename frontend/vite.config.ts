@@ -1,3 +1,4 @@
+/** Vite build (vendor chunks) and dev server; /api is proxied to the local FastAPI. */
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 

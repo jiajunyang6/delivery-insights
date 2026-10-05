@@ -1,5 +1,7 @@
+/** Display formatting, waiting-state labels and colors, and UTC date-range helpers. */
 import type { DateLimits, Params, State } from "./types";
 
+/** Waiting states in display order. */
 export const states: State[] = [
   "waiting_reviewer",
   "waiting_author",
@@ -15,17 +17,26 @@ export const stateColors: Record<State, string> = {
   waiting_author: "#9db9bd",
   waiting_merge: "#657299",
 };
+/** Format a number with up to `digits` decimals; missing values show as an em dash. */
 export function number(value: number | null | undefined, digits = 1): string {
   return value == null
     ? "—"
     : value.toLocaleString("en-US", { maximumFractionDigits: digits });
 }
+/** Format a fraction (0.12) as a percentage ("12%"). */
 export function percent(value: number | null | undefined): string {
   return value == null ? "—" : number(value * 100) + "%";
 }
+
+/** Format elapsed hours with an "h" suffix. */
 export function hours(value: number | null | undefined): string {
   return value == null ? "—" : number(value) + " h";
 }
+
+/**
+ * Format an evidence value by its API unit. Review rounds keep two decimals, because one
+ * decimal can hide a real change between periods.
+ */
 export function format(value: number | null | undefined, unit: string): string {
   if (unit === "share" || unit === "change") return percent(value);
   if (unit === "hours") return hours(value);
@@ -54,7 +65,7 @@ export function signed(
     ? "—"
     : (value > 0 ? "+" : "") + number(value * scale) + suffix;
 }
-// Inclusive range of UTC calendar days, matching the API's UTC date handling.
+/** Inclusive range of `days` UTC calendar days ending on `to`, matching the API's dates. */
 export function dateRange(days: number, to = new Date().toISOString().slice(0, 10)) {
   const from = new Date(Date.parse(to + "T00:00:00Z") - (days - 1) * 86_400_000)
     .toISOString()
@@ -62,18 +73,23 @@ export function dateRange(days: number, to = new Date().toISOString().slice(0, 1
   return { from, to };
 }
 
+/** Upper-case the first character. */
 export function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 const DAY = 86_400_000;
-// Round-trips through UTC so impossible dates such as 2024-02-31 are rejected.
+/**
+ * Check a YYYY-MM-DD string. It round-trips through UTC so impossible dates such as
+ * 2024-02-31 are rejected.
+ */
 function validDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(value + "T00:00:00Z");
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
+/** Whether the selected range spans exactly `days` days, so its preset button shows active. */
 export function isPeriodSelected(
   params: Pick<Params, "from" | "to">,
   days: number,

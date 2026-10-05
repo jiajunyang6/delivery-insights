@@ -1,6 +1,8 @@
+/** Report settings: repository, period presets, custom UTC dates and refresh. */
 import type { DateLimits, Params, RepoStatus } from "../types";
 import { dateRange, isPeriodSelected, periodError } from "../format";
 
+/** Current parameters and the callbacks and limits the controls need. */
 interface Props {
   params: Params;
   setParams: (p: Params) => void;
@@ -9,6 +11,10 @@ interface Props {
   validationError: string | null;
   refresh: () => void;
 }
+/**
+ * Render the settings row. Presets outside the configured history are disabled with the
+ * reason as a tooltip; refresh stays disabled until the period is valid.
+ */
 export function Controls(p: Props) {
   return (
     <section className="controls" aria-label="Report settings">
