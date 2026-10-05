@@ -105,12 +105,9 @@ into this snapshot for audit; the dashboard does not display it.
 | `drivers`, `trend` | Slowest-decile size ratio; attribution of added hours by state, location and large PRs | E37, E42, E48, location items |
 | `series` | Weekly current and previous values | Effect size and persistence |
 
-Sampling uses the frozen seed version and the original canonical structure. The retired
-`ci_source` key is reconstructed only inside sampling identity; the internal profile
-replays the historical GitHub default or the direct/synthetic default. The CI setting
-is absent from configuration and API output. Existing GitHub-default and no-CI inputs
-keep their bootstrap draws. Old snapshots and narrative caches stay isolated by version;
-workers rederive stored PRs in the background.
+Bootstrap seeds are frozen by `SAMPLING_SEED_VERSION`, so sampling stays stable across
+releases. Old snapshots and narrative caches stay isolated by version; workers rederive stored
+PRs in the background.
 
 ## Narrative, confidence and evidence chain
 
@@ -189,7 +186,16 @@ verified.
 
 ## Operations
 
-`/v1/repos` also returns `setup`: whether `GITHUB_TOKEN` and `AWS_BEARER_TOKEN_BEDROCK` are set (never their values), sync statuses that point to configuration (`missing_token`, `auth_error`, `not_found`), the Bedrock region and model ID, and the latest Bedrock error code, cleared after the next successful call and ignored once `BEDROCK_MODEL_ID` or `AWS_REGION` changes. A connection error (`EndpointConnectionError`) means the endpoint was not reached, so the model ID was not checked; an invalid model ID returns `ValidationException`. The API checks these settings once at startup with a one-token Bedrock request, because cached narratives make no Bedrock call and would otherwise hide a bad key until a new snapshot needs wording. The dashboard turns these into a Configuration notice that names the `.env` variable to fix.
+`/v1/repos` also returns `setup`: whether `GITHUB_TOKEN` and `AWS_BEARER_TOKEN_BEDROCK` are
+set (never their values), sync statuses that point to configuration (`missing_token`,
+`auth_error`, `not_found`), the Bedrock region and model ID, and the latest Bedrock error code.
+That code is cleared after the next successful call and ignored once `BEDROCK_MODEL_ID` or
+`AWS_REGION` changes. A connection error (`EndpointConnectionError`) means the endpoint was not
+reached, so the model ID was not checked; an invalid model ID returns `ValidationException`.
+The API checks these settings once at startup with a one-token Bedrock request, because cached
+narratives make no Bedrock call and would otherwise hide a bad key until a new snapshot needs
+wording. The dashboard turns these into a Configuration notice that names the `.env` variable
+to fix.
 
 Read `/v1/repos` before judging missing data. Snapshots/narratives are retained for seven days
 and sync-job records for thirty days; source PR records are retained until the database is
