@@ -5,173 +5,165 @@
     "locations": [
       {
         "location": "area-A",
-        "merged_prs": 126,
-        "pickup_p50_hours": 5.55,
-        "pickup_ratio_vs_rest": 0.96,
-        "previous_waiting_reviewer_pr_hours": 1549.87,
-        "waiting_reviewer_pr_hours": 1941.77
+        "merged_prs": 109,
+        "pickup_p50_hours": 6.61,
+        "pickup_ratio_vs_rest": 1.12,
+        "previous_waiting_reviewer_pr_hours": 1518.9,
+        "waiting_reviewer_pr_hours": 1921.69
       },
       {
         "location": "area-B",
-        "merged_prs": 94,
-        "pickup_p50_hours": 5.83,
-        "pickup_ratio_vs_rest": 1.03,
+        "merged_prs": 88,
+        "pickup_p50_hours": 8.08,
+        "pickup_ratio_vs_rest": 1.36,
         "previous_waiting_reviewer_pr_hours": 2023.77,
-        "waiting_reviewer_pr_hours": 1572.62
+        "waiting_reviewer_pr_hours": 1537.16
       },
       {
         "location": "area-C",
-        "merged_prs": 100,
-        "pickup_p50_hours": 5.51,
-        "pickup_ratio_vs_rest": 0.96,
-        "previous_waiting_reviewer_pr_hours": 1375.03,
-        "waiting_reviewer_pr_hours": 1497.31
+        "merged_prs": 89,
+        "pickup_p50_hours": 4.4,
+        "pickup_ratio_vs_rest": 0.66,
+        "previous_waiting_reviewer_pr_hours": 1373.03,
+        "waiting_reviewer_pr_hours": 1166.56
       },
       {
         "location": "area-D",
-        "merged_prs": 76,
-        "pickup_p50_hours": 4.96,
-        "pickup_ratio_vs_rest": 0.85,
-        "previous_waiting_reviewer_pr_hours": 935.35,
-        "waiting_reviewer_pr_hours": 1090.84
+        "merged_prs": 64,
+        "pickup_p50_hours": 6.04,
+        "pickup_ratio_vs_rest": 0.97,
+        "previous_waiting_reviewer_pr_hours": 907.8,
+        "waiting_reviewer_pr_hours": 903.39
       },
       {
         "location": "area-E",
-        "merged_prs": 45,
-        "pickup_p50_hours": 5.7,
-        "pickup_ratio_vs_rest": 1.0,
-        "previous_waiting_reviewer_pr_hours": 712.88,
-        "waiting_reviewer_pr_hours": 530.74
-      },
-      {
-        "location": "dir:src/D",
-        "merged_prs": 11,
-        "pickup_p50_hours": 7.58,
-        "pickup_ratio_vs_rest": 1.36,
-        "previous_waiting_reviewer_pr_hours": 62.66,
-        "waiting_reviewer_pr_hours": 336.59
+        "merged_prs": 35,
+        "pickup_p50_hours": 5.74,
+        "pickup_ratio_vs_rest": 0.93,
+        "previous_waiting_reviewer_pr_hours": 711.88,
+        "waiting_reviewer_pr_hours": 416.06
       },
       {
         "location": "other",
-        "merged_prs": 14,
-        "pickup_p50_hours": 5.58,
-        "pickup_ratio_vs_rest": 0.98,
-        "previous_waiting_reviewer_pr_hours": 195.08,
-        "waiting_reviewer_pr_hours": 217.11
+        "merged_prs": 19,
+        "pickup_p50_hours": 4.85,
+        "pickup_ratio_vs_rest": 0.78,
+        "previous_waiting_reviewer_pr_hours": 256.74,
+        "waiting_reviewer_pr_hours": 296.76
       }
     ],
     "review_queue": {
-      "weeks_inflow_exceeds_outflow": 5,
+      "weeks_inflow_exceeds_outflow": 6,
       "weeks_total": 6
     }
   },
   "drivers": {
-    "slowest_decile_size_ratio": 1.6
+    "slowest_decile_size_ratio": 1.73
   },
   "efficiency": {
     "avg_review_rounds": {
       "change_abs": 0.05,
-      "change_rel": 0.073,
+      "change_rel": 0.0767,
       "extra": {},
-      "n": 448,
-      "n_previous": 426,
-      "previous": 0.69,
+      "n": 386,
+      "n_previous": 410,
+      "previous": 0.71,
       "significant": false,
       "status": "ok",
       "unit": "rounds",
-      "value": 0.75
+      "value": 0.77
     },
     "cycle_time_p50_hours": {
-      "change_abs": -0.78,
-      "change_rel": -0.019,
+      "change_abs": -1.04,
+      "change_rel": -0.025,
       "extra": {},
-      "n": 448,
-      "n_previous": 426,
-      "previous": 40.73,
+      "n": 386,
+      "n_previous": 410,
+      "previous": 41.49,
       "significant": false,
       "status": "ok",
       "unit": "hours",
-      "value": 39.95
+      "value": 40.45
     },
     "large_pr_share": {
-      "change_abs": 0.0027,
-      "change_rel": 0.0777,
+      "change_abs": 0.0021,
+      "change_rel": 0.0622,
       "extra": {
-        "denominator": 448,
-        "events": 17
+        "denominator": 386,
+        "events": 14
       },
-      "n": 448,
-      "n_previous": 426,
-      "previous": 0.0352,
+      "n": 386,
+      "n_previous": 410,
+      "previous": 0.0341,
       "significant": null,
       "status": "ok",
       "unit": "share",
-      "value": 0.0379
+      "value": 0.0363
     },
     "merged_prs": {
-      "change_abs": 22,
-      "change_rel": 0.0516,
+      "change_abs": -24,
+      "change_rel": -0.0585,
       "extra": {},
-      "n": 448,
-      "n_previous": 426,
-      "previous": 426,
+      "n": 386,
+      "n_previous": 410,
+      "previous": 410,
       "significant": null,
       "status": "ok",
       "unit": "count",
-      "value": 448
+      "value": 386
     },
     "pickup_p50_hours": {
-      "change_abs": -0.64,
-      "change_rel": -0.1009,
+      "change_abs": -0.3,
+      "change_rel": -0.0462,
       "extra": {},
-      "n": 448,
-      "n_previous": 426,
-      "previous": 6.36,
+      "n": 386,
+      "n_previous": 410,
+      "previous": 6.45,
       "significant": false,
       "status": "ok",
       "unit": "hours",
-      "value": 5.71
+      "value": 6.15
     },
     "post_review_commit_share": {
-      "change_abs": 0.0413,
-      "change_rel": 0.0867,
+      "change_abs": 0.0536,
+      "change_rel": 0.11,
       "extra": {
-        "denominator": 448,
-        "events": 232
+        "denominator": 386,
+        "events": 209
       },
-      "n": 448,
-      "n_previous": 426,
-      "previous": 0.4765,
+      "n": 386,
+      "n_previous": 410,
+      "previous": 0.4878,
       "significant": false,
       "status": "ok",
       "unit": "share",
-      "value": 0.5179
+      "value": 0.5415
     },
     "pr_size_p50_lines": {
-      "change_abs": 8.5,
-      "change_rel": 0.1111,
+      "change_abs": -1.5,
+      "change_rel": -0.0195,
       "extra": {},
-      "n": 448,
-      "n_previous": 426,
-      "previous": 76.5,
+      "n": 386,
+      "n_previous": 410,
+      "previous": 77.0,
       "significant": false,
       "status": "ok",
       "unit": "lines",
-      "value": 85.0
+      "value": 75.5
     },
     "review_concentration_top_k": {
-      "change_abs": 0.0273,
-      "change_rel": 0.1208,
+      "change_abs": 0.0274,
+      "change_rel": 0.1191,
       "extra": {
         "k": 2
       },
-      "n": 967,
-      "n_previous": 898,
-      "previous": 0.2261,
+      "n": 836,
+      "n_previous": 879,
+      "previous": 0.2298,
       "significant": null,
       "status": "ok",
       "unit": "share",
-      "value": 0.2534
+      "value": 0.2572
     }
   },
   "meta": {
@@ -180,7 +172,7 @@
     "comparison_available": true,
     "location_dimension": "label:area-",
     "sample": {
-      "merged_prs": 448
+      "merged_prs": 386
     },
     "thresholds_version": "1.0.0"
   },
@@ -200,113 +192,113 @@
   "series": {
     "current": [
       {
-        "cycle_p50_hours": 39.26,
-        "merged": 80,
-        "pickup_p50_hours": 5.13,
-        "pr_size_p50_lines": 82.5,
+        "cycle_p50_hours": 48.14,
+        "merged": 64,
+        "pickup_p50_hours": 4.59,
+        "pr_size_p50_lines": 70.5,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.4402,
+        "waiting_reviewer_share": 0.3795,
         "week_start": "2026-01-19"
       },
       {
-        "cycle_p50_hours": 37.67,
-        "merged": 72,
-        "pickup_p50_hours": 6.15,
-        "pr_size_p50_lines": 57.0,
+        "cycle_p50_hours": 44.42,
+        "merged": 68,
+        "pickup_p50_hours": 8.05,
+        "pr_size_p50_lines": 66.5,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5556,
+        "waiting_reviewer_share": 0.4823,
         "week_start": "2026-01-26"
       },
       {
-        "cycle_p50_hours": 45.51,
-        "merged": 63,
-        "pickup_p50_hours": 5.57,
-        "pr_size_p50_lines": 101.0,
+        "cycle_p50_hours": 39.23,
+        "merged": 65,
+        "pickup_p50_hours": 7.39,
+        "pr_size_p50_lines": 99.0,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.4887,
+        "waiting_reviewer_share": 0.5203,
         "week_start": "2026-02-02"
       },
       {
-        "cycle_p50_hours": 42.64,
-        "merged": 87,
-        "pickup_p50_hours": 6.71,
-        "pr_size_p50_lines": 95.0,
+        "cycle_p50_hours": 36.89,
+        "merged": 71,
+        "pickup_p50_hours": 6.06,
+        "pr_size_p50_lines": 88.0,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5488,
+        "waiting_reviewer_share": 0.4989,
         "week_start": "2026-02-09"
       },
       {
-        "cycle_p50_hours": 40.48,
-        "merged": 80,
-        "pickup_p50_hours": 6.32,
-        "pr_size_p50_lines": 88.0,
+        "cycle_p50_hours": 38.69,
+        "merged": 56,
+        "pickup_p50_hours": 6.67,
+        "pr_size_p50_lines": 70.0,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5382,
+        "waiting_reviewer_share": 0.5139,
         "week_start": "2026-02-16"
       },
       {
-        "cycle_p50_hours": 39.07,
-        "merged": 66,
-        "pickup_p50_hours": 4.88,
-        "pr_size_p50_lines": 93.5,
+        "cycle_p50_hours": 38.4,
+        "merged": 62,
+        "pickup_p50_hours": 5.25,
+        "pr_size_p50_lines": 61.5,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5001,
+        "waiting_reviewer_share": 0.5035,
         "week_start": "2026-02-23"
       }
     ],
     "previous": [
       {
         "cycle_p50_hours": 45.73,
-        "merged": 73,
+        "merged": 71,
         "pickup_p50_hours": 6.9,
         "pr_size_p50_lines": 86.0,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5561,
+        "waiting_reviewer_share": 0.5691,
         "week_start": "2025-12-08"
       },
       {
-        "cycle_p50_hours": 35.09,
-        "merged": 67,
-        "pickup_p50_hours": 5.93,
-        "pr_size_p50_lines": 82.0,
+        "cycle_p50_hours": 36.41,
+        "merged": 65,
+        "pickup_p50_hours": 6.05,
+        "pr_size_p50_lines": 71.0,
         "waiting_ci_share": 0.0,
         "waiting_reviewer_share": 0.5335,
         "week_start": "2025-12-15"
       },
       {
-        "cycle_p50_hours": 45.07,
-        "merged": 63,
-        "pickup_p50_hours": 6.38,
-        "pr_size_p50_lines": 84.0,
+        "cycle_p50_hours": 48.9,
+        "merged": 59,
+        "pickup_p50_hours": 6.45,
+        "pr_size_p50_lines": 90.0,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.4746,
+        "waiting_reviewer_share": 0.4739,
         "week_start": "2025-12-22"
       },
       {
-        "cycle_p50_hours": 38.92,
-        "merged": 70,
-        "pickup_p50_hours": 7.87,
-        "pr_size_p50_lines": 63.5,
+        "cycle_p50_hours": 40.05,
+        "merged": 68,
+        "pickup_p50_hours": 7.94,
+        "pr_size_p50_lines": 66.0,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5821,
+        "waiting_reviewer_share": 0.5823,
         "week_start": "2025-12-29"
       },
       {
-        "cycle_p50_hours": 37.03,
-        "merged": 98,
-        "pickup_p50_hours": 5.47,
+        "cycle_p50_hours": 38.07,
+        "merged": 94,
+        "pickup_p50_hours": 6.1,
         "pr_size_p50_lines": 76.5,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.4317,
+        "waiting_reviewer_share": 0.4318,
         "week_start": "2026-01-05"
       },
       {
-        "cycle_p50_hours": 46.02,
-        "merged": 55,
+        "cycle_p50_hours": 47.11,
+        "merged": 53,
         "pickup_p50_hours": 5.85,
-        "pr_size_p50_lines": 78.0,
+        "pr_size_p50_lines": 76.0,
         "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5237,
+        "waiting_reviewer_share": 0.5226,
         "week_start": "2026-01-12"
       }
     ]
@@ -315,14 +307,14 @@
   "time_ledger": {
     "ci_coverage": 0.0,
     "ci_data_available": false,
-    "merged_prs": 448,
+    "merged_prs": 386,
     "states": {
       "waiting_author": {
-        "change_pp": 2.16,
-        "pr_hours": 4167.99,
-        "previous_pr_hours": 3670.42,
-        "previous_share": 0.2754,
-        "share": 0.297
+        "change_pp": 4.33,
+        "pr_hours": 4133.3,
+        "previous_pr_hours": 3613.76,
+        "previous_share": 0.2748,
+        "share": 0.3181
       },
       "waiting_ci": {
         "change_pp": 0.0,
@@ -332,80 +324,75 @@
         "share": 0.0
       },
       "waiting_merge": {
-        "change_pp": -1.95,
-        "pr_hours": 2678.79,
-        "previous_pr_hours": 2804.5,
-        "previous_share": 0.2104,
-        "share": 0.1909
+        "change_pp": -0.7,
+        "pr_hours": 2620.6,
+        "previous_pr_hours": 2744.4,
+        "previous_share": 0.2087,
+        "share": 0.2017
       },
       "waiting_reviewer": {
-        "change_pp": -0.21,
-        "pr_hours": 7186.98,
-        "previous_pr_hours": 6854.65,
-        "previous_share": 0.5142,
-        "share": 0.5121
+        "change_pp": -3.62,
+        "pr_hours": 6241.61,
+        "previous_pr_hours": 6792.12,
+        "previous_share": 0.5165,
+        "share": 0.4803
       }
     },
-    "total_pr_hours": 14033.76
+    "total_pr_hours": 12995.51
   },
   "trend": {
     "attribution": {
       "basis": "mean_hours_per_merged_pr",
       "large_prs": {
-        "change": -0.46,
-        "current": 1.3,
-        "previous": 1.76,
+        "change": 0.67,
+        "current": 2.47,
+        "previous": 1.81,
         "share_of_increase": 0
       },
       "locations": [
         {
-          "change": 0.7,
+          "change": 1.27,
           "location": "area-A",
           "share_of_increase": 0.0
         },
         {
-          "change": -1.24,
+          "change": -0.95,
           "location": "area-B",
           "share_of_increase": 0.0
         },
         {
-          "change": 0.11,
+          "change": -0.33,
           "location": "area-C",
           "share_of_increase": 0.0
         },
         {
-          "change": 0.24,
+          "change": 0.13,
           "location": "area-D",
           "share_of_increase": 0.0
         },
         {
-          "change": -0.49,
+          "change": -0.66,
           "location": "area-E",
           "share_of_increase": 0.0
         },
         {
-          "change": 0.6,
-          "location": "dir:src/D",
-          "share_of_increase": 0.0
-        },
-        {
-          "change": 0.03,
+          "change": 0.14,
           "location": "other",
           "share_of_increase": 0.0
         }
       ],
       "states": {
         "coding": {
-          "change": -1.73,
-          "current": 18.52,
-          "previous": 20.25,
+          "change": -2.83,
+          "current": 17.81,
+          "previous": 20.63,
           "share_of_increase": 0.0
         },
         "waiting_author": {
-          "change": 0.69,
-          "current": 9.3,
-          "previous": 8.62,
-          "share_of_increase": 1.0
+          "change": 1.89,
+          "current": 10.71,
+          "previous": 8.81,
+          "share_of_increase": 0.952
         },
         "waiting_ci": {
           "change": 0.0,
@@ -414,15 +401,15 @@
           "share_of_increase": 0.0
         },
         "waiting_merge": {
-          "change": -0.6,
-          "current": 5.98,
-          "previous": 6.58,
-          "share_of_increase": 0.0
+          "change": 0.1,
+          "current": 6.79,
+          "previous": 6.69,
+          "share_of_increase": 0.048
         },
         "waiting_reviewer": {
-          "change": -0.05,
-          "current": 16.04,
-          "previous": 16.09,
+          "change": -0.4,
+          "current": 16.17,
+          "previous": 16.57,
           "share_of_increase": 0.0
         }
       }

@@ -7,6 +7,12 @@ including the removed quality trade-off, two seeds and two audiences) are histor
 Raw new reports are under ignored `backend/reports/`; older artifacts remain
 recoverable in Git history. Violations include first-attempt and final errors.
 
+After the v11 runs below, the synthetic generator dropped the removed quality scenario's
+inputs (fast approvals of large PRs, planted reverts and relands) and supersession
+successors, which changes every synthetic dataset. The offline suite was rerun on that data
+with analytics 1.7.0 and passed all eight gates with the same rates (`eval-20261005T060104Z-stub.json`, ignored).
+The real Bedrock v11 run below predates this generator change.
+
 Confidence is evidence strength, not a calibrated probability. Prompt refinement
 used these same synthetic cases; this is not a held-out real-world causal benchmark.
 

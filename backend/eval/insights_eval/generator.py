@@ -1,7 +1,7 @@
 """Deterministic source records with planted process changes."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
@@ -30,9 +30,6 @@ class ScenarioSpec:
     arrival_mult: Mapping[str, float]
     area_reviewers: Mapping[str, int]
     size_mult: float
-    first_approval_bonus: float
-    rubber_stamp_large_share: float
-    revert_rate: tuple[float, float]
     ci_enabled: bool
     ci_queue_mult: float
     ci_run_mult: float
@@ -41,16 +38,13 @@ class ScenarioSpec:
 
     @classmethod
     def baseline(cls) -> "ScenarioSpec":
-        """Return the no-intervention spec; normal closures, reverts and random variation remain."""
+        """Return the no-intervention spec; normal closures and random variation remain."""
         return cls(
             "no_signal",
             {},
             {},
             {},
             1.0,
-            0.0,
-            0.0,
-            (0.02, 0.02),
             False,
             1.0,
             1.0,
@@ -83,7 +77,6 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
     records: list[PullRequestRecord] = []
     runs: list[CiRun] = []
     next_number = 1000
-    pending_supersedes: list[int] = []
 
     def ln(median: float, sigma: float) -> float:
         """Draw a positive lognormal value with the given median and log-scale dispersion."""
@@ -93,35 +86,18 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
         """Shift a timestamp by elapsed hours; negative values represent earlier authored work."""
         return at + timedelta(hours=hours)
 
-    def make(
-        number: int,
-        created: datetime,
-        area: str,
-        *,
-        title: str | None = None,
-        author_override: Actor | None = None,
-        simple: bool = False,
-        force_merge: bool = False,
-    ) -> PullRequestRecord:
-        """Construct one lifecycle and append its CI runs and possible supersession candidate.
-
-        simple creates a short approval/merge path; force_merge bypasses random closure/open
-        outcomes. Either can still be open when its planned merge falls beyond AS_OF.
-        """
+    def make(number: int, created: datetime, area: str) -> PullRequestRecord:
+        """Construct one PR lifecycle and append its CI runs."""
         current = created >= CURRENT
         size = max(1, round(ln(80, 1.1) * (spec.size_mult if current else 1)))
         external = rng.random() < 0.2
-        if author_override and author_override.login:
-            external = author_override.login.startswith("ext")
-        author = author_override or Actor(
+        author = Actor(
             f"ext{rng.integers(1, 31):02}" if external else f"dev{rng.integers(1, 41):02}", False
         )
-        if author_override is None and rng.random() < 0.05:
+        if rng.random() < 0.05:
             author = Actor("dependabot[bot]", True)
         base = "release/9.0" if rng.random() < 0.03 else "main"
-        if simple or force_merge:
-            base = "main"
-        draft = not simple and rng.random() < 0.15
+        draft = rng.random() < 0.15
         ready = later(created, ln(10, 0.8)) if draft else created
         # Controlled size intervention: larger changes take longer to code and revise.
         # The square-root coupling is a documented synthetic assumption, not a fitted effect.
@@ -202,17 +178,13 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
         base_events = tuple(events)
         area_mult = {"area-B": 1.2, "area-C": 0.9, "area-D": 1.1}.get(area, 1.0)
         pickup = ln(6 * area_mult * (spec.pickup_mult.get(area, 1) if current else 1), 1.0)
-        first_review = later(ready, min(pickup, 1) if simple else pickup)
+        first_review = later(ready, pickup)
         if spec.reviewers_wait_for_ci and local_runs:
             first_review = max(
                 first_review, later(max(run.updated_at for run in local_runs), ln(0.5, 0.5))
             )
         probability = 0.55 if size < 100 else 0.35 if size < 500 else 0.20
-        probability = min(0.95, probability + (spec.first_approval_bonus if current else 0))
-        rubber = current and size >= 500 and rng.random() < spec.rubber_stamp_large_share
-        if rubber:
-            first_review = later(ready, ln(0.1, 0.3))
-        approved = bool(rubber or simple or author.is_bot or rng.random() < probability)
+        approved = bool(author.is_bot or rng.random() < probability)
         first_state = (
             "APPROVED" if approved else ("CHANGES_REQUESTED" if rng.random() < 0.6 else "COMMENTED")
         )
@@ -236,18 +208,18 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
                 reviewer,
                 state="APPROVED" if approved else "CHANGES_REQUESTED",
             )
-        if not simple and rng.random() < 0.3 and not local_only:
+        if rng.random() < 0.3 and not local_only:
             clock = later(clock, ln(4, 1))
             reviewer = Actor(
                 next(f"rev-x{i}" for i in range(1, 5) if f"rev-x{i}" != reviewer.login), False
             )
             add(EventKind.REVIEW, clock, reviewer, state="APPROVED")
-        planned_merge = later(clock, min(1.5, ln(3, 1)) if simple else ln(3, 1))
+        planned_merge = later(clock, ln(3, 1))
         merge_at: datetime | None = planned_merge
         if rng.random() < 0.1:
             commit(clock + (planned_merge - clock) / 2)
         end = planned_merge
-        outcome = 0.0 if simple or force_merge or author.is_bot else float(rng.random())
+        outcome = 0.0 if author.is_bot else float(rng.random())
         state = "MERGED"
         if 0.85 <= outcome < 0.95:
             state = "CLOSED"
@@ -265,7 +237,6 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
                 events = list(base_events)
                 end = later(first_review, ln(8, 1))
                 closer = author
-                pending_supersedes.append(number)
             merge_at = None
             add(EventKind.CLOSED, end, closer)
         elif outcome >= 0.95:
@@ -297,7 +268,7 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
         closed_at = end if state != "OPEN" else None
         return PullRequestRecord(
             number=number,
-            title=title or f"Change {number} in {area}",
+            title=f"Change {number} in {area}",
             url=f"https://github.com/synthetic/repo/pull/{number}",
             state=state,
             is_draft=draft and ready >= AS_OF,
@@ -330,95 +301,6 @@ def generate(spec: ScenarioSpec, seed: int) -> SyntheticRepo:
             records.append(make(next_number, created, area))
             next_number += 1
         day += timedelta(days=1)
-    by_number = {p.number: i for i, p in enumerate(records)}
-    for number in pending_supersedes:
-        index = by_number[number]
-        original = records[index]
-        if original.closed_at is None:
-            continue
-        created = original.closed_at + timedelta(hours=float(rng.uniform(-12, 12)))
-        if created >= AS_OF:
-            continue
-        successor = make(
-            next_number,
-            created,
-            original.labels[0] if original.labels else "area-A",
-            author_override=original.author,
-            simple=True,
-        )
-        next_number += 1
-        stable = f"syn-{number}-cross-{successor.number}"
-        at = max(created, original.created_at)
-        payload = {
-            "source_repo": "synthetic/repo",
-            "source_number": successor.number,
-            "source_state": successor.state,
-            "source_merged_at": successor.merged_at.isoformat() if successor.merged_at else None,
-            "source_author": successor.author.login,
-            "will_close": False,
-        }
-        cross = Event(
-            EventKind.CROSS_REFERENCED,
-            at,
-            original.author,
-            payload,
-            dedup_key(EventKind.CROSS_REFERENCED, at, original.author.login, stable),
-        )
-        records[index] = replace(
-            original,
-            events=tuple(
-                sorted(
-                    (*original.events, cross), key=lambda e: (e.occurred_at, e.kind, e.dedup_key)
-                )
-            ),
-            updated_at=max(original.updated_at, at),
-        )
-        records.append(successor)
-    # Iterate a frozen set of originals so newly appended reverts are not themselves randomly
-    # reverted in the same pass. Relands are added explicitly below when the revert has merged.
-    for original in tuple(records):
-        if (
-            original.merged_at is None
-            or rng.random() >= spec.revert_rate[int(original.merged_at >= CURRENT)]
-        ):
-            continue
-        created = later(original.merged_at, ln(30, 0.8))
-        if created >= AS_OF:
-            continue
-        area = original.labels[0] if original.labels else "area-A"
-        revert = make(
-            next_number,
-            created,
-            area,
-            title=f'Revert "{original.title}"',
-            author_override=Actor(
-                next(f"dev{i:02}" for i in range(1, 41) if f"dev{i:02}" != original.author.login),
-                False,
-            ),
-            simple=True,
-        )
-        next_number += 1
-        records.append(revert)
-        if revert.merged_at and rng.random() < 0.5:
-            reland_at = later(revert.merged_at, ln(72, 0.5))
-            if reland_at < AS_OF:
-                reland = make(
-                    next_number,
-                    reland_at,
-                    area,
-                    title=f'Reland "{original.title}"',
-                    author_override=Actor(
-                        next(
-                            f"dev{i:02}"
-                            for i in range(1, 41)
-                            if f"dev{i:02}" != revert.author.login
-                        ),
-                        False,
-                    ),
-                    force_merge=True,
-                )
-                records.append(reland)
-                next_number += 1
     return SyntheticRepo(
         "synthetic/repo",
         "main",
