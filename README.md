@@ -1,9 +1,15 @@
 # Delivery Insights
 
-Delivery Insights shows engineering managers and directors **where pull requests wait** and
-which evidence supports an explanation. It syncs GitHub PR history in the background, computes
-a deterministic time ledger and the evidence behind two scored hypotheses, and adds a cited
-narrative written by Claude Sonnet 4.6 on Amazon Bedrock. Each claim in the narrative links to the number behind it, and every number comes from code.
+Delivery Insights shows engineering managers **where pull request time goes** and whether
+delivery slowed down for a reason the data supports. A background worker syncs GitHub PR
+history into Postgres. One endpoint returns a deterministic insight for any period: the time
+ledger of reviewer, author and merge waiting, the largest wait and shift, and median cycle
+time. A second endpoint adds a short narrative written by Claude Sonnet 4.6 on Amazon Bedrock,
+with root-cause hypotheses, a confidence score and an evidence chain. Every number comes from
+code, and each claim in the narrative links to the number behind it.
+
+Sections 1–4 are the submission notes. The sections after them summarize the product, API,
+configuration and development; [docs/REFERENCE.md](docs/REFERENCE.md) has the details.
 
 ## 1. How to run it locally
 
@@ -53,7 +59,7 @@ narrative written by Claude Sonnet 4.6 on Amazon Bedrock. Each claim in the narr
 
     Expected status: `migrate` has exited with code `0`; `api`, `worker`, `web`,
     `postgres` and `redis` are running.
-    It might take up to 5 minutes to prepare the reports.
+    It might take up to 5 minutes to pull Github PR info and prepare the reports.
 
 - Dashboard: <http://localhost:5173>. API docs: <http://localhost:8000/docs>. Both bind to localhost only.
 - The worker starts syncing `bevyengine/bevy` immediately: 7 days first, then 30, then
@@ -68,47 +74,67 @@ narrative written by Claude Sonnet 4.6 on Amazon Bedrock. Each claim in the narr
 
 ![How Delivery Insights works](docs/diagrams/how-it-works.svg)
 
-**01 — Local data and reporting:** the arq worker syncs GitHub history into Postgres and derives
-PR timelines. FastAPI serves insights and narratives from local data; Redis supports jobs, caches, locks and
-rate limits. The React dashboard accesses FastAPI through nginx.
+**Data sync and local reporting.** An arq worker pulls PR history from the GitHub GraphQL API
+with a read-only token: a staged backfill (7, 30, then 120 days), incremental syncs every 15
+minutes and periodic sweeps of open PRs. It stores raw records, per-PR timelines and derived
+facts in Postgres, and precomputes the 7/30/60-day reports. FastAPI answers from this local
+data only and never calls GitHub on a request. Each report is an immutable snapshot identified
+by its parameters, code versions and sync watermarks, so it can be cached in Redis and Postgres
+and served with an ETag; until a period is covered, the API returns `202` with sync progress.
+Redis also holds the job queue, locks and rate limits. nginx serves the React dashboard and
+proxies `/api` to FastAPI.
 
-**02 — Narrative generation:** code computes metrics, selects evidence and scores hypotheses.
-Bedrock writes the wording; local validation checks numbers, citations and uncertainty language,
-with at most one repair. A deterministic template handles disabled, busy or failed LLM calls
-and replies that remain invalid. Validation and fallback run inside FastAPI; PR titles,
-comments and user names are never sent to the LLM.
+**Narrative generation.** Code builds an evidence pack from the snapshot and scores two
+root-cause hypotheses, review capacity and PR size growth, with fixed rules. Bedrock receives
+only that pack, never PR titles, bodies, comments or logins, and returns wording through a tool
+call. A local validator checks every number, citation and hedge word against the pack. An
+invalid reply gets one repair with the exact violations, and a deterministic template covers a
+disabled, busy, failing or still-invalid LLM. Validated narratives are stored and reused, so
+repeat requests make no LLM call.
+
+**The metric and why I chose it.** The insight measures where the post-ready waiting time of
+merged PRs goes (to reviewers, the author or merge) and how that split changed against the
+previous period of equal length, alongside median cycle time. I chose it over contributor
+leaderboards because it points to a team decision (review capacity, author follow-up or merge
+policy) instead of ranking people, and because every hour traces back to a PR timeline.
+PR-hours are elapsed waiting time, not effort; a large waiting share is a reason to look
+closer, not a proven cause.
 
 Main decisions:
 
-- **Metric:** cycle time and where PRs wait, measured in UTC elapsed time. PR-hours describe
-  waiting; a large waiting share does not establish a cause or measure engineering effort.
-- **Scope:** every section uses PRs opened or with human activity in the selected period.
-  Older idle PRs may require a longer window to appear.
-- **Reproducibility:** background sync keeps GitHub I/O off the request path. Pure analytics
-  and snapshots identified by parameters, versions and watermarks support repeatable reports.
-- **Evidence strength:** fixed rules score hypotheses, calibrated on synthetic scenarios only.
-  Weak evidence or no slowdown leads to abstention; the score is not a probability.
-- **Constraints:** English narratives and public repositories only.
+- **Background sync over request-time fetching:** GitHub I/O and rate limits stay off the
+  request path, and repeated queries cost nothing upstream.
+- **Deterministic snapshots:** analytics is pure computation with no I/O, so the same data and
+  parameters give the same bytes. This is what makes caching, ETags and a golden-file test
+  possible.
+- **One cohort everywhere:** every section counts PRs opened, or with human activity, in the
+  period; bot and backport PRs are excluded from flow metrics. Older idle PRs need a longer
+  window to appear.
+- **Numbers in code, wording by the LLM:** the LLM never computes or scores. Confidence is an
+  evidence-strength score from fixed rules, calibrated on synthetic scenarios only. It is not
+  a probability, and weak evidence or no slowdown leads to abstention.
 - **Project scope:** The broader scope gave the narrative more complete evidence, at the cost
   of additional implementation complexity. In retrospect, I would keep the initial delivery
   focused on the required path and add extensions only where their value justified the added
   complexity.
 
-Trade-offs and what I chose not to do (full list in
+Trade-offs and what I chose not to do (more in
 [REFERENCE.md](docs/REFERENCE.md#trade-offs-and-limitations)):
 
-- **Stable reads over freshness:** reports read only local data synced every 15 minutes, so
-  they can lag GitHub, and the first sync takes a few minutes before every period is ready.
-- **Numbers in code, wording by the LLM:** the LLM never computes or scores. If its reply
-  still fails validation after one repair, the page shows a deterministic template instead.
+- **Freshness:** reports lag GitHub by up to one sync interval, and the first sync takes a few
+  minutes before every period is ready.
+- **Time basis:** UTC wall-clock time, including nights and weekends; no team calendars.
 - **Locations:** current labels, otherwise the most-touched directories; historical labels and
   code ownership are not modelled.
+- **Constraints:** one repository per request, public repositories and English narratives.
 - **Not done:** individual productivity rankings, request-time GitHub fetching,
-  authentication, webhooks, a second source adapter and deployment or release timing.
-- **Beyond the brief:** a background worker with staged backfill, Postgres storage with
-  Redis and ETag caching, deterministic hypothesis scoring with a validator, repair and
-  template fallback, an offline and real-Bedrock evaluation harness, a React dashboard and
-  Docker Compose.
+  authentication, webhooks, a second source adapter (the `SourceAdapter` protocol is the
+  extension point) and deployment or release timing.
+
+Beyond the brief: a React dashboard, the background worker with staged backfill, Postgres
+storage with Redis and ETag caching, deterministic hypothesis scoring with a validator, repair
+and template fallback, unit and integration tests, an offline and real-Bedrock evaluation
+harness, Docker Compose and a CI workflow.
 
 ## 3. With one more day
 I would do one of the followings if I had one more day: 
@@ -116,9 +142,7 @@ I would do one of the followings if I had one more day:
    manual sync endpoint with a cooldown; the worker already runs on-demand sync jobs.
 2. **Add a point-in-time "all open PRs" view** for backlog and at-risk stock, beside the
    period-active view.
-3. **Harden sync:** reconcile jobs killed mid-run at startup, and retry GraphQL throttling
-   returned with HTTP 200 and dropped connections.
-4. **Speed up the first sync:** split the initial time window into date ranges and fetch them 
+3. **Speed up the first sync:** split the initial time window into date ranges and fetch them 
    in parallel using GraphQL search with updated: filters, instead of fetching one page at a time. 
    Also sync tracked repositories in parallel while staying within the shared GitHub rate limit. 
    Snapshot analytics already runs outside the event loop. If it becomes slow on large repositories, 
@@ -153,8 +177,7 @@ I would do one of the followings if I had one more day:
 ## What you get
 
 - **Repository and period:** a tracked repository and the last 7, 30 (default) or 60 days, or
-  custom UTC dates, compared with the preceding period of equal length. Every section counts PRs
-  opened, or with recorded human activity, during the period.
+  custom UTC dates, compared with the preceding period of equal length.
 - **Sync progress:** until the period is covered, the page shows the sync stage and retries; a
   configuration notice names the `.env` setting to fix.
 - **Narrative:** root-cause hypotheses scored by fixed rules, with every claim cited to its
@@ -174,27 +197,34 @@ I would do one of the followings if I had one more day:
 
 ```bash
 curl -s "http://localhost:8000/v1/insights/delivery?repo=bevyengine/bevy&from=2026-09-04&to=2026-10-03"
+curl -s "http://localhost:8000/v1/snapshots/<snapshot_id>/narrative"
 ```
 
-The insight is a projection of an internal snapshot. The full snapshot, with every metric the
-narrative evidence reads, stays in Postgres and Redis and is never returned by the API.
-Dates are inclusive UTC dates. Errors use RFC 9457 `application/problem+json`. Current contract: [REFERENCE.md](docs/REFERENCE.md#api) and the strict models in
+Dates are inclusive UTC dates. Insight and narrative responses carry an `ETag` and answer
+`If-None-Match` with `304`. A `202` carries `Retry-After` and per-repository sync progress.
+Errors use RFC 9457 `application/problem+json`: `422` for invalid input, `403` for an untracked
+repository and `429` for the rate limit. Contract details:
+[REFERENCE.md](docs/REFERENCE.md#api) and the strict models in
 `backend/src/insights/api/schemas.py`.
 
 ## Configuration
 
-Settings come from `.env`; never commit it. Without `.env`, code defaults apply (`backend/src/insights/config.py`):
-`TRACKED_REPOS=bevyengine/bevy` and `BACKFILL_DAYS=120`.
+Settings come from `.env`; never commit it. Without `.env`, the code defaults in
+`backend/src/insights/config.py` apply.
 
-| Variable | `.env.example` | Purpose |
+| Variable | Default | Purpose |
 |---|---|---|
 | `GITHUB_TOKEN` | empty | Required for sync; without it `/v1/repos` reports `missing_token` |
 | `AWS_BEARER_TOKEN_BEDROCK` | empty | Required for LLM-generated narratives; without it, only deterministic templates are available |
 | `AWS_REGION`, `BEDROCK_MODEL_ID` | `us-west-2`, `us.anthropic.claude-sonnet-4-6` | Bedrock Converse target |
 | `TRACKED_REPOS` | `bevyengine/bevy` | Comma-separated allowlist, e.g. `bevyengine/bevy,prometheus/prometheus` |
 | `BACKFILL_DAYS` | `120` | History to collect (30–365); the 60-day view needs at least 120 for a full comparison |
-| `PRECOMPUTE_DAYS` | `7,30,60` | Snapshot windows warmed after a successful sync changes repository data |
+| `SYNC_INTERVAL_MINUTES` | `15` | Incremental sync cadence; must divide 60 |
+| `PRECOMPUTE_DAYS` | `7,30,60` | Report windows warmed after a sync changes repository data |
 | `LOCATION_DIMENSION` | `label:area-` | Area grouping: matching labels, otherwise directories |
+
+Connection, CORS, rate-limit and logging settings are listed in
+[REFERENCE.md](docs/REFERENCE.md#additional-settings).
 
 ## Development
 
@@ -207,10 +237,9 @@ make eval          # same against real Bedrock (reads the key from .env)
 cd frontend && npm ci && npm test && npm run typecheck && npm run build
 ```
 
-The internal snapshot contains the time ledger and the metrics supporting the review-capacity
-and PR-size hypotheses; the API returns only its insight view.
-Analytics and prompt versions isolate existing snapshots and narrative caches; workers
-rederive PR timelines from lifecycle events. Bootstrap sampling keeps its frozen identity.
+Without Make (for example on Windows), run the `uv run` commands from the [Makefile](Makefile)
+in `backend/`. Test scope and evaluation results are in
+[REFERENCE.md](docs/REFERENCE.md#testing-and-evaluation).
 
 The unreleased application keeps one migration, `0001_initial`, which is edited in place
 until release. A database created by an earlier version of that file must be deleted and
@@ -222,18 +251,13 @@ docker compose down -v
 docker compose up -d --build
 ```
 
-The worker resumes collection from an empty database, with 7-, 30- and 120-day backfill
-checkpoints under the default configuration. Wait for repository `last_sync_status=ok`
-and full coverage before checking the dashboard. Keep `BACKFILL_DAYS=120` for the 60-day
-view and its comparison period.
-
-Local checks: **322 backend tests** (259 unit, 63 integration), **15 frontend tests**,
-strict lint/types/build and all eight offline and real Bedrock narrative gates pass on
-prompt v13 (no template fallback). Results are in
-[REFERENCE.md](docs/REFERENCE.md#testing-and-evaluation).
+The worker then collects history again from an empty database. Wait for repository
+`last_sync_status=ok` and full coverage before checking the dashboard, and keep
+`BACKFILL_DAYS=120` for the 60-day view and its comparison period.
 
 ## Documentation
 
 | Document | Contents |
 |---|---|
-| [docs/REFERENCE.md](docs/REFERENCE.md) | Metric definitions, confidence scoring, API, operations, security, test and evaluation results, limitations |
+| [docs/REFERENCE.md](docs/REFERENCE.md) | Metric semantics, pipeline, API and insight contract, confidence scoring, operations, security, test and evaluation results, limitations |
+| [AGENTS.md](AGENTS.md) | Repository map, invariants and verification steps for coding agents |

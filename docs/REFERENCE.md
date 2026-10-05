@@ -1,34 +1,35 @@
 # Technical reference
 
-Detailed behavior behind the [README](../README.md). Current contracts are in code and this reference.
+Details behind the [README](../README.md), which covers running the stack, the architecture
+tour, the metric choice, the API overview and the main settings.
 
-## The insight and why this metric
-
-The core metric is **where PR time goes**: the post-ready waiting time of merged PRs, split
-into reviewer, author and merge waiting, and compared with the previous period.
-A cited narrative explains a slowdown when the evidence supports one, and otherwise says where
-PR time goes now.
-
-| View | Question | Decision it supports |
-|---|---|---|
-| Time ledger | Who or what is the post-ready wait for? | Review capacity, author follow-up or merge policy |
-| Narrative | Did delivery slow down, and which supported cause fits? | Where to investigate first |
+## Metric semantics
 
 The narrative draws on cycle time, first-review wait, review rounds, the review queue and
-review concentration, PR size, the weekly series and an accounting
-attribution of the added hours. They appear on the page only as cited evidence. Relative
-changes use unrounded values, so recomputing them from displayed values can differ slightly.
-These are PR-flow signals, not deployment lead time, DORA change failure rate, individual
-productivity scores or causal proof. Workflow and timestamp changes affect them.
+review concentration, PR size, the weekly series and an accounting attribution of the added
+hours. They appear on the page only as cited evidence. Relative changes use unrounded values,
+so recomputing them from displayed values can differ slightly. These are PR-flow signals, not
+deployment lead time, DORA change failure rate, individual productivity scores or causal
+proof. Workflow and timestamp changes affect them.
 
-## How it works
+The time ledger covers the post-ready waiting time of merged PRs only: no bot or backport PRs
+and no pre-ready coding time.
 
-![Delivery Insights data flow and narrative generation](diagrams/how-it-works.svg)
+## Pipeline
 
-1. **Sync:** staged backfill, overlapping incremental windows and open-PR sweeps write idempotent batches. Coverage and success checkpoints advance after phase completion; the resumable backfill cursor is saved with each batch.
-2. **Derive:** an event-driven state machine creates non-overlapping intervals and per-PR facts. A PR is located by its matching labels, otherwise by its most-touched directories. Version changes rederive stored PRs and enqueue snapshot precomputation.
-3. **Snapshot:** cached or persisted snapshots are reused. On a miss, a read-only repeatable-read transaction loads a consistent dataset for pure analytics, deterministic bootstrap comparisons and canonical JSON; the result is persisted in a separate write transaction. Parameters, versions and watermarks set identity.
-4. **Narrative:** code selects evidence and scores hypotheses. Bedrock supplies wording; local code validates the LLM reply and requests at most one repair. A deterministic template is used when the LLM is disabled, busy, unavailable, times out or remains invalid. The validator and template run inside the API process; the template does not pass through the LLM validator at runtime.
+1. **Sync:** staged backfill, overlapping incremental windows and open-PR sweeps write
+   idempotent batches. Coverage and success checkpoints advance after phase completion; the
+   resumable backfill cursor is saved with each batch.
+2. **Derive:** an event-driven state machine creates non-overlapping intervals and per-PR
+   facts. A PR is located by its matching labels, otherwise by its most-touched directories.
+   Version changes rederive stored PRs and enqueue snapshot precomputation.
+3. **Snapshot:** cached or persisted snapshots are reused. On a miss, a read-only
+   repeatable-read transaction loads a consistent dataset for pure analytics, deterministic
+   bootstrap comparisons and canonical JSON; the result is persisted in a separate write
+   transaction. Parameters, versions and watermarks set identity.
+4. **Narrative:** described in
+   [Narrative, confidence and evidence chain](#narrative-confidence-and-evidence-chain). The
+   validator and template run inside the API process.
 
 | Component | Responsibility |
 |---|---|
@@ -39,26 +40,15 @@ productivity scores or causal proof. Workflow and timestamp changes affect them.
 | `web` | React dashboard and nginx same-origin proxy |
 | `migrate` | One-shot Alembic schema upgrade before API/worker startup |
 
-Analytics has no database or HTTP imports. The I/O loader lives in `db/dataset.py`.
-The API process does not import source adapters or call GitHub on requests.
-It may call Bedrock for an uncached narrative; heavy analytics and boto3 run in threads.
+Analytics has no database or HTTP imports; the I/O loader lives in `db/dataset.py`. The API
+process does not import source adapters or call GitHub. It may call Bedrock for an uncached
+narrative; snapshot computation and boto3 calls run in threads.
 
 ## API
 
-OpenAPI is available at `/openapi.json` and `/docs`. Dates and timestamps use UTC.
-`from` and `to` are inclusive dates; comparison uses the preceding equal-length period. `as_of` is capped by the least recent repository sync watermark.
-
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/v1/insights/delivery` | Insight for one tracked repository and period, or `202` Pending |
-| GET | `/v1/snapshots/{snapshot_id}/narrative` | English narrative for a retained snapshot (`links.narrative`) |
-| GET | `/v1/repos` | Tracked repositories, sync status, date limits and configuration health (`setup`) |
-| GET | `/healthz` | Process liveness |
-| GET | `/readyz` | Postgres and Redis readiness |
-
-`repo=` names exactly one tracked repository. Unknown parameters are ignored. Invalid input
-returns `422`; untracked repos return `403`.
-Errors use RFC 9457 `application/problem+json` with `request_id` and sanitized detail.
+OpenAPI is available at `/openapi.json` and `/docs`. `as_of` is capped by the least recent
+repository sync watermark. `repo=` names exactly one tracked repository; unknown parameters
+are ignored. Problem responses include `request_id` and sanitized detail.
 
 Once sync has produced a `200` response:
 
@@ -73,14 +63,13 @@ curl -i -H "If-None-Match: $ETAG" "$API/v1/insights/delivery?repo=bevyengine/bev
 curl -s "$API/v1/snapshots/$SID/narrative"
 ```
 
-The conditional request returns `304` with no body. Insights use `private, no-cache`, so
-browsers revalidate with the ETag and see new coverage as soon as a sync lands. Successful narratives and
-disabled-LLM templates have `private, max-age=3600`; failure fallbacks use `no-store`.
-Internal Redis TTLs are separate from HTTP cache directives.
+Insights use `private, no-cache`, so browsers revalidate with the ETag and see new coverage as
+soon as a sync lands. Successful narratives and disabled-LLM templates have
+`private, max-age=3600`; failure fallbacks use `no-store`. Internal Redis TTLs are separate
+from HTTP cache directives.
 
-A `202` is a Pending object, not an insight. Respect `Retry-After`; inspect each repo's
-`reason` and `job` (status and phase). The UI polls for at most five minutes, then asks for a
-later refresh.
+A `202` is a Pending object, not an insight. Inspect each repo's `reason` and `job` (status
+and phase). The UI polls for at most five minutes, then asks for a later refresh.
 
 ## Insight contract
 
@@ -130,8 +119,8 @@ It has not been calibrated against real repository outcomes or hand-labeled caus
 Correlations and queue pressure are reasons to investigate, not proof.
 
 The model sees structured numbers, evidence IDs and sanitized repository/location names.
-It never sees PR titles, bodies, comments or user names. Code supplies evidence references,
-sample counts, changes and eligible hypotheses from this library:
+Code supplies evidence references, sample counts, changes and eligible hypotheses from this
+library:
 
 | Hypothesis | Symptom | Mechanism to look for |
 |---|---|---|
@@ -171,8 +160,6 @@ Validators check schema, IDs, sentence-local numeric grounding, units, direction
 citation coverage, personal identifiers and causal wording ceilings across the whole body.
 An LLM may downgrade a candidate, never raise its deterministic score or wording level.
 At most one outside-library hypothesis is allowed and fixed at low confidence (0.35).
-Invalid output is repaired once using the previous output and exact validation failures.
-Timeouts, errors or a second invalid answer return a deterministic template.
 Inspect `meta.generated_by`, `validation`, `attempts`, `fallback_reason` and `violations`.
 In the UI, citation buttons scroll to and highlight the corresponding evidence entry.
 
@@ -185,47 +172,30 @@ are ranked by human review-event counts separately in each period; repeated revi
 PR count separately, and the top reviewers can differ between periods. The same labels
 and values appear in hypothesis evidence chips, including for cached narrative responses.
 
-## Configuration
+## Additional settings
 
-Copy `.env.example`; never commit `.env`. Full environment defaults are in `backend/src/insights/config.py`.
+The README lists the main settings. These have working defaults in `.env.example`:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `GITHUB_TOKEN` | empty | GitHub collection; missing token is reported explicitly |
-| `AWS_BEARER_TOKEN_BEDROCK` | empty | Required for LLM-generated narratives; without it, only deterministic templates are available |
-| `AWS_REGION` | `us-west-2` | Bedrock client region |
-| `BEDROCK_MODEL_ID` | `us.anthropic.claude-sonnet-4-6` | Converse model/inference profile |
-| `TRACKED_REPOS` | `bevyengine/bevy` | Comma-separated repository allowlist |
-| `LOCATION_DIMENSION` | `label:area-` | Label grouping with directory fallback, or directory grouping |
-| `BACKFILL_DAYS` | `120` | Final backfill stage, between 30 and 365 |
-| `SYNC_INTERVAL_MINUTES` | `15` | Incremental cadence; must divide 60 |
 | `CORS_ORIGINS` | `http://localhost:5173` | Comma-separated allowed browser origins |
 | `RATE_LIMIT_PER_MINUTE` | `120` | Per-client-IP fixed-window limit on `/v1` |
 | `DATABASE_URL` | Compose Postgres URL | Async SQLAlchemy database connection |
 | `REDIS_URL` | `redis://redis:6379/0` | Cache, job queue and locks |
+| `LOG_LEVEL` | `INFO` | Application logging level |
 
-Create the GitHub token under Settings → Developer settings → Personal access tokens
-→ Fine-grained tokens. Choose Public repositories, an expiration and no extra permissions.
-The current implementation targets public repositories; private-repo authorization is not verified.
-Model availability and Bedrock access/billing must be verified in your AWS account.
+The current implementation targets public repositories; private-repo authorization is not
+verified.
 
 ## Operations
 
 `/v1/repos` also returns `setup`: whether `GITHUB_TOKEN` and `AWS_BEARER_TOKEN_BEDROCK` are set (never their values), sync statuses that point to configuration (`missing_token`, `auth_error`, `not_found`), the Bedrock region and model ID, and the latest Bedrock error code, cleared after the next successful call and ignored once `BEDROCK_MODEL_ID` or `AWS_REGION` changes. A connection error (`EndpointConnectionError`) means the endpoint was not reached, so the model ID was not checked; an invalid model ID returns `ValidationException`. The API checks these settings once at startup with a one-token Bedrock request, because cached narratives make no Bedrock call and would otherwise hide a bad key until a new snapshot needs wording. The dashboard turns these into a Configuration notice that names the `.env` variable to fix.
 
-Use `/healthz` for liveness and `/readyz` for dependency readiness. Read `/v1/repos`
-before judging missing data. Snapshots/narratives are retained for seven days and sync-job
-records for thirty days; source PR records are retained until the database is reset.
-Worker housekeeping expires retained data and precomputes 7-, 30- and 60-day reports.
-
-```bash
-curl -s http://localhost:8000/readyz
-curl -s http://localhost:8000/v1/repos
-docker compose logs --tail=50 api worker
-```
+Read `/v1/repos` before judging missing data. Snapshots/narratives are retained for seven days
+and sync-job records for thirty days; source PR records are retained until the database is
+reset. Worker housekeeping expires retained data daily.
 
 The worker syncs on a schedule (`SYNC_INTERVAL_MINUTES`); there is no manual sync endpoint.
-Rate limiting returns `429` with `Retry-After`.
 Requests proxied through nginx share its upstream client-IP bucket; this is a local demo.
 Cache/rate-limit Redis failures are fail-open where possible; readiness still reports failure.
 Worker locks are renewed; checkpoints support resumption. Compose restarts failed workers.
@@ -246,14 +216,12 @@ Tokens, headers, raw upstream responses and prose are not logged; exceptions exp
 | Incomplete comparison | More history is needed for the previous equal-length period |
 | Unexpected numbers | Sync job `skipped_prs` and `invariant_violations` counters and their structured warnings |
 
-`docker compose down` stops the stack while preserving Postgres data.
-`docker compose down -v` intentionally deletes the local database volume; use only for reset.
-The unreleased storage schema is consolidated into `0001_initial`. Databases created by an
-earlier version of it require that confirmed reset and a new sync. Raw GitHub node IDs and actor types remain in the query for timeline paging and
-bot detection. The schema stores only the PR fields and facts that analytics reads: no PR
-bodies, head branches, merge commits, author associations, ownership rules or link fields.
-`UNIQUE(pr_id, seq)` also serves interval lookups by PR; no performance claim is made without representative EXPLAIN measurements.
-There is no authenticated administrative UI or backup orchestration in this demo.
+Raw GitHub node IDs and actor types remain in the query for timeline paging and bot
+detection. The schema stores only the PR fields and facts that analytics reads: no PR bodies,
+head branches, merge commits, author associations, ownership rules or link fields.
+`UNIQUE(pr_id, seq)` also serves interval lookups by PR; no performance claim is made without
+representative EXPLAIN measurements. There is no authenticated administrative UI or backup
+orchestration in this demo.
 
 ## Security
 
@@ -278,18 +246,6 @@ resumable ingestion, snapshot identity/expiry, privacy, validators and fallback 
 Integration tests use actual Postgres 16 and Redis 7 through Testcontainers; GitHub and
 Bedrock calls are mocked or SDK-stubbed. Docker must be running for the full suite.
 
-```bash
-make lint
-make test-unit
-make test
-make eval-offline
-# Reads AWS_BEARER_TOKEN_BEDROCK from root .env:
-make eval
-```
-
-Current checks: 322 backend tests (63 integration) and 15 frontend tests pass, together with
-Ruff, strict mypy and the frontend typecheck and build.
-
 The evaluation harness runs three planted scenarios (review capacity, PR size growth and no
 signal) with five seeds: 15 English narratives on prompt v13. Numeric, citation and hedge
 consistency cover final LLM outputs.
@@ -308,76 +264,39 @@ repair. On live Bevy data, the 60-day narrative with two low-band hypotheses pas
 on the first attempt in 4/4 generations. The synthetic suite was used during prompt
 development; it is not a held-out benchmark or real-world causal calibration. The size
 scenario scales synthetic work duration with the square root of the planted size multiplier,
-an explicit fixture assumption. Validators and
-gate thresholds were never relaxed to pass. Missing-key evaluation exits 2.
+an explicit fixture assumption. Validators and gate thresholds were never relaxed to pass.
+Missing-key evaluation exits 2.
 
 ## Trade-offs and limitations
 
-### Key trade-offs
+The README lists the main trade-offs (freshness, time basis, locations, constraints) and the
+largest items left out. Further trade-offs:
 
 | Decision | Choice and cost | Follow-up |
 |---|---|---|
-| Time basis | UTC wall-clock, including nights/weekends | Add team calendars |
-| Locations | Current labels → directories; historical labels unavailable | Choose a label prefix that matches the repository's area labels |
 | Scope | Default-branch flow; bots/backports excluded | Separate release-branch view |
-| Freshness | Background sync, default 15 minutes | Webhooks if lower latency is needed |
 | Sources | Whitelisted GitHub repos only | Extend `SourceAdapter` with shared normalized records |
 | Snapshot compute | Concurrent cold requests can duplicate deterministic work | Add single-flight only if measured necessary |
 | Commit times | Committer timestamps approximate push/revision time | Collect push events |
 | Reopened PRs | Closed intervals excluded from ledger; elapsed milestones retain them | Review prevalence before changing duration semantics |
 | Confidence | Evidence score tested only on synthetic scenarios | Replay history and calibrate with human labels |
 
-### Things deliberately not done
+Also not done: arbitrary repo/org discovery, LLM arithmetic, self-assigned LLM confidence,
+raw-text prompts and a business-hours mode. Revert, reland and supersession links are not
+derived. Real-history backtesting, human calibration, AI-authorship analysis, stacked-PR
+dependency waiting and cumulative-flow charts remain outside this version.
 
-No individual productivity rankings, request-time GitHub fetching, arbitrary repo/org discovery,
-LLM arithmetic, self-assigned LLM confidence or raw-text prompts. No authentication, deployment
-integration, webhook ingestion, second source adapter implementation or business-hours mode.
-Revert, reland and supersession links are not derived.
-Real-history backtesting, human calibration, AI-authorship analysis, stacked-PR dependency
-waiting, cumulative-flow charts and release/deployment timing remain outside this version.
+Known limitations:
 
-### Beyond the brief
+- PRs opened before the selected period and merged by a bot with no human activity in the
+  period are not counted in throughput.
+- GitHub omits design discussions, offline coordination and deployments. Rewritten or rebased
+  commit timestamps distort coding time. Current labels are not historical ownership.
+- Small samples suppress p50 below 20 and rates below 30 cases/5 events. Location and PR-size
+  comparisons have their own sample gates; insufficient values remain null.
+- Recharts 2 is deprecated; migrating to v3 is a maintenance follow-up.
 
-Implemented: deterministic evidence scoring and validation, repair/template fallback, immutable
-snapshots and ETags, staged backfill/open sweeps,
-an English narrative with two scored hypotheses, offline eval, React dashboard,
-Docker and automated verification config.
-
-### Known limitations
-
-- PRs that have been open without human activity during the selected period are not listed;
-  extend the date range to include them.
-- PRs opened before the selected period and merged by a bot with no human activity in
-  the period are not counted in throughput.
-
-GitHub omits design discussions, offline coordination and deployments. Rewritten or rebased
-commit timestamps distort coding time. Current labels are not historical ownership.
-Small samples suppress p50 below 20 and rates below 30 cases/5 events.
-Location and PR-size comparisons have their own sample gates. Insufficient values remain null.
-Confidence still needs historical replay and human labels.
-Recharts 2 is deprecated; migrating to v3 is a maintenance follow-up.
-
-## Development
-
-Use Python 3.12 and uv for backend development, Node 24 for the frontend.
-Lockfiles are committed; use frozen installs for reproducibility.
-
-```bash
-cd backend
-uv sync --frozen
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy
-uv run pytest -m "not integration"
-uv run pytest
-uv run python -m insights_eval.run --llm stub
-cd ../frontend
-npm ci
-npm test
-npm run typecheck
-npm run build
-npm run dev
-```
+## Code organization
 
 The delivery insight and narrative routes, including HTTP reply conversion, live in
 `api/routes/insights.py`. The PR-size driver shares `analytics/efficiency.py`; the stable
@@ -390,17 +309,15 @@ requests and requests still active on unmount. `format.ts` owns display and UTC 
 TypeScript rejects unused locals and parameters. Pure configuration-message logic stays
 separate from JSX so its Node tests need no browser or JSX loader.
 
-Vite proxies `/api` to the local API. Compose serves the built UI through nginx instead.
-Make targets: `up`, `down`, `logs`, `lint`, `fmt`, `test-unit`, `test`, `eval-offline`, `eval`.
-The GitHub Actions workflow applies backend lint/tests/eval and frontend typecheck/build.
+`npm run dev` starts Vite, which proxies `/api` to the local API; Compose serves the built UI
+through nginx instead. The GitHub Actions workflow runs backend lint, unit and integration
+tests and the offline eval, and frontend tests, typecheck and build.
 
 | Directory | Contents |
 |---|---|
-| `backend/src/insights/` | API, source, sync, database, analytics and narrative modules |
+| `backend/src/insights/` | API, source, sync, database, analytics, snapshot and narrative modules |
 | `backend/migrations/` | Consolidated Alembic initial schema; earlier databases require reset/resync |
 | `backend/tests/` | Unit, integration, fixture and golden checks |
 | `backend/eval/` | Synthetic generator, scenarios and evaluation runner |
 | `frontend/` | React/TypeScript UI, shared abortable requests and formatting, Vite config and nginx image |
-| `backend/src/insights/snapshots/` | Shared orchestration, readiness, caching and domain errors |
-| `backend/src/insights/sync/queue.py` | Shared job lifecycle, locks and queue helpers |
 | `docs/` | This technical reference and the architecture diagram |

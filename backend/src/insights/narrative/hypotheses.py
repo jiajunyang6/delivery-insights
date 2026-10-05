@@ -1,4 +1,4 @@
-"""Deterministic scoring of the three library hypotheses against evidence items.
+"""Deterministic scoring of the two library hypotheses against evidence items.
 
 Code decides which hypotheses qualify and their confidence band; the LLM only words them.
 """
