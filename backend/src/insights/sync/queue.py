@@ -25,7 +25,6 @@ logger = structlog.get_logger(__name__)
 JOB_ROUTES = {
     "backfill": ("sync_repo", "sync"),
     "incremental": ("sync_repo", "sync"),
-    "manual": ("sync_repo", "sync"),
     "rederive": ("rederive_repo", "rederive"),
     "ci_runs": ("enrich_repo", "ci"),
     "ownership": ("enrich_repo", "owners"),

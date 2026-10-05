@@ -36,7 +36,7 @@ async def prepare(api, *, enabled=False, bad=False):
     return (
         snapshot,
         valid,
-        f"/v1/snapshots/{snapshot['snapshot_id']}/narrative?audience=director&lang=en",
+        f"/v1/snapshots/{snapshot['snapshot_id']}/narrative",
     )
 
 
@@ -102,36 +102,28 @@ async def test_unknown_expired_and_invalid_narrative_requests(api):
     client, _, clock, _ = api
     _, _, url = await prepare(api)
     assert (await client.get("/v1/snapshots/s_0000000000000000/narrative")).status_code == 404
-    assert (await client.get("/v1/snapshots/no/narrative")).status_code == 422
-    for query in ("audience=administrator", "lang=xx", "lang=zh"):
-        response = await client.get(url.split("?")[0] + "?" + query)
-        assert response.status_code == 422 and response.headers["content-type"].startswith(
-            "application/problem+json"
-        )
-        assert query.split("=")[1] not in response.text
-        assert response.json()["errors"][0]["param"] == query.split("=")[0]
+    invalid = await client.get("/v1/snapshots/no/narrative")
+    assert invalid.status_code == 422
+    assert invalid.headers["content-type"].startswith("application/problem+json")
     assert (await client.get(url)).status_code == 200
     clock["now"] += timedelta(days=8)
     assert (await client.get(url)).status_code == 404
 
 
-@pytest.mark.parametrize("audience", ["director", "manager"])
-async def test_only_english_default_and_explicit_language_match(api, audience):
+async def test_narrative_is_the_english_director_view(api):
     client, _, _, _ = api
-    snapshot, _, _ = await prepare(api)
-    url = f"/v1/snapshots/{snapshot['snapshot_id']}/narrative?audience={audience}"
-    default = await client.get(url)
-    explicit = await client.get(url + "&lang=en")
-    assert default.status_code == explicit.status_code == 200
-    assert default.content == explicit.content
-    assert default.headers["etag"] == explicit.headers["etag"]
-    payload = default.json()
-    assert payload["lang"] == "en" and payload["meta"]["prompt_version"] == PROMPT_VERSION
+    _, _, url = await prepare(api)
+    response = await client.get(url)
+    ignored = await client.get(url + "?audience=manager&lang=zh")
+    assert response.status_code == ignored.status_code == 200
+    assert response.content == ignored.content
+    payload = response.json()
+    assert payload["lang"] == "en" and payload["audience"] == "director"
+    assert payload["meta"]["prompt_version"] == PROMPT_VERSION
     NarrativeSchema.model_validate(payload)
     contract = (await client.get("/openapi.json")).json()
     parameters = contract["paths"]["/v1/snapshots/{snapshot_id}/narrative"]["get"]["parameters"]
-    language = next(p["schema"] for p in parameters if p["name"] == "lang")
-    assert language.get("const") == "en" or language.get("enum") == ["en"]
+    assert [p["name"] for p in parameters] == ["snapshot_id"]
 
 
 async def test_current_prompt_never_reuses_legacy_language_or_prompt_caches(api):
@@ -162,8 +154,7 @@ async def test_current_prompt_never_reuses_legacy_language_or_prompt_caches(api)
                     created_at=clock["now"],
                 )
             )
-    rejected = await client.get(url.replace("lang=en", "lang=zh"))
-    assert rejected.status_code == 422 and not app.state.llm.calls
+    assert not app.state.llm.calls
     fresh = await client.get(url)
     assert fresh.status_code == 200 and fresh.json()["meta"]["prompt_version"] == PROMPT_VERSION
     assert fresh.json()["narrative"] != "legacy" and len(app.state.llm.calls) == 1

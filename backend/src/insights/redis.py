@@ -3,7 +3,6 @@
 from hashlib import sha256
 from typing import cast
 
-from arq.connections import ArqRedis, RedisSettings, create_pool
 from redis.asyncio import Redis
 
 from insights.config import Settings
@@ -19,11 +18,6 @@ def create_redis(settings: Settings) -> Redis:
 def snapshot_key(snapshot_id: str) -> str:
     """Redis key for a snapshot's cached body and ETag."""
     return f"di:snap:{snapshot_id}"
-
-
-def rows_key(snapshot_id: str) -> str:
-    """Redis key for the cached PR rows belonging to a snapshot."""
-    return f"di:rows:{snapshot_id}"
 
 
 def narrative_key(
@@ -48,11 +42,6 @@ def narrative_lock_key(snapshot_id: str, audience: str, lang: str) -> str:
     return f"di:lock:narr:{snapshot_id}:{audience}:{lang}"
 
 
-def sync_cooldown_key(repo: str) -> str:
-    """Repository-level manual-sync cooldown key, normalized to lowercase."""
-    return f"di:cooldown:sync:{repo.lower()}"
-
-
 def rate_limit_key(client_ip: str, epoch_minute: int) -> str:
     """Client-IP request counter key for a single epoch-minute bucket."""
     return f"di:rl:{client_ip}:{epoch_minute}"
@@ -61,11 +50,3 @@ def rate_limit_key(client_ip: str, epoch_minute: int) -> str:
 def github_etag_key(url: str) -> str:
     """Redis key derived from the complete request URL without exposing that URL in the key."""
     return f"di:gh:etag:{sha256(url.encode()).hexdigest()}"
-
-
-async def connect_arq(url: str) -> ArqRedis:
-    """Connect without retries so callers can fail fast and report the queue unavailable."""
-    settings = RedisSettings.from_dsn(url)
-    settings.conn_retries = 0
-    settings.conn_timeout = 2
-    return await create_pool(settings)

@@ -91,8 +91,8 @@ Main decisions:
 
 ## 3. With one more day
 I would do one of the followings if I had one more day: 
-1. **Add a "Sync now" button** for tracked repositories in the dashboard. The API
-   (`POST /v1/repos/{owner}/{name}/sync` plus job polling) already exists.
+1. **Add a "Sync now" button** for tracked repositories in the dashboard, backed by a
+   manual sync endpoint with a cooldown; the worker already runs on-demand sync jobs.
 2. **Add a point-in-time "all open PRs" view** for backlog and at-risk stock, beside the
    period-active view.
 3. **Harden sync:** reconcile jobs killed mid-run at startup, and retry GraphQL throttling

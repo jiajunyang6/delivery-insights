@@ -42,8 +42,6 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int = Field(default=60, ge=1)
     cors_origins: str = "http://localhost:5173"
     rate_limit_per_minute: int = Field(default=120, ge=1)
-    manual_sync_cooldown_seconds: int = Field(default=300, ge=1)
-    max_repos_per_request: int = Field(default=20, ge=1)
     precompute_days: str = "7,30,60"
     ci_source: Literal["actions", "none"] = "actions"
     ci_complete: bool = False

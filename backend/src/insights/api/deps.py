@@ -4,15 +4,11 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Annotated, cast
 
-from arq.connections import ArqRedis
 from fastapi import Depends, Request
 from redis.asyncio import Redis
-from redis.exceptions import RedisError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from insights.api.errors import unavailable
 from insights.config import Settings
-from insights.redis import connect_arq
 from insights.snapshots.service import SnapshotService
 
 
@@ -46,16 +42,3 @@ def get_snapshot_service(
 ) -> "SnapshotService":
     """Bind snapshot orchestration to shared dependencies and this request's observation time."""
     return SnapshotService(request.app.state.session_factory, redis, settings, now)
-
-
-async def get_arq(request: Request) -> "ArqRedis":
-    """Shared arq pool, connected on first use if startup could not reach Redis; 503 if down."""
-    existing = getattr(request.app.state, "arq", None)
-    if existing is not None:
-        return cast(ArqRedis, existing)
-    try:
-        pool = await connect_arq(get_settings(request).redis_url)
-    except (RedisError, OSError, TimeoutError) as exc:
-        raise unavailable("The sync queue is unavailable.") from exc
-    request.app.state.arq = pool
-    return pool

@@ -148,7 +148,6 @@ def assemble(
         "abstain_reason": pack["abstain_reason"],
         "hypotheses": hypotheses,
         "evidence": evidence,
-        "links": {"snapshot": f"/v1/snapshots/{snapshot['snapshot_id']}"},
         "meta": meta,
     }
 

@@ -1,6 +1,5 @@
 from datetime import timedelta
 from unittest.mock import AsyncMock
-from uuid import uuid4
 
 import httpx
 import orjson
@@ -14,18 +13,11 @@ from tests.integration.test_sync import NOW
 
 from insights.analytics import ANALYTICS_VERSION
 from insights.api.deps import get_now
-from insights.api.schemas import (
-    Pending,
-    PrPage,
-    RepoList,
-    SyncJobResponse,
-)
-from insights.api.schemas import (
-    Snapshot as SnapshotSchema,
-)
-from insights.db.models import PrFact, PrInterval, PullRequest, Repository, Snapshot, SyncJob
+from insights.api.schemas import Pending, RepoList
+from insights.api.schemas import Snapshot as SnapshotSchema
+from insights.db.models import Repository, Snapshot, SyncJob
 from insights.main import create_app
-from insights.redis import llm_error_key, snapshot_key, sync_cooldown_key
+from insights.redis import llm_error_key, snapshot_key
 from insights.sync.derive import current_key
 from insights.sync.queue import enqueue_sync
 
@@ -50,7 +42,6 @@ async def api(context):
     app = create_app(context["settings"])
     app.state.session_factory = context["session_factory"]
     app.state.redis = context["redis"]
-    app.state.arq = context["redis"]
     clock = {"now": NOW}
     app.dependency_overrides[get_now] = lambda: clock["now"]
     async with httpx.AsyncClient(
@@ -66,7 +57,6 @@ async def test_snapshot_caches_etags_and_schema(api, monkeypatch):
     SnapshotSchema.model_validate(first.json())
     assert first.headers["cache-control"] == "private, no-cache"
     assert first.headers["x-request-id"] == "api-check"
-    assert first.headers["content-location"].endswith(first.json()["snapshot_id"])
     assert first.headers["x-snapshot-id"] == first.json()["snapshot_id"]
     second = await client.get(DELIVERY)
     assert second.content == first.content
@@ -117,13 +107,17 @@ async def test_all_pending_reasons_and_no_get_enqueue(api, values, reason):
         await session.execute(update(Repository).values(**values))
         await session.commit()
         job, _ = await enqueue_sync(
-            ctx["redis"], session, "a/b", "rederive" if reason == "rederive" else "manual", now=NOW
+            ctx["redis"],
+            session,
+            "a/b",
+            "rederive" if reason == "rederive" else "incremental",
+            now=NOW,
         )
     result = await client.get(DELIVERY)
     assert result.status_code == 202, result.text
     Pending.model_validate(result.json())
     assert result.json()["repos"][0]["reason"] == reason
-    assert result.headers["location"] == f"/v1/sync-jobs/{job.id}"
+    assert result.json()["repos"][0]["job"] == {"status": job.status, "phase": job.phase}
     assert result.headers["retry-after"] == "30"
     async with ctx["session_factory"]() as session:
         assert await session.scalar(select(func.count()).select_from(SyncJob)) == 1
@@ -154,10 +148,10 @@ async def test_sync_after_configuration_fix_reports_progress_not_unavailable(api
             update(Repository).values(last_sync_status="missing_token", covered_since=None)
         )
         await session.commit()
-        job, _ = await enqueue_sync(ctx["redis"], session, "a/b", "manual", now=NOW)
+        job, _ = await enqueue_sync(ctx["redis"], session, "a/b", "incremental", now=NOW)
     result = await client.get(DELIVERY)
     assert result.status_code == 202, result.text
-    assert result.json()["repos"][0]["job"]["id"] == str(job.id)
+    assert result.json()["repos"][0]["job"]["status"] == job.status
     problems = (await client.get("/v1/repos")).json()["setup"]["github"]["problems"]
     assert problems == [{"repo": "a/b", "status": "missing_token", "syncing": True}]
 
@@ -173,18 +167,14 @@ async def test_partial_watermark(api):
     assert response.json()["meta"]["sample"]["merged_prs"] == 0
 
 
-async def test_id_expiry_and_refresh_expired_cache(api):
+async def test_expired_snapshot_is_recomputed_with_the_same_id(api):
     client, _, clock, ctx = api
     first = await client.get(DELIVERY)
     sid = first.json()["snapshot_id"]
-    stored = await client.get(f"/v1/snapshots/{sid}")
-    assert stored.status_code == 200 and "immutable" in stored.headers["cache-control"]
     clock["now"] += timedelta(days=8)
     assert await ctx["redis"].exists(snapshot_key(sid))
-    assert (await client.get(f"/v1/snapshots/{sid}")).status_code == 404
     renewed = await client.get(DELIVERY)
     assert renewed.status_code == 200 and renewed.content == first.content
-    assert (await client.get(f"/v1/snapshots/{sid}")).status_code == 200
     async with ctx["session_factory"]() as session:
         assert (await session.get(Snapshot, sid)).created_at == clock["now"]
 
@@ -193,12 +183,10 @@ async def test_id_expiry_and_refresh_expired_cache(api):
     ("path", "code"),
     [
         ("/v1/insights/delivery?repo=x/y", 403),
-        ("/v1/insights/delivery?org=unknown", 403),
         ("/v1/insights/delivery?repo=../../secret", 422),
-        ("/v1/insights/delivery?repo=a/b&org=a", 422),
-        ("/v1/snapshots/nope", 422),
-        ("/v1/snapshots/s_0000000000000000", 404),
-        ("/v1/sync-jobs/invalid", 422),
+        ("/v1/insights/delivery?repo=a/b&repo=c/d", 422),
+        ("/v1/snapshots/nope/narrative", 422),
+        ("/v1/snapshots/s_0000000000000000/narrative", 404),
     ],
 )
 async def test_errors_request_ids_and_cors(api, path, code):
@@ -214,85 +202,15 @@ async def test_errors_request_ids_and_cors(api, path, code):
     assert "../../secret" not in response.json()["detail"]
 
 
-async def test_pr_paging_filters_and_stale_cursor(api):
-    client, _, _, ctx = api
-    async with ctx["session_factory"]() as session, session.begin():
-        await session.execute(update(PullRequest).values(author_login=None))
-    all_rows = (await client.get("/v1/insights/delivery/prs?" + QUERY + "&limit=200")).json()
-    PrPage.model_validate(all_rows)
-    assert all_rows["items"][0]["author"] is None
-    items, cursor = [], None
-    while True:
-        suffix = "&cursor=" + cursor if cursor else ""
-        response = await client.get("/v1/insights/delivery/prs?" + QUERY + "&limit=7" + suffix)
-        assert response.status_code == 200, response.text
-        page = response.json()
-        items.extend(page["items"])
-        cursor = page["next_cursor"]
-        if cursor is None:
-            break
-    assert items == all_rows["items"]
-    page = (await client.get("/v1/insights/delivery/prs?" + QUERY + "&limit=5")).json()
-    async with ctx["session_factory"]() as session, session.begin():
-        await session.execute(update(Repository).values(data_version=Repository.data_version + 1))
-    expired = await client.get(
-        "/v1/insights/delivery/prs?" + QUERY + "&cursor=" + page["next_cursor"]
-    )
-    assert expired.status_code == 422
-    assert "restart from the first page" in expired.json()["errors"][0]["message"]
-
-
-async def test_open_risk_rows_and_closed_population(api):
-    client, _, _, ctx = api
-    async with ctx["session_factory"]() as session, session.begin():
-        ids = (await session.scalars(select(PrFact.pr_id).order_by(PrFact.pr_id))).all()
-        await session.execute(
-            update(PrFact)
-            .where(PrFact.pr_id == ids[0])
-            .values(merged_at=None, end_at=None, ready_at=at(-100))
-        )
-        await session.execute(
-            update(PullRequest).where(PullRequest.id == ids[0]).values(state="OPEN", merged_at=None)
-        )
-        await session.execute(
-            update(PrInterval)
-            .where(PrInterval.pr_id == ids[0])
-            .values(start_at=at(-100), end_at=None, state="waiting_reviewer")
-        )
-        await session.execute(
-            update(PrFact)
-            .where(PrFact.pr_id == ids[1])
-            .values(merged_at=None, closed_at=at(10), close_class="abandoned")
-        )
-    snapshot = (await client.get(DELIVERY)).json()
-    rows = await client.get(
-        "/v1/insights/delivery/prs?"
-        + QUERY
-        + "&at_risk=true&state=waiting_reviewer&location=area-A"
-    )
-    assert rows.status_code == 200, rows.text
-    assert rows.json()["total"] == snapshot["at_risk_summary"]["total"] == 1
-    closed = await client.get("/v1/insights/delivery/prs?" + QUERY + "&status=closed")
-    assert closed.json()["total"] == 1
-
-
-async def test_repos_manual_sync_cooldown_dedup_and_job_status(api):
+async def test_repos_list_tracked_repositories(api):
     client, _, _, ctx = api
     ctx["settings"].tracked_repos = "a/b,c/d"
     repos = await client.get("/v1/repos")
     RepoList.model_validate(repos.json())
-    assert repos.json()["items"][1]["last_sync_status"] == "never"
-    first = await client.post("/v1/repos/a/b/sync")
-    assert first.status_code == 202, first.text
-    SyncJobResponse.model_validate(first.json())
-    assert (await client.get(first.headers["location"])).json() == first.json()
-    again = await client.post("/v1/repos/a/b/sync")
-    assert again.status_code == 429 and int(again.headers["retry-after"]) > 0
-    await ctx["redis"].delete(sync_cooldown_key("a/b"))
-    duplicate = await client.post("/v1/repos/a/b/sync")
-    assert duplicate.json()["id"] == first.json()["id"]
-    assert (await client.get(f"/v1/sync-jobs/{uuid4()}")).status_code == 404
-    assert (await client.post("/v1/repos/unknown/repo/sync")).status_code == 403
+    assert repos.json()["items"] == [
+        {"repo": "a/b", "last_sync_status": "ok"},
+        {"repo": "c/d", "last_sync_status": "never"},
+    ]
 
 
 async def test_rate_limit_fail_open_and_redis_cache_fallback(api, monkeypatch):
@@ -316,25 +234,19 @@ async def test_rate_limit_fail_open_and_redis_cache_fallback(api, monkeypatch):
     assert "access-control-allow-origin" not in denied_origin.headers
 
 
-async def test_org_alias_and_complete_openapi_models(api):
-    client, app, _, _ = api
-    single = await client.get(DELIVERY)
-    organization = await client.get(DELIVERY.replace("repo=a/b", "org=a"))
-    assert single.status_code == organization.status_code == 200
-    assert single.content == organization.content
+async def test_complete_openapi_models(api):
+    _, app, _, _ = api
     paths = app.openapi()["paths"]
-    for path in (
+    assert set(paths) == {
         "/v1/insights/delivery",
-        "/v1/insights/delivery/prs",
-        "/v1/snapshots/{snapshot_id}",
         "/v1/snapshots/{snapshot_id}/narrative",
         "/v1/repos",
-        "/v1/sync-jobs/{job_id}",
         "/healthz",
         "/readyz",
-    ):
-        assert paths[path]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
-    assert "post" in paths["/v1/repos/{owner}/{name}/sync"]
+    }
+    for item in paths.values():
+        assert set(item) == {"get"}
+        assert item["get"]["responses"]["200"]["content"]["application/json"]["schema"]
 
 
 async def test_repos_report_setup_problems_without_secret_values(api):

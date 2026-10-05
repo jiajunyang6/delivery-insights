@@ -68,12 +68,9 @@ Until a period is covered, the API returns `202` with `Retry-After` and the dash
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/v1/insights/delivery?repo=…&from=…&to=…` | Metrics, time ledger, bottlenecks and at-risk PRs (immutable snapshot) |
-| GET | `/v1/snapshots/{snapshot_id}/narrative?audience=director\|manager` | Cited narrative, hypotheses and evidence for that snapshot |
-| GET | `/v1/insights/delivery/prs` | Filtered, paginated PR drilldown |
-| GET | `/v1/snapshots/{snapshot_id}` | Read a retained snapshot |
-| GET | `/v1/repos` | Tracked repositories, freshness and sync status |
-| POST | `/v1/repos/{owner}/{name}/sync` | Enqueue a manual sync (`GET /v1/sync-jobs/{id}` for progress) |
+| GET | `/v1/insights/delivery?repo=…&from=…&to=…` | Snapshot for one repository and period, or `202` sync progress |
+| GET | `/v1/snapshots/{snapshot_id}/narrative` | Cited narrative, hypotheses and evidence for that snapshot |
+| GET | `/v1/repos` | Tracked repositories, sync status, date limits and configuration health |
 | GET | `/healthz`, `/readyz` | Liveness and Postgres/Redis readiness |
 
 ```bash

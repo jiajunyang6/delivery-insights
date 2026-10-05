@@ -262,7 +262,7 @@ async def test_timeline_violation_is_counted_and_facts_are_still_saved(
 
 async def test_enqueue_deduplicates_without_extra_ledger_rows(context):
     first, created = await queued(context)
-    second, again = await queued(context, "manual")
+    second, again = await queued(context, "incremental")
     assert created and not again and first.id == second.id
     async with context["session_factory"]() as session:
         assert await session.scalar(select(func.count()).select_from(SyncJob)) == 1
@@ -271,7 +271,7 @@ async def test_enqueue_deduplicates_without_extra_ledger_rows(context):
 async def test_repository_lock_records_skipped_job(context):
     job, _ = await queued(context)
     await context["redis"].set(sync_lock_key("a/b"), "another-job", ex=60)
-    assert await sync_repo(context, "a/b", "manual", str(job.id)) == "skipped_locked"
+    assert await sync_repo(context, "a/b", "incremental", str(job.id)) == "skipped_locked"
     _, jobs = await load_state(context)
     assert jobs[0].status == "failed" and jobs[0].error.startswith("skipped:")
     assert await context["redis"].get(sync_lock_key("a/b")) == b"another-job"
@@ -280,7 +280,7 @@ async def test_repository_lock_records_skipped_job(context):
 async def test_auth_failure_redacts_token(context):
     context["router"].post("https://api.github.com/graphql").respond(401, text="private body")
     job, _ = await queued(context)
-    assert await sync_repo(context, "a/b", "manual", str(job.id)) == "failed"
+    assert await sync_repo(context, "a/b", "incremental", str(job.id)) == "failed"
     repo, jobs = await load_state(context)
     assert repo.last_sync_status == "auth_error"
     assert "private" not in jobs[0].error
@@ -294,8 +294,8 @@ async def test_missing_token_keeps_worker_usable(context):
     await incremental_sync_all(context)
     repo, jobs = await load_state(context)
     assert repo.last_sync_status == "missing_token" and not jobs
-    job, _ = await queued(context, "manual")
-    assert await sync_repo(context, "a/b", "manual", str(job.id)) == "missing_token"
+    job, _ = await queued(context, "incremental")
+    assert await sync_repo(context, "a/b", "incremental", str(job.id)) == "missing_token"
 
 
 async def test_incremental_runs_before_resumed_backfill(context, github_page):

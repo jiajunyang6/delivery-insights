@@ -40,7 +40,7 @@ individual productivity scores or causal proof. Workflow and timestamp changes a
 
 | Component | Responsibility |
 |---|---|
-| `api` | Local-data queries, snapshot/narrative persistence, manual sync enqueueing |
+| `api` | Local-data queries, snapshot/narrative persistence |
 | `worker` | GitHub ingestion, derivation, enrichment, precomputation, retention |
 | `postgres` | Source data, facts, intervals, immutable snapshots and narratives |
 | `redis` | arq jobs, locks, response caches and fixed-window limits |
@@ -59,19 +59,14 @@ OpenAPI is available at `/openapi.json` and `/docs`; the historical design is
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/v1/insights/delivery` | Insight snapshot for selected repositories and dates |
-| GET | `/v1/insights/delivery/prs` | Filtered and paginated PR detail |
-| GET | `/v1/snapshots/{snapshot_id}` | Read a retained immutable snapshot |
-| GET | `/v1/snapshots/{snapshot_id}/narrative` | `audience=director\|manager`, `lang=en` only (default) |
-| GET | `/v1/repos` | Whitelist, freshness, sync status and configuration health (`setup`) |
-| POST | `/v1/repos/{owner}/{name}/sync` | Enqueue a manual sync |
-| GET | `/v1/sync-jobs/{job_id}` | Inspect sync progress |
+| GET | `/v1/insights/delivery` | Insight snapshot for one tracked repository and period, or `202` Pending |
+| GET | `/v1/snapshots/{snapshot_id}/narrative` | English narrative for a retained snapshot |
+| GET | `/v1/repos` | Tracked repositories, sync status, date limits and configuration health (`setup`) |
 | GET | `/healthz` | Process liveness |
 | GET | `/readyz` | Postgres and Redis readiness |
 
-Repeated `repo=` values aggregate tracked repositories; `org=` selects only tracked
-repositories of that owner. Percentiles pool PRs; query a single repository for a separate view.
-Unknown parameters are rejected. Invalid input returns `422`; untracked repos return `403`.
+`repo=` names exactly one tracked repository. Unknown parameters are ignored. Invalid input
+returns `422`; untracked repos return `403`.
 Errors use RFC 9457 `application/problem+json` with `request_id` and sanitized detail.
 
 Once sync has produced a `200` response:
@@ -84,19 +79,17 @@ curl -sD /tmp/di-headers "$API/v1/insights/delivery?repo=bevyengine/bevy&from=$F
 SID=$(python3 -c 'import json; print(json.load(open("/tmp/di-snapshot.json"))["snapshot_id"])')
 ETAG=$(python3 -c 'from pathlib import Path; print(next(s.split(":",1)[1].strip() for s in Path("/tmp/di-headers").read_text().splitlines() if s.lower().startswith("etag:")))')
 curl -i -H "If-None-Match: $ETAG" "$API/v1/insights/delivery?repo=bevyengine/bevy&from=$FROM&to=$TO"
-curl -s "$API/v1/snapshots/$SID"
-curl -s "$API/v1/snapshots/$SID/narrative?audience=manager&lang=en"
+curl -s "$API/v1/snapshots/$SID/narrative"
 ```
 
-The conditional request returns `304` with no body. Insights and PR rows use `private, no-cache`,
-so browsers revalidate with the ETag and see new coverage as soon as a sync lands; snapshots by ID have a one-day immutable cache. Successful narratives and
+The conditional request returns `304` with no body. Insights use `private, no-cache`, so
+browsers revalidate with the ETag and see new coverage as soon as a sync lands. Successful narratives and
 disabled-LLM templates have `private, max-age=3600`; failure fallbacks use `no-store`.
 Internal Redis TTLs are separate from HTTP cache directives.
 
 A `202` is a Pending object, not a snapshot. Respect `Retry-After`; inspect each repo's
-`reason` and `job`. The UI polls for at most five minutes, then asks for a later refresh.
-PR pages accept `status`, `at_risk`, `state`, `location`, `limit` and `cursor`.
-A cursor is tied to snapshot identity and filters; refresh if the data version changes.
+`reason` and `job` (status and phase). The UI polls for at most five minutes, then asks for a
+later refresh.
 
 ## Snapshot contract in analytics 1.5.3
 
@@ -228,12 +221,11 @@ Worker housekeeping expires retained data and precomputes 7-, 30- and 60-day rep
 ```bash
 curl -s http://localhost:8000/readyz
 curl -s http://localhost:8000/v1/repos
-curl -i -X POST http://localhost:8000/v1/repos/bevyengine/bevy/sync
 docker compose logs --tail=50 api worker
 ```
 
-Manual sync responds `202` with `Location`; repeating it during the 300-second cooldown
-returns `429` with `Retry-After`. General rate limiting also returns `429`.
+The worker syncs on a schedule (`SYNC_INTERVAL_MINUTES`); there is no manual sync endpoint.
+Rate limiting returns `429` with `Retry-After`.
 Requests proxied through nginx share its upstream client-IP bucket; this is a local demo.
 Cache/rate-limit Redis failures are fail-open where possible; readiness still reports failure.
 Worker locks are renewed; checkpoints support resumption. Compose restarts failed workers.
@@ -341,7 +333,6 @@ benchmark or real-world causal calibration. Missing-key evaluation exits 2.
 | Decision | Choice and cost | Follow-up |
 |---|---|---|
 | Time basis | UTC wall-clock, including nights/weekends | Add team calendars |
-| Multi-repo | Pool PRs; larger repos dominate aggregate percentiles | Query each repository separately |
 | Locations | Current labels → CODEOWNERS → directories; historical labels unavailable | Inspect location rows and current ownership configuration |
 | Scope | Default-branch flow; bots/backports excluded | Separate release-branch view |
 | Freshness | Background sync, default 15 minutes | Webhooks if lower latency is needed |
@@ -367,7 +358,7 @@ waiting, cumulative-flow charts and release/deployment timing remain outside thi
 ### Beyond the brief
 
 Implemented: deterministic evidence scoring and validation, repair/template fallback, immutable
-snapshots and ETags, multi-repo aggregation, PR drilldown, staged backfill/open sweeps,
+snapshots and ETags, staged backfill/open sweeps,
 four narrative variants, offline eval, React dashboard, CODEOWNERS/area-owner enrichment,
 Actions CI waiting, drivers, Kaplan–Meier survival, historical predictability, Docker and CI config.
 

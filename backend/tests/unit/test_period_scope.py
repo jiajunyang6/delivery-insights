@@ -8,7 +8,7 @@ from tests.unit.test_ci import run
 
 from insights.analytics.bottlenecks import at_risk, series
 from insights.analytics.dataset import RepoData, SnapshotParams, Window, active_in
-from insights.analytics.snapshot import build_pr_rows, build_snapshot
+from insights.analytics.snapshot import build_snapshot
 from insights.analytics.timeline import Interval
 from insights.narrative.evidence import extract_evidence
 from insights_eval.generator import SyntheticRepo
@@ -55,7 +55,6 @@ def test_human_activity_union_flows_through_all_dashboard_outputs():
     assert snapshot["bottleneck_analysis"]["review_queue"]["weeks"][0]["open_at_week_end"] == 2
     assert snapshot["at_risk_summary"]["total"] == 1
     assert {p["number"] for p in snapshot["at_risk_prs"]} == {2}
-    assert {p["number"] for p in build_pr_rows(d)} == {2, 5, 8}
     evidence = next(e for e in extract_evidence(snapshot) if e["id"] == "E25")
     assert evidence["value"] == 1
     assert set(evidence["examples"]) == {
@@ -113,9 +112,6 @@ def test_inactive_bot_merged_pr_and_ci_are_excluded_with_consistent_totals():
     assert sum(w["merged"] for w in s["series"]["current"]) == 1
     assert s["bottleneck_analysis"]["ci"]["queue_p50_minutes"]["n"] == 1
     assert s["bottleneck_analysis"]["ci"]["flaky_rerun_rate"]["n"] == 1
-    rows = build_pr_rows(d)
-    assert [r["number"] for r in rows] == [1]
-    assert sum(sum(r["ledger_hours"].values()) for r in rows) == 30
 
 
 def test_weekly_series_keeps_the_full_selected_period_cohort():

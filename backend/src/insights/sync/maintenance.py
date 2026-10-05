@@ -10,7 +10,7 @@ from sqlalchemy import delete
 from insights.analytics.dataset import SnapshotParams
 from insights.config import Settings, split_list
 from insights.db.models import Snapshot, SyncJob
-from insights.redis import rows_key, snapshot_key
+from insights.redis import snapshot_key
 from insights.snapshots.errors import ResourceError
 from insights.snapshots.service import SnapshotService
 from insights.sync.queue import now_for, sessions_for
@@ -60,7 +60,7 @@ async def housekeeping(ctx: dict[str, Any]) -> None:
         await session.execute(delete(SyncJob).where(SyncJob.finished_at < now - timedelta(days=30)))
     for sid in expired:
         try:
-            keys = [snapshot_key(sid), rows_key(sid)]
+            keys = [snapshot_key(sid)]
             async for key in ctx["redis"].scan_iter(match=f"di:narr:{sid}:*", count=100):
                 keys.append(key)
             await ctx["redis"].delete(*keys)

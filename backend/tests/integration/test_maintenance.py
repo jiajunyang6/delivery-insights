@@ -8,7 +8,7 @@ from tests.integration.test_sync import NOW
 
 from insights.analytics.dataset import SnapshotParams
 from insights.db.models import Repository, Snapshot, SyncJob
-from insights.redis import rows_key, snapshot_key
+from insights.redis import snapshot_key
 from insights.snapshots.service import SnapshotService
 from insights.sync.derive import current_key
 from insights.sync.maintenance import housekeeping, precompute_snapshots
@@ -31,7 +31,7 @@ async def test_housekeeping_deletes_all_cache_keys_and_only_finished_old_jobs(co
             )
         )
         await session.commit()
-        job, _ = await enqueue_sync(context["redis"], session, "a/b", "manual", now=NOW)
+        job, _ = await enqueue_sync(context["redis"], session, "a/b", "incremental", now=NOW)
         job.finished_at = NOW - timedelta(days=31)
         job.status = "succeeded"
         await session.commit()
@@ -43,13 +43,12 @@ async def test_housekeeping_deletes_all_cache_keys_and_only_finished_old_jobs(co
     )
     response = await service.delivery(params)
     sid = response.headers["X-Snapshot-Id"]
-    await context["redis"].set(rows_key(sid), b"[]")
     narrative_key = f"di:narr:{sid}:manager:en:v1:template:hash"
     await context["redis"].set(narrative_key, b"test")
     async with context["session_factory"]() as session, session.begin():
         await session.execute(update(Snapshot).values(created_at=NOW - timedelta(days=8)))
     await housekeeping(context)
-    assert not await context["redis"].exists(snapshot_key(sid), rows_key(sid), narrative_key)
+    assert not await context["redis"].exists(snapshot_key(sid), narrative_key)
     async with context["session_factory"]() as session:
         assert await session.get(Snapshot, sid) is None
         assert await session.get(SyncJob, job.id) is None

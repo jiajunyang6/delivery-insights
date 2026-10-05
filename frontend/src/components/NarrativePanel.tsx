@@ -251,10 +251,7 @@ export function NarrativePanel({
     setData(null);
     setError("");
     setHighlight("");
-    fetchJson<Narrative>(
-      "/v1/snapshots/" + snapshotId + "/narrative?audience=director",
-      signal,
-    )
+    fetchJson<Narrative>("/v1/snapshots/" + snapshotId + "/narrative", signal)
       .then((r) => {
         if (signal.aborted) return;
         setData(r.data);

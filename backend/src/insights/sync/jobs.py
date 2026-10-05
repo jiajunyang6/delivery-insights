@@ -328,7 +328,7 @@ async def enqueue_enrichment(ctx: dict[str, Any], repo: Repository) -> None:
 
 
 async def sync_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
-    """arq entry point for backfill, incremental and manual syncs of one repository.
+    """arq entry point for backfill and incremental syncs of one repository.
 
     Returns the job result, "skipped_locked" or "missing_token". Snapshots are precomputed only
     when the run changed `data_version`; due CI and ownership enrichment is queued afterwards.

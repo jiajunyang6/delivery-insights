@@ -62,7 +62,8 @@ Without Make (Windows), run the equivalent `uv run` commands from the Makefile.
   bytes. The golden file pins this.
 - Bump `ANALYTICS_VERSION` (`analytics/__init__.py`) whenever snapshot output or derived facts
   change. It is part of the snapshot ID and of the derive key: new requests get new snapshot
-  IDs (old snapshots stay readable by ID, so caches are isolated, not invalidated) and workers
+  IDs (old snapshots stay stored until retention expires, so caches are isolated, not
+  invalidated) and workers
   rederive existing PRs in the background.
 - `SAMPLING_SEED_VERSION` (`analytics/stats.py`) freezes bootstrap seeds. Change it only to
   change statistical sampling on purpose.
