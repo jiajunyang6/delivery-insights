@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Instructions for coding agents working in this repository. Read this file first; `README.md`
-and `NOTES.md` describe the product, `docs/REFERENCE.md` holds the current contracts.
+describes the product and submission, `docs/REFERENCE.md` holds the current contracts.
 
 ## Ground rules
 
@@ -29,7 +29,7 @@ and `NOTES.md` describe the product, `docs/REFERENCE.md` holds the current contr
 | `backend/tests/` | Unit and integration tests, factories, golden snapshot (`tests/golden/`) |
 | `backend/eval/` | Synthetic scenarios and the narrative evaluation harness |
 | `frontend/src/` | React dashboard: components, `format.ts`, `api.ts` request cancellation |
-| `docs/` | `REFERENCE.md` contracts, `DECISIONS.md` why, `EVALUATION.md` eval runs, `PLAN.md` historical plan (not authoritative) |
+| `docs/` | `REFERENCE.md` contracts, evaluation results and trade-offs; the architecture diagram |
 
 ## Commands
 
@@ -106,8 +106,8 @@ Without Make (Windows), run the equivalent `uv run` commands from the Makefile.
 - Golden snapshot: regenerate with `UPDATE_GOLDEN=1 uv run pytest tests/unit/test_snapshot.py` (in `backend/`)
   and review the diff; it may contain only the intended changes.
 - Prompt changes need a real `make eval`: all gates pass, first-attempt validity at least 0.90
-  and numeric, citation and hedge consistency 1.00. Record results in `docs/EVALUATION.md`.
+  and numeric, citation and hedge consistency 1.00. Record results in the `docs/REFERENCE.md` testing section.
 - UI changes: check 7/30/60-day and custom periods, the pending state, the configuration
   notice, the narrative panel and the time ledger in a browser.
-- Update the docs your change affects: README (run), NOTES (submission), REFERENCE (contracts),
-  DECISIONS (reasons).
+- Update the docs your change affects: README (run and submission notes) and REFERENCE
+  (contracts, results and trade-offs).

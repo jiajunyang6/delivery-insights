@@ -1,7 +1,6 @@
 # Technical reference
 
-Detailed behavior moved out of the README. Start with the [README](../README.md) and [NOTES](../NOTES.md).
-Current contracts are in code and this reference; [the consolidated plan](PLAN.md) retains historical design input. Implementation decisions are in [DECISIONS.md](DECISIONS.md).
+Detailed behavior behind the [README](../README.md). Current contracts are in code and this reference.
 
 ## The insight and why this metric
 
@@ -46,8 +45,7 @@ It may call Bedrock for an uncached narrative; heavy analytics and boto3 run in 
 
 ## API
 
-OpenAPI is available at `/openapi.json` and `/docs`; the historical design is
-[API contract chapter](PLAN.md#plan-06). Dates and timestamps use UTC.
+OpenAPI is available at `/openapi.json` and `/docs`. Dates and timestamps use UTC.
 `from` and `to` are inclusive dates; comparison uses the preceding equal-length period. `as_of` is capped by the least recent repository sync watermark.
 
 | Method | Path | Purpose |
@@ -280,53 +278,27 @@ make eval-offline
 make eval
 ```
 
-Current checks: 318 backend tests (63 integration), 15 frontend tests,
-Ruff/strict mypy, typecheck/build and all eight offline narrative gates pass. Browser
-verification uses synthetic data on the newly built UI, including 7/30/60 days, a custom
-period, pending, configuration notice, narrative and the three-state ledger. After the user's
-database rebuild, the Bevy worker completed the 120-day backfill and precomputed the
-7/30/60-day reports. The current real Bedrock run passes all eight gates: first validity
-14/15, numeric/citation/hedge consistency 14/14 each and fallback 1/15. The golden
-comparison removes only CI fields and changes version/identity; retained values match.
+Current checks: 318 backend tests (63 integration) and 15 frontend tests pass, together with
+Ruff, strict mypy and the frontend typecheck and build.
 
-Historical scope-reduction checks (before CI removal):
+The evaluation harness runs three planted scenarios (review capacity, PR size growth and no
+signal) with five seeds: 15 English narratives on prompt v13. Numeric, citation and hedge
+consistency cover final LLM outputs.
 
-| Check | Observed result |
-|---|---|
-| Ruff check/format and strict mypy | Pass |
-| Backend suite | 326 passed: 261 unit and 65 integration tests |
-| Frontend tests, typecheck and build | 15 tests passed; typecheck/build pass with Node 24 |
-| Scope-reduction equivalence | Every retained snapshot value in the golden output matches the pre-reduction golden (290 values); only the snapshot ID and analytics version differ |
-| Live rebuild | After a confirmed `down -v`, Bevy synced from empty: the 120-day backfill finished in 293 s with status `ok`; the pending panel showed `backfill:7d` progress first |
-| Live browser check | 7, 30 and 60 days: the 7-day `no_slowdown` and 30-day `no_comparison` LLM narratives passed validation first time; the 60-day narrative fell back to the template on a low-band wording violation under v11. Under v13 the live 60-day snapshot (two low-band hypotheses) passed validation on the first attempt in 4/4 generations. No console errors |
-
-Earlier acceptance measured 3,541 PRs with no invariant violations, three matching PR pages, 533 merged PRs with ledger rounding error 0.0000004833, cold compute 1,376.95 ms and warm HTTP p95 32.32 ms.
-Those analytics 1.2/1.3 measurements and npm ci/audit checks were not repeated here. They are local measurements, not production load evidence.
-The original 90-day performance gate remains excluded; three upstream deprecation warnings remain.
-
-The current harness runs three planted scenarios (review capacity, PR size growth and
-no signal) with five seeds: 15 English narratives. CI slowdown is retired. On prompt v13
-both suites pass all gates: offline 15/15 first-attempt valid; real Bedrock 14/15
-first-attempt valid, every case answered by the LLM after at most one repair, fallback
-0/15. Per-case results are in [EVALUATION.md](EVALUATION.md).
-The following offline and Bedrock results are historical runs with CI analysis enabled.
-Numeric/citation/hedge denominators include final LLM outputs, excluding fallback.
-
-| Metric | Offline (v11) | Real Bedrock (v11) | Required |
+| Metric | Offline (stub) | Real Bedrock (Sonnet 4.6) | Required |
 |---|---|---|---|
-| First-attempt validity | 20/20 (1.00) | 19/20 (0.95) | ≥ 0.90 |
-| Numeric / citation / hedge consistency | 20/20 each | 19/19 each | 1.00 each |
-| Root-cause hit rate | 15/15 (1.00) | 15/15 (1.00) | ≥ 0.80 |
-| No-signal abstention | 5/5 (1.00) | 5/5 (1.00) | ≥ 0.80 |
-| High-confidence precision | 14/14 (1.00) | 14/14 (1.00) | ≥ 0.80 |
-| Fallback rate | 0/20 (0.00) | 1/20 (0.05) | ≤ 0.10 |
+| First-attempt validity | 15/15 | 14/15 (0.93) | ≥ 0.90 |
+| Numeric / citation / hedge consistency | 15/15 each | 15/15 each | 1.00 each |
+| Root-cause hit rate | 10/10 | 10/10 | ≥ 0.80 |
+| No-signal abstention | 5/5 | 5/5 | ≥ 0.80 |
+| High-confidence precision | 10/10 | 10/10 | ≥ 0.80 |
+| Fallback rate | 0/15 | 0/15 | ≤ 0.10 |
 
-Both v11 suites pass all gates. The real fallback (pr_size_growth seed 303) is a low-band
-wording failure on a secondary hypothesis, also seen in live 60-day Bevy narratives.
-Medium/low precision is undefined. Failed v1/v2 and English v4/v5 trials remain
-recorded, together with rejected stage-8 candidates A/B. Earlier rebuilt-API English-only real-manager HTTP smoke is historical; the refactor UI check used synthetic fixtures.
-This small synthetic suite was used during prompt development; it is not a held-out
-benchmark or real-world causal calibration. Missing-key evaluation exits 2.
+The one invalid real first answer quoted an unsupported number and passed after its single
+repair. On live Bevy data, the 60-day narrative with two low-band hypotheses passed validation
+on the first attempt in 4/4 generations. The synthetic suite was used during prompt
+development; it is not a held-out benchmark or real-world causal calibration. Validators and
+gate thresholds were never relaxed to pass. Missing-key evaluation exits 2.
 
 ## Trade-offs and limitations
 
@@ -344,8 +316,6 @@ benchmark or real-world causal calibration. Missing-key evaluation exits 2.
 | Reopened PRs | Closed intervals excluded from ledger; elapsed milestones retain them | Review prevalence before changing duration semantics |
 | Confidence | Evidence score tested only on synthetic scenarios | Replay history and calibrate with human labels |
 | Size scenario | Synthetic duration scales with square root of planted size multiplier | Validate this assumption with real observations |
-
-Implementation-specific decisions and their reasons are recorded in [DECISIONS.md](DECISIONS.md).
 
 ### Things deliberately not done
 
@@ -434,5 +404,4 @@ The GitHub Actions workflow applies backend lint/tests/eval and frontend typeche
 | `frontend/` | React/TypeScript UI, shared abortable requests and formatting, Vite config and nginx image |
 | `backend/src/insights/snapshots/` | Shared orchestration, readiness, caching and domain errors |
 | `backend/src/insights/sync/queue.py` | Shared job lifecycle, locks and queue helpers |
-| `PLAN.md` | Consolidated historical design input |
-| `docs/` | Decisions, acceptance evidence and evaluation records in Markdown |
+| `docs/` | This technical reference and the architecture diagram |

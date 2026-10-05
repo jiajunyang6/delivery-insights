@@ -5,26 +5,29 @@ which evidence supports an explanation. It syncs GitHub PR history in the backgr
 a deterministic time ledger and the evidence behind two scored hypotheses, and adds a cited
 narrative written by Claude Sonnet 4.6 on Amazon Bedrock. Each claim in the narrative links to the number behind it, and every number comes from code.
 
-**Reviewers:** [NOTES.md](NOTES.md) covers how to run it, the architecture, next steps and AI use.
+## 1. How to run it locally
 
-## Quickstart
+**Prerequisites:**
 
-Prerequisites: Docker with Compose v2, and a GitHub fine-grained token with
-**Public repositories** access and no extra permissions. A Bedrock API key is required for
-LLM-generated narratives.
+- Docker with Compose v2 (Docker Desktop on Windows/macOS).
+- A GitHub fine-grained personal access token for live data: Settings → Developer settings → Fine-grained tokens,
+  **Repository access: Public repositories**, no extra permissions.
+- A Bedrock API key is required for LLM-generated narratives.
 
-1. **Create the configuration file.** Copy `.env.example` if `.env` does not already exist:
+**Steps:**
+
+1. **Create the configuration file.** If `.env` does not exist, copy `.env.example`:
 
     Bash:
 
     ```bash
-    [ -f .env ] || cp .env.example .env
+    cp .env.example .env
     ```
 
     PowerShell:
 
     ```powershell
-    if (!(Test-Path .env)) { Copy-Item .env.example .env }
+    Copy-Item .env.example .env
     ```
 
 2. **Edit and save `.env` before starting Docker.** Open `.env` in a text editor.
@@ -41,15 +44,100 @@ LLM-generated narratives.
    Without a Bedrock key, narratives use deterministic templates and no LLM calls are made.
    Save the file before continuing.
 
-3. **Start the services.** Run this command after saving `.env`:
+3. **Start the services and check their status.** Run these commands after saving `.env`:
 
     ```bash
     docker compose up --build -d
+    docker compose ps -a
     ```
 
-Open the dashboard at <http://localhost:5173> and the API docs at <http://localhost:8000/docs>.
-The worker backfills `bevyengine/bevy` in 7-day, 30-day and then `BACKFILL_DAYS` (120) stages.
-Until a period is covered, the API returns `202` with `Retry-After` and the dashboard shows progress.
+    Expected status: `migrate` has exited with code `0`; `api`, `worker`, `web`,
+    `postgres` and `redis` are running.
+    It might take up to 5 minutes to prepare the reports.
+
+- Dashboard: <http://localhost:5173>. API docs: <http://localhost:8000/docs>. Both bind to localhost only.
+- The worker starts syncing `bevyengine/bevy` immediately: 7 days first, then 30, then
+  `BACKFILL_DAYS=120`. Last 7/30 days become available first. Until a period is covered, the
+  API returns `202` with `Retry-After`, and the dashboard shows progress and retries.
+- To track more repositories, set `TRACKED_REPOS=owner/repo_a,owner/repo_b` and run `docker compose up -d` again. Other variables in `.env` are working defaults.
+- Without `GITHUB_TOKEN` the stack still starts; `/v1/repos` reports `missing_token`.
+- Check status: `curl -s localhost:8000/readyz`, `curl -s localhost:8000/v1/repos`, `docker compose logs --tail=50 worker`.
+- Stop: `docker compose down` keeps data; `docker compose down -v` resets the database.
+
+## 2. Architecture and main decisions
+
+![How Delivery Insights works](docs/diagrams/how-it-works.svg)
+
+**01 — Local data and reporting:** the arq worker syncs GitHub history into Postgres and derives
+PR timelines. FastAPI serves snapshots from local data; Redis supports jobs, caches, locks and
+rate limits. The React dashboard accesses FastAPI through nginx.
+
+Report routes share one API module; evidence definitions live with extraction, and the
+PR-size comparison lives with efficiency metrics. Request cancellation shares the frontend
+API module. Before/after comparisons confirm the OpenAPI contract and 15 synthetic snapshots,
+evidence packs and template narratives are unchanged by this cleanup.
+
+**02 — Narrative generation:** code computes metrics, selects evidence and scores hypotheses.
+Bedrock writes the wording; local validation checks numbers, citations and uncertainty language,
+with at most one repair. A deterministic template handles disabled, busy or failed LLM calls
+and replies that remain invalid. Validation and fallback run inside FastAPI; PR titles,
+comments and user names are never sent to the LLM.
+
+Main decisions:
+
+- **Metric:** cycle time and where PRs wait, measured in UTC elapsed time. PR-hours describe
+  waiting; a large waiting share does not establish a cause or measure engineering effort.
+- **Scope:** every section uses PRs opened or with human activity in the selected period.
+  Older idle PRs may require a longer window to appear.
+- **Reproducibility:** background sync keeps GitHub I/O off the request path. Pure analytics
+  and snapshots identified by parameters, versions and watermarks support repeatable reports.
+- **Evidence strength:** fixed rules score hypotheses, calibrated on synthetic scenarios only.
+  Weak evidence or no slowdown leads to abstention; the score is not a probability.
+- **Constraints:** English narratives and public repositories only.
+- **Project scope:** The broader scope gave the narrative more complete evidence, at the cost
+  of additional implementation complexity. In retrospect, I would keep the initial delivery
+  focused on the required path and add extensions only where their value justified the added
+  complexity.
+
+## 3. With one more day
+I would do one of the followings if I had one more day: 
+1. **Add a "Sync now" button** for tracked repositories in the dashboard, backed by a
+   manual sync endpoint with a cooldown; the worker already runs on-demand sync jobs.
+2. **Add a point-in-time "all open PRs" view** for backlog and at-risk stock, beside the
+   period-active view.
+3. **Harden sync:** reconcile jobs killed mid-run at startup, and retry GraphQL throttling
+   returned with HTTP 200 and dropped connections.
+4. **Speed up the first sync:** split the initial time window into date ranges and fetch them 
+   in parallel using GraphQL search with updated: filters, instead of fetching one page at a time. 
+   Also sync tracked repositories in parallel while staying within the shared GitHub rate limit. 
+   Snapshot analytics already runs outside the event loop. If it becomes slow on large repositories, 
+   move it to a process pool, because threads do not speed up CPU-heavy Python work.
+
+## 4. How AI was used
+
+- **My role:** I led the project, defined the scope, roadmap, tech stack and architecture,
+  and made the product decisions around metrics, trade-offs and the period-scoped dashboard.
+  I directed the AI-assisted work, reviewed the plans and code diffs, and made the final
+  design decisions.
+- **Claude (Anthropic):** supported brainstorming, drafting the design and implementation
+  plan, code review and targeted improvements, under my lead and direction.
+- **Codex (OpenAI):** assisted with implementation, fixes and verification across the backend,
+  frontend, migrations, tests, evaluation harness, containers and CI, following my direction
+  and review feedback.
+- **Claude Sonnet 4.6 on Bedrock** is part of the product: it writes narrative wording only,
+  and the deterministic validator decides whether it is shown.
+- **How the output was checked:**
+  - 318 backend tests, 63 of them on real Postgres 16 and Redis 7, plus 15 frontend tests.
+  - Strict ruff/mypy and the frontend typecheck and build.
+  - The current 15-case offline and real Bedrock evaluations on prompt v13 pass all eight
+    gates. The real run is first-valid in 14/15 cases, the one invalid first answer is
+    fixed by its repair, and no case falls back to the template; numeric, citation and
+    hedge consistency are 15/15 each for final LLM outputs.
+  - Real GitHub sync and browser checks.
+  - CI removal checked field by field: every retained golden snapshot value is unchanged;
+    synthetic browser checks cover presets, a custom period, pending, configuration, narrative
+    and the three-state ledger. After the user's database rebuild, the Bevy worker completed
+    the 120-day backfill and precomputed the 7/30/60-day reports.
 
 ## What you get
 
@@ -78,7 +166,7 @@ curl -s "http://localhost:8000/v1/insights/delivery?repo=bevyengine/bevy&from=20
 ```
 
 Dates are inclusive UTC dates. Errors use RFC 9457 `application/problem+json`. Current contract: [REFERENCE.md](docs/REFERENCE.md#api) and the strict models in
-`backend/src/insights/api/schemas.py`. The original design is retained in `docs/PLAN.md`.
+`backend/src/insights/api/schemas.py`.
 
 ## Configuration
 
@@ -127,10 +215,9 @@ and full coverage before checking the dashboard. Keep `BACKFILL_DAYS=120` for th
 view and its comparison period.
 
 Local checks: **318 backend tests** (255 unit, 63 integration), **15 frontend tests**,
-strict lint/types/build and all eight offline and real Bedrock narrative gates pass. The
-current real run is first-valid in 14/15 cases; one invalid downgrade causes template
-fallback. Numeric, citation and hedge consistency are 14/14 each for final LLM outputs.
-See [evaluation records](docs/EVALUATION.md) for the remaining low-band limitation.
+strict lint/types/build and all eight offline and real Bedrock narrative gates pass on
+prompt v13 (no template fallback). Results are in
+[REFERENCE.md](docs/REFERENCE.md#testing-and-evaluation).
 
 The module cleanup preserves the OpenAPI contract and computed/narrative outputs. Request
 cancellation now lives in `frontend/src/api.ts`; frontend type checking also rejects unused
@@ -139,10 +226,6 @@ locals and parameters. Current module boundaries are described in
 
 ## Documentation
 
-| Document | Contents                                                                                                |
-|---|---------------------------------------------------------------------------------------------------------|
-| [NOTES.md](NOTES.md) | Submission notes: run, architecture, next steps, AI use                                                 |
-| [docs/REFERENCE.md](docs/REFERENCE.md) | Metric definitions, confidence scoring, operations, security, test results, limitations                 |
-| [docs/DECISIONS.md](docs/DECISIONS.md) | Implementation decisions and their reasons                                                              |
-| [docs/EVALUATION.md](docs/EVALUATION.md) | Narrative evaluation runs, per case                                                                     |
-| [docs/PLAN.md](docs/PLAN.md) | Consolidated historical design input as implementation plan; current code and reference take precedence |
+| Document | Contents |
+|---|---|
+| [docs/REFERENCE.md](docs/REFERENCE.md) | Metric definitions, confidence scoring, API, operations, security, test and evaluation results, limitations |
