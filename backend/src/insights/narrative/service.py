@@ -365,7 +365,7 @@ class NarrativeService:
         (llm_busy). On a concurrent insert the stored row wins, so every client gets the
         same body and ETag. Redis failures fail open; generation proceeds without the lock.
         """
-        snapshot = orjson.loads((await self.snapshots.by_id(sid, None)).body)
+        snapshot = orjson.loads(await self.snapshots.by_id(sid))
         settings, redis = self.snapshots.settings, self.snapshots.redis
         evidence = extract_evidence(snapshot)
         pack, candidates = build_evidence_pack(snapshot, evidence=evidence)

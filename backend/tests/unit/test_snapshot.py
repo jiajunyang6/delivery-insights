@@ -9,8 +9,9 @@ from tests.factories import at
 
 from insights.analytics import ANALYTICS_VERSION, derive_key
 from insights.analytics.dataset import SnapshotParams
+from insights.analytics.insight import insight_view
 from insights.analytics.snapshot import build_snapshot, canonical, etag, identifiers, rounded
-from insights.api.schemas import Snapshot
+from insights.api.schemas import Insight
 from insights_eval.generator import ScenarioSpec, generate
 from insights_eval.pipeline import dataset_from_repo
 
@@ -30,7 +31,7 @@ def test_golden_determinism_contract_and_independent_accounting(synthetic):
     payload = build_snapshot(synthetic, params=params(synthetic))
     again = build_snapshot(synthetic, params=params(synthetic))
     assert canonical(payload) == canonical(again)
-    Snapshot.model_validate(payload)
+    Insight.model_validate(insight_view(payload))
     assert set(payload["time_ledger"]) == {"merged_prs", "total_pr_hours", "states"}
     assert set(payload["time_ledger"]["states"]) == {
         "waiting_reviewer",

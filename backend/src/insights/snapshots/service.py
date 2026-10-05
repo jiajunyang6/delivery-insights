@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from insights.analytics import ANALYTICS_VERSION, derive_key
 from insights.analytics.dataset import Dataset, RepoData, SnapshotParams
+from insights.analytics.insight import insight_view
 from insights.analytics.snapshot import build_snapshot, canonical, etag, identifiers, rounded
 from insights.config import Settings
 from insights.db.dataset import load_dataset
@@ -191,20 +192,30 @@ class SnapshotService:
         except (ValueError, TypeError):
             return None
 
-    async def put_cache(self, sid: str, body: bytes, tag: str, created_at: datetime) -> None:
-        """Best-effort cache of snapshot body/ETag/creation time, bounded by remaining retention."""
+    async def put_cache(
+        self, sid: str, body: bytes, view: bytes, tag: str, created_at: datetime
+    ) -> None:
+        """Best-effort cache of the full snapshot, its public view and the view's ETag.
+
+        Entries expire with the snapshot's remaining retention.
+        """
         ttl = cache_ttl(created_at, self.now)
         if ttl:
             pipe = self.redis.pipeline()
             pipe.hset(
                 snapshot_key(sid),
-                mapping={"body": body, "etag": tag, "created_at": created_at.isoformat()},
+                mapping={
+                    "body": body,
+                    "view": view,
+                    "etag": tag,
+                    "created_at": created_at.isoformat(),
+                },
             )
             pipe.expire(snapshot_key(sid), ttl)
             await self.cache(pipe.execute())
 
     async def cached_reply(self, sid: str, conditional: str | None) -> Reply | None:
-        """Serve a retained Redis snapshot or matching 304; return None on a miss/cache failure."""
+        """Serve a retained Redis view or matching 304; return None on a miss/cache failure."""
         key = snapshot_key(sid)
         if conditional:
             fields = await self.cache(
@@ -219,44 +230,55 @@ class SnapshotService:
                 tag = fields[0].decode()
                 if matches_etag(conditional, tag):
                     return snapshot_reply(sid, b"", tag, conditional)
-        cached = await self.cache(cast(Awaitable[Any], self.redis.hgetall(key)))
+        fields = await self.cache(
+            cast(Awaitable[Any], self.redis.hmget(key, ["view", "etag", "created_at"]))
+        )
         if (
-            cached
-            and (created := self.cache_created(cached.get(b"created_at")))
+            fields
+            and fields[0] is not None
+            and fields[1]
+            and (created := self.cache_created(fields[2]))
             and alive(created, self.now)
         ):
-            body, tag = cached.get(b"body"), cached.get(b"etag")
-            if body is not None and tag:
-                return snapshot_reply(sid, body, tag.decode(), conditional)
+            return snapshot_reply(sid, fields[0], fields[1].decode(), conditional)
         return None
 
-    async def persisted_reply(
-        self, session: AsyncSession, sid: str, conditional: str | None
-    ) -> Reply | None:
-        """Serve a retained database snapshot and warm Redis; return None if absent or expired."""
+    async def persisted(self, session: AsyncSession, sid: str) -> tuple[bytes, bytes, str] | None:
+        """Load a retained database snapshot as (body, view, etag) and warm Redis.
+
+        Returns None when the row is absent or expired.
+        """
         row = await session.get(Snapshot, sid)
         if row is None or not alive(row.created_at, self.now):
             return None
-        body = canonical(row.payload)
-        await self.put_cache(sid, body, row.etag, row.created_at)
-        return snapshot_reply(sid, body, row.etag, conditional)
+        body, view = canonical(row.payload), canonical(insight_view(row.payload))
+        await self.put_cache(sid, body, view, row.etag, row.created_at)
+        return body, view, row.etag
 
-    async def by_id(self, sid: str, conditional: str | None = None) -> Reply:
-        """Read an existing snapshot within retention; never recompute it from newer repo data.
+    async def by_id(self, sid: str) -> bytes:
+        """Return the full internal snapshot within retention for narrative evidence.
 
-        Old analytics-version snapshots remain readable by ID until they expire.
+        It never recomputes from newer repo data; old analytics-version snapshots remain
+        readable by ID until they expire. Raises 404 when absent or expired.
         """
-        cached = await self.cached_reply(sid, conditional)
-        if cached is not None:
-            return cached
+        fields = await self.cache(
+            cast(Awaitable[Any], self.redis.hmget(snapshot_key(sid), ["body", "created_at"]))
+        )
+        if (
+            fields
+            and fields[0] is not None
+            and (created := self.cache_created(fields[1]))
+            and alive(created, self.now)
+        ):
+            return cast(bytes, fields[0])
         async with self.sessions() as session:
-            stored = await self.persisted_reply(session, sid, conditional)
+            stored = await self.persisted(session, sid)
         if stored is None:
             raise not_found()
-        return stored
+        return stored[0]
 
     async def delivery(self, params: SnapshotParams, conditional: str | None = None) -> Reply:
-        """Return the snapshot for params, computing and persisting it on a cache and DB miss.
+        """Return the public insight for params, computing and persisting the snapshot on a miss.
 
         The ID comes from repo metadata alone, so Redis and the snapshots table are checked
         before PRs are loaded. Returns a 202 Reply while data is pending.
@@ -270,9 +292,10 @@ class SnapshotService:
             cached = await self.cached_reply(sid, conditional)
             if cached is not None:
                 return cached
-            stored = await self.persisted_reply(session, sid, conditional)
+            stored = await self.persisted(session, sid)
             if stored is not None:
-                return stored
+                _, view, tag = stored
+                return snapshot_reply(sid, view, tag, conditional)
             load_started = perf_counter()
             dataset = await load_dataset(session, params, metadata=metadata)
             load_ms = (perf_counter() - load_started) * 1000
@@ -281,7 +304,9 @@ class SnapshotService:
             # and runs off the event loop while retaining the metadata view used for this ID.
             payload = await asyncio.to_thread(build_snapshot, dataset, params=params)
             compute_ms = (perf_counter() - compute_started) * 1000
-        body, tag = canonical(payload), etag(canonical(payload))
+        # The full snapshot stays internal; the ETag identifies the public view's bytes.
+        body, view = canonical(payload), canonical(insight_view(payload))
+        tag = etag(view)
         async with self.sessions() as session, session.begin():
             statement = insert(Snapshot).values(
                 snapshot_id=sid,
@@ -301,7 +326,7 @@ class SnapshotService:
                     set_={"created_at": statement.excluded.created_at},
                 )
             )
-        await self.put_cache(sid, body, tag, self.now)
+        await self.put_cache(sid, body, view, tag, self.now)
         logger.info(
             "snapshot_computed",
             snapshot_id=sid,
@@ -310,4 +335,4 @@ class SnapshotService:
             compute_ms=compute_ms,
             merged_prs=payload["meta"]["sample"]["merged_prs"],
         )
-        return snapshot_reply(sid, body, tag, conditional)
+        return snapshot_reply(sid, view, tag, conditional)

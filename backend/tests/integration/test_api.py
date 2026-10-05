@@ -13,8 +13,7 @@ from tests.integration.test_sync import NOW
 
 from insights.analytics import ANALYTICS_VERSION
 from insights.api.deps import get_now
-from insights.api.schemas import Pending, RepoList
-from insights.api.schemas import Snapshot as SnapshotSchema
+from insights.api.schemas import Insight, Pending, RepoList
 from insights.db.models import Repository, Snapshot, SyncJob
 from insights.main import create_app
 from insights.redis import llm_error_key, snapshot_key
@@ -54,7 +53,17 @@ async def test_snapshot_caches_etags_and_schema(api, monkeypatch):
     client, _, _, ctx = api
     first = await client.get(DELIVERY, headers={"X-Request-ID": "api-check"})
     assert first.status_code == 200, first.text
-    SnapshotSchema.model_validate(first.json())
+    Insight.model_validate(first.json())
+    assert set(first.json()) == {
+        "snapshot_id",
+        "repo",
+        "period",
+        "as_of",
+        "comparison_available",
+        "insight",
+        "time_ledger",
+        "links",
+    }
     assert first.headers["cache-control"] == "private, no-cache"
     assert first.headers["x-request-id"] == "api-check"
     assert first.headers["x-snapshot-id"] == first.json()["snapshot_id"]
@@ -81,7 +90,8 @@ async def test_analytics_version_isolates_postgres_redis_and_http_cache(api, mon
     assert fresh.status_code == 200
     old_sid, new_sid = old.json()["snapshot_id"], fresh.json()["snapshot_id"]
     assert new_sid != old_sid
-    assert fresh.json()["meta"]["analytics_version"] == ANALYTICS_VERSION
+    async with ctx["session_factory"]() as session:
+        assert (await session.get(Snapshot, new_sid)).analytics_version == ANALYTICS_VERSION
     assert fresh.headers["etag"] != old.headers["etag"]
     for sid in (old_sid, new_sid):
         assert await ctx["redis"].exists(snapshot_key(sid))
@@ -164,7 +174,7 @@ async def test_partial_watermark(api):
     assert response.status_code == 200
     assert response.json()["as_of"] == "2026-01-01T06:00:00Z"
     assert not response.json()["period"]["complete"]
-    assert response.json()["meta"]["sample"]["merged_prs"] == 0
+    assert response.json()["insight"]["merged_prs"]["value"] == 0
 
 
 async def test_expired_snapshot_is_recomputed_with_the_same_id(api):

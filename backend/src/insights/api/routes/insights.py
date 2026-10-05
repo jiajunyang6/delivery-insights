@@ -8,7 +8,7 @@ from starlette.responses import Response
 from insights.analytics.dataset import SnapshotParams
 from insights.api import deps
 from insights.api.params import parse_params, validate_snapshot_id
-from insights.api.schemas import Narrative, Pending, Snapshot
+from insights.api.schemas import Insight, Narrative, Pending
 from insights.narrative.llm import LLMClient
 from insights.narrative.service import NarrativeService
 from insights.snapshots.caching import Reply
@@ -32,7 +32,7 @@ def parameters(
 
 @router.get(
     "/insights/delivery",
-    response_model=Snapshot,
+    response_model=Insight,
     responses={202: {"model": Pending}, 304: {}},
     tags=["Insights"],
 )

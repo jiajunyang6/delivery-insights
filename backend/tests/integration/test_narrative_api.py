@@ -25,7 +25,10 @@ pytestmark = pytest.mark.integration
 
 async def prepare(api, *, enabled=False, bad=False):
     client, app, _, ctx = api
-    snapshot = (await client.get(DELIVERY)).json()
+    sid = (await client.get(DELIVERY)).json()["snapshot_id"]
+    # The API returns only the public insight; narrative evidence reads the stored snapshot.
+    async with ctx["session_factory"]() as session:
+        snapshot = (await session.get(Snapshot, sid)).payload
     pack, _ = build_evidence_pack(snapshot)
     valid = build_template(pack)
     if enabled:

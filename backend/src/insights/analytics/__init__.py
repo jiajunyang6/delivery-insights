@@ -2,7 +2,7 @@
 
 from insights.analytics.thresholds import THRESHOLDS_VERSION
 
-ANALYTICS_VERSION = "1.8.0"
+ANALYTICS_VERSION = "1.9.0"
 
 
 def derive_key(location_dimension: str, directory_depth: int) -> str:

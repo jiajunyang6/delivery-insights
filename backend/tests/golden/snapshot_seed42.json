@@ -166,7 +166,7 @@
     }
   },
   "meta": {
-    "analytics_version": "1.8.0",
+    "analytics_version": "1.9.0",
     "comparison_available": true,
     "location_dimension": "label:area-",
     "sample": {
@@ -289,7 +289,7 @@
       }
     ]
   },
-  "snapshot_id": "s_6d3fd930740cfa09",
+  "snapshot_id": "s_2fbf92de14264513",
   "time_ledger": {
     "merged_prs": 386,
     "states": {

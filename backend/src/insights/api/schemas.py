@@ -1,4 +1,4 @@
-"""Explicit public snapshot contract; unexpected fields fail validation."""
+"""Explicit public API contract; unexpected fields fail validation."""
 
 from datetime import date, datetime
 from typing import Any, Literal
@@ -24,19 +24,6 @@ class Contract(BaseModel):
         return iso(value) if isinstance(value, datetime) else value
 
 
-class Metric(Contract):
-    value: float | int | None
-    unit: Unit
-    n: int
-    previous: float | int | None
-    n_previous: int | None
-    change_abs: float | None
-    change_rel: float | None
-    significant: bool | None
-    status: Literal["ok", "insufficient_sample"]
-    extra: dict[str, Any]
-
-
 class DateRange(Contract):
     start: date = Field(alias="from")
     to: date
@@ -48,17 +35,6 @@ class Period(DateRange):
     compared_to: DateRange
 
 
-class Efficiency(Contract):
-    merged_prs: Metric
-    cycle_time_p50_hours: Metric
-    pickup_p50_hours: Metric
-    avg_review_rounds: Metric
-    post_review_commit_share: Metric
-    review_concentration_top_k: Metric
-    pr_size_p50_lines: Metric
-    large_pr_share: Metric
-
-
 class StateLedger(Contract):
     pr_hours: float
     previous_pr_hours: float | None
@@ -68,102 +44,57 @@ class StateLedger(Contract):
 
 
 class TimeLedger(Contract):
-    merged_prs: int
     total_pr_hours: float
     states: dict[State, StateLedger]
 
 
-class ReviewQueue(Contract):
-    weeks_total: int
-    weeks_inflow_exceeds_outflow: int
+class LargestWait(Contract):
+    state: State
+    share: float
+    previous_share: float | None
 
 
-class Location(Contract):
-    location: str
-    merged_prs: int
-    pickup_p50_hours: float | None
-    pickup_ratio_vs_rest: float | None
-    waiting_reviewer_pr_hours: float
-    previous_waiting_reviewer_pr_hours: float | None
+class LargestChange(Contract):
+    state: State
+    change_pp: float
 
 
-class BottleneckAnalysis(Contract):
-    review_queue: ReviewQueue
-    locations: list[Location]
+class CycleTime(Contract):
+    value: float | None
+    previous: float | None
+    change_rel: float | None
+    significant: bool | None
+    n: int
 
 
-class Drivers(Contract):
-    slowest_decile_size_ratio: float | None
+class MergedPrs(Contract):
+    value: int
+    previous: int | None
 
 
-class Change(Contract):
-    current: float
-    previous: float
-    change: float
+class InsightSummary(Contract):
+    statement: str
+    largest_wait: LargestWait | None
+    largest_change: LargestChange | None
+    cycle_time_p50_hours: CycleTime
+    merged_prs: MergedPrs
 
 
-class StateAttribution(Change):
-    share_of_increase: float
+class InsightLinks(Contract):
+    narrative: str
 
 
-class LocationAttribution(Contract):
-    location: str
-    change: float
-    share_of_increase: float
+class Insight(Contract):
+    """Where PR time goes in one repository and period; the snapshot behind it stays internal."""
 
-
-class Attribution(Contract):
-    basis: Literal["mean_hours_per_merged_pr"]
-    states: dict[
-        Literal["coding", "waiting_reviewer", "waiting_author", "waiting_merge"],
-        StateAttribution,
-    ]
-    locations: list[LocationAttribution]
-    large_prs: StateAttribution
-
-
-class Trend(Contract):
-    attribution: Attribution | None
-
-
-class Week(Contract):
-    week_start: date
-    merged: int
-    cycle_p50_hours: float | None
-    pickup_p50_hours: float | None
-    pr_size_p50_lines: float | None
-    waiting_reviewer_share: float | None
-
-
-class Series(Contract):
-    current: list[Week]
-    previous: list[Week]
-
-
-class Sample(Contract):
-    merged_prs: int
-
-
-class Meta(Contract):
-    analytics_version: str
-    thresholds_version: str
-    location_dimension: str
-    comparison_available: bool
-    sample: Sample
-
-
-class Snapshot(Contract):
     snapshot_id: str = Field(pattern=r"^s_[0-9a-f]{16}$")
-    repos: list[str]
+    repo: str
     period: Period
     as_of: datetime
-    efficiency: Efficiency
+    comparison_available: bool
+    insight: InsightSummary
     time_ledger: TimeLedger
-    bottleneck_analysis: BottleneckAnalysis
-    drivers: Drivers
-    trend: Trend
-    series: Series
-    meta: Meta
+    links: InsightLinks
 
 
 class PendingJob(Contract):
