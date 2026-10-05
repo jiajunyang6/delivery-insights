@@ -50,8 +50,8 @@ OpenAPI is available at `/openapi.json` and `/docs`. Dates and timestamps use UT
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/v1/insights/delivery` | Insight snapshot for one tracked repository and period, or `202` Pending |
-| GET | `/v1/snapshots/{snapshot_id}/narrative` | English narrative for a retained snapshot |
+| GET | `/v1/insights/delivery` | Insight for one tracked repository and period, or `202` Pending |
+| GET | `/v1/snapshots/{snapshot_id}/narrative` | English narrative for a retained snapshot (`links.narrative`) |
 | GET | `/v1/repos` | Tracked repositories, sync status, date limits and configuration health (`setup`) |
 | GET | `/healthz` | Process liveness |
 | GET | `/readyz` | Postgres and Redis readiness |
@@ -66,8 +66,8 @@ Once sync has produced a `200` response:
 API=http://localhost:8000
 TO=$(python3 -c 'import datetime as d; print(d.datetime.now(d.timezone.utc).date())')
 FROM=$(python3 -c 'import datetime as d; print(d.datetime.now(d.timezone.utc).date()-d.timedelta(days=29))')
-curl -sD /tmp/di-headers "$API/v1/insights/delivery?repo=bevyengine/bevy&from=$FROM&to=$TO" -o /tmp/di-snapshot.json
-SID=$(python3 -c 'import json; print(json.load(open("/tmp/di-snapshot.json"))["snapshot_id"])')
+curl -sD /tmp/di-headers "$API/v1/insights/delivery?repo=bevyengine/bevy&from=$FROM&to=$TO" -o /tmp/di-insight.json
+SID=$(python3 -c 'import json; print(json.load(open("/tmp/di-insight.json"))["snapshot_id"])')
 ETAG=$(python3 -c 'from pathlib import Path; print(next(s.split(":",1)[1].strip() for s in Path("/tmp/di-headers").read_text().splitlines() if s.lower().startswith("etag:")))')
 curl -i -H "If-None-Match: $ETAG" "$API/v1/insights/delivery?repo=bevyengine/bevy&from=$FROM&to=$TO"
 curl -s "$API/v1/snapshots/$SID/narrative"
@@ -78,15 +78,34 @@ browsers revalidate with the ETag and see new coverage as soon as a sync lands. 
 disabled-LLM templates have `private, max-age=3600`; failure fallbacks use `no-store`.
 Internal Redis TTLs are separate from HTTP cache directives.
 
-A `202` is a Pending object, not a snapshot. Respect `Retry-After`; inspect each repo's
+A `202` is a Pending object, not an insight. Respect `Retry-After`; inspect each repo's
 `reason` and `job` (status and phase). The UI polls for at most five minutes, then asks for a
 later refresh.
 
-## Snapshot contract
+## Insight contract
 
-The strict `api/schemas.py` models are the current field contract (`extra="forbid"`). The
-snapshot holds the time ledger shown on the dashboard and every metric the narrative evidence
-catalog reads, and nothing else.
+The strict `Insight` model in `api/schemas.py` is the public field contract
+(`extra="forbid"`). `analytics/insight.py` projects it from the snapshot:
+
+| Field | Contents |
+|---|---|
+| `snapshot_id`, `repo`, `period`, `as_of`, `comparison_available` | Identity, dates, comparison window and observation cutoff |
+| `insight.statement` | Deterministic factual summary; it names the largest wait and its change, never a cause |
+| `insight.largest_wait` | State with the largest share of post-ready waiting time; `null` when no merged PR waited |
+| `insight.largest_change` | State whose share moved most in percentage points; `null` without a comparison or movement |
+| `insight.cycle_time_p50_hours`, `insight.merged_prs` | Median cycle time with its significance and sample; merged PR count |
+| `time_ledger` | Reviewer/author/merge PR-hours and shares, current and previous |
+| `links.narrative` | Narrative route for this snapshot |
+
+When the largest wait is also the largest shift, the statement reports both in one sentence.
+The ETag is computed over the insight bytes; the view is deterministic for a snapshot.
+
+## Snapshot (internal)
+
+The snapshot is stored in Postgres and Redis and read server-side by the narrative; the API
+never returns it. It holds the time ledger and every metric the narrative evidence catalog
+reads, and nothing else. Evidence items in the narrative response keep a `ref` JSON pointer
+into this snapshot for audit; the dashboard does not display it.
 
 | Block | Contents | Consumers |
 |---|---|---|
@@ -103,7 +122,8 @@ and revert chains, the guardrail, merge blockers, review load, predictability, K
 survival, the other drivers and the unused efficiency metrics and signals. Analytics 1.7.0
 stops deriving the per-PR facts, links and ownership counts those outputs needed. Every
 retained value is unchanged; in the golden output only the snapshot ID and analytics version
-differ.
+differ. Analytics 1.9.0 changes only the API response to the insight view; snapshot
+contents are unchanged.
 
 Sampling uses the frozen seed version and the original canonical structure. The retired
 `ci_source` key is reconstructed only inside sampling identity; the internal profile
@@ -371,7 +391,7 @@ npm run build
 npm run dev
 ```
 
-The delivery snapshot and narrative routes, including HTTP reply conversion, live in
+The delivery insight and narrative routes, including HTTP reply conversion, live in
 `api/routes/insights.py`. The PR-size driver shares `analytics/efficiency.py`; the stable
 numbered catalog shares `narrative/evidence.py`; `sources/__init__.py` exports the source
 protocol. Health and repository routes remain separate. Analytics input records contain

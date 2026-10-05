@@ -172,8 +172,8 @@ I would do one of the followings if I had one more day:
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/v1/insights/delivery?repo=…&from=…&to=…` | Snapshot for one repository and period, or `202` sync progress |
-| GET | `/v1/snapshots/{snapshot_id}/narrative` | Cited narrative, hypotheses and evidence for that snapshot |
+| GET | `/v1/insights/delivery?repo=…&from=…&to=…` | Insight for one repository and period: a one-paragraph statement, the largest wait, the largest shift, median cycle time and the time ledger; or `202` sync progress |
+| GET | `/v1/snapshots/{snapshot_id}/narrative` | Cited narrative, hypotheses and evidence for that insight (`links.narrative`) |
 | GET | `/v1/repos` | Tracked repositories, sync status, date limits and configuration health |
 | GET | `/healthz`, `/readyz` | Liveness and Postgres/Redis readiness |
 
@@ -181,6 +181,8 @@ I would do one of the followings if I had one more day:
 curl -s "http://localhost:8000/v1/insights/delivery?repo=bevyengine/bevy&from=2026-09-04&to=2026-10-03"
 ```
 
+The insight is a projection of an internal snapshot. The full snapshot, with every metric the
+narrative evidence reads, stays in Postgres and Redis and is never returned by the API.
 Dates are inclusive UTC dates. Errors use RFC 9457 `application/problem+json`. Current contract: [REFERENCE.md](docs/REFERENCE.md#api) and the strict models in
 `backend/src/insights/api/schemas.py`.
 
@@ -210,8 +212,8 @@ make eval          # same against real Bedrock (reads the key from .env)
 cd frontend && npm ci && npm test && npm run typecheck && npm run build
 ```
 
-The snapshot contains the time ledger and the metrics supporting the review-capacity and
-PR-size hypotheses. CI telemetry, its hypothesis and Actions collection have been removed.
+The internal snapshot contains the time ledger and the metrics supporting the review-capacity
+and PR-size hypotheses; the API returns only its insight view. CI telemetry, its hypothesis and Actions collection have been removed.
 Analytics and prompt versions isolate existing snapshots and narrative caches; workers
 rederive PR timelines from lifecycle events. Bootstrap sampling keeps its frozen identity.
 
