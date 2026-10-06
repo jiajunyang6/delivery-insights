@@ -1,6 +1,6 @@
 /** Report settings: repository, period presets, custom UTC dates and refresh. */
 import type { DateLimits, Params, RepoStatus } from "../types";
-import { dateRange, isPeriodSelected, periodError } from "../format";
+import { PRESET_DAYS, dateRange, isPeriodSelected, periodError } from "../format";
 
 /** Current parameters and the callbacks and limits the controls need. */
 interface Props {
@@ -29,7 +29,11 @@ export function Controls(p: Props) {
             {p.repos.map((r) => (
               <option key={r.repo} value={r.repo}>
                 {r.repo}
-                {r.last_sync_status !== "ok" ? " · " + r.last_sync_status : ""}
+                {r.syncing
+                  ? " · syncing"
+                  : r.last_sync_status !== "ok"
+                    ? " · " + r.last_sync_status
+                    : ""}
               </option>
             ))}
           </select>
@@ -37,7 +41,7 @@ export function Controls(p: Props) {
         <div className="range-control">
           <span className="label">Period · UTC</span>
           <div className="segmented">
-            {[7, 30, 60].map((days) => {
+            {PRESET_DAYS.map((days) => {
               // Anchor presets to the server's UTC today, not the browser's local date.
               const range = dateRange(days, p.dateLimits?.latest_to);
               const selected = isPeriodSelected(p.params, days);

@@ -73,6 +73,19 @@ export function dateRange(days: number, to = new Date().toISOString().slice(0, 1
   return { from, to };
 }
 
+/** Period presets in days, shortest first. */
+export const PRESET_DAYS = [7, 30, 60];
+
+/**
+ * The default period: the longest preset that fits the configured history, ending on the
+ * server's UTC today. Falls back to the shortest preset when none fits.
+ */
+export function defaultRange(limits: DateLimits) {
+  const ranges = PRESET_DAYS.map((days) => dateRange(days, limits.latest_to));
+  const fitting = ranges.filter((range) => periodError(range, limits) === null);
+  return fitting.at(-1) ?? ranges[0];
+}
+
 /** Upper-case the first character. */
 export function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);

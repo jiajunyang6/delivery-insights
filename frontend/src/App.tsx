@@ -6,9 +6,10 @@ import {
   loadInsights,
   message,
   pendingText,
+  retryUnavailable,
   useAbortable,
 } from "./api";
-import { dateRange, periodError } from "./format";
+import { dateRange, defaultRange, periodError } from "./format";
 import type {
   DateLimits,
   Params,
@@ -22,10 +23,12 @@ import { Controls } from "./components/Controls";
 import { TimeLedgerChart } from "./components/TimeLedgerChart";
 import { NarrativePanel } from "./components/NarrativePanel";
 import { SetupNotice } from "./components/SetupNotice";
+import { SyncNotice } from "./components/SyncNotice";
 
 // The URL carries repo/from/to, so a report link can be shared or reloaded.
 const initial = new URLSearchParams(window.location.search);
-const defaults = dateRange(30);
+const periodFromUrl = initial.has("from") || initial.has("to");
+const defaults = dateRange(60);
 
 /**
  * Load tracked repositories and date limits, then the insight for the selected period. While
@@ -49,9 +52,11 @@ export default function App() {
   const validationError = periodError(params, dateLimits);
   const invalid = validationError !== null;
   // Repositories, date limits and setup health; reloaded by "Refresh report". An unknown
-  // repo from the URL falls back to the first tracked one.
+  // repo from the URL falls back to the first tracked one. On the first load without dates in
+  // the URL, the period becomes the longest preset the server's history supports, anchored to
+  // its UTC today; later reloads keep the user's choice.
   useAbortable((signal) => {
-    fetchJson<RepoList>("/v1/repos", signal)
+    retryUnavailable(() => fetchJson<RepoList>("/v1/repos", signal), signal)
       .then((r) => {
         if (signal.aborted) return;
         setRepos(r.data.items);
@@ -59,6 +64,7 @@ export default function App() {
         setSetup(r.data.setup);
         setParams((p) => ({
           ...p,
+          ...(refresh === 0 && !periodFromUrl ? defaultRange(r.data.date_limits) : {}),
           repo: r.data.items.some((repo) => repo.repo === p.repo)
             ? p.repo
             : (r.data.items[0]?.repo ?? ""),
@@ -76,8 +82,8 @@ export default function App() {
         if (!signal.aborted) setError(message(e));
       });
   }, [refresh]);
-  // Re-read setup and sync statuses (not the report) after a report loads or a narrative
-  // reports a Bedrock failure, so a sync that has since succeeded clears stale labels.
+  // Re-read setup and sync statuses (not the report) on each pending poll, after a report
+  // loads or fails, or when a narrative reports a Bedrock failure, so labels stay current.
   useAbortable(
     (signal) => {
       if (!setupCheck) return;
@@ -110,7 +116,10 @@ export default function App() {
       params,
       signal,
       (p) => {
-        if (!signal.aborted) setPending(p);
+        if (signal.aborted) return;
+        setPending(p);
+        // Keep the repository labels and Sync notice current during a long sync.
+        setSetupCheck((n) => n + 1);
       },
       refresh > 0 ? "no-cache" : undefined,
     )
@@ -126,6 +135,8 @@ export default function App() {
         if (!signal.aborted) {
           setPending(null);
           setError(message(e));
+          // Show the sync status behind the error, such as a failed last sync.
+          setSetupCheck((n) => n + 1);
         }
       })
       .finally(() => {
@@ -158,6 +169,7 @@ export default function App() {
           refresh={() => setRefresh((r) => r + 1)}
         />
         <SetupNotice setup={setup} />
+        <SyncNotice repo={repos.find((r) => r.repo === params.repo)} />
         {error && (
           <div className="error-banner" role="alert">
             <strong>{error.title}</strong>
@@ -190,7 +202,8 @@ export default function App() {
               </div>
             ))}
             <p className="footnote">
-              This page retries automatically for up to five minutes.
+              This page keeps checking while a sync is running; a full backfill can take
+              several minutes.
             </p>
           </section>
         )}
