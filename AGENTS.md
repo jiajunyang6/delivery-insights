@@ -115,7 +115,7 @@ Without Make (Windows), run the equivalent `uv run` commands from the Makefile.
 - Prompt changes need a real `make eval`: all gates pass, first-attempt validity at least 0.90
   and numeric, citation and hedge consistency 1.00. Record results in the `docs/TECHNICAL_DETAILS.md` testing section.
 - UI changes: check 7/30/60-day and custom periods, the pending state, the configuration
-  notice, the narrative panel and the time ledger in a browser.
+  notice, the narrative panel and the time ledger with its figures in a browser.
 - Update the docs your change affects, keeping each fact in one place:
   - README: sections 1–4 are the submission notes the assignment brief requires (run it,
     architecture and decisions, one more day, AI use). Sections 3 and 4 are the owner's own

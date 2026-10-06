@@ -182,7 +182,7 @@ I would do one of the following if I had one more day:
 
 ## How the output was checked
 
-- 322 backend tests, 63 of them on real Postgres 16 and Redis 7, plus 15 frontend tests.
+- 323 backend tests, 63 of them on real Postgres 16 and Redis 7, plus 15 frontend tests.
 - Strict ruff/mypy and the frontend typecheck and build.
 - The current 15-case offline and real Bedrock evaluations on prompt v13 pass all eight
   gates. The real run is first-valid in 14/15 cases, the one invalid first answer is
@@ -203,7 +203,8 @@ I would do one of the following if I had one more day:
   metric. When delivery did not slow down, or evidence is too weak, it says so and points to
   where PR time goes now.
 - **Where PR time goes:** the time ledger of merged PRs across reviewer, author and merge
-  waiting, current period against the previous one.
+  waiting, current period against the previous one, with the insight's largest shift, median
+  cycle time and merged PRs.
 
 ## Configuration
 

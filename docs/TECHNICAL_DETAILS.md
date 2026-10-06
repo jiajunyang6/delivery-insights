@@ -48,7 +48,8 @@ narrative; snapshot computation and boto3 calls run in threads.
 
 OpenAPI is available at `/openapi.json` and `/docs`. `as_of` is capped by the least recent
 repository sync watermark. `repo=` names exactly one tracked repository; unknown parameters
-are ignored. Problem responses include `request_id` and sanitized detail.
+are ignored. Problem responses include `request_id` and sanitized detail; framework errors
+(unknown route, wrong method) take their title and type from the HTTP status.
 
 Once sync has produced a `200` response:
 
@@ -87,6 +88,8 @@ The strict `Insight` model in `api/schemas.py` is the public field contract
 | `links.narrative` | Narrative route for this snapshot |
 
 When the largest wait is also the largest shift, the statement reports both in one sentence.
+The dashboard shows the time ledger with the largest shift, median cycle time and merged PRs;
+it leaves `statement` to API clients, because the narrative already words the page.
 The ETag is computed over the insight bytes; the view is deterministic for a snapshot.
 
 ## Snapshot (internal)
@@ -217,6 +220,7 @@ Tokens, headers, raw upstream responses and prose are not logged; exceptions exp
 | `rederive` | A configuration/version change requires complete fact rederivation; failed jobs retry next sync |
 | `stale` | The consistent sync watermark has not reached the requested period |
 | `missing_token` / 503 | Add GitHub credentials and recreate API/worker with the environment |
+| `auth_error` | GitHub returned 401, or 403 without rate-limit signals (`access_forbidden`): check the token and its repository access; rate-limit 403s are retried instead |
 | Always template | `meta.fallback_reason`, model access, validator violations and sanitized logs |
 | 404 for an old snapshot | Seven-day retention expired; request a new insight |
 | Incomplete comparison | More history is needed for the previous equal-length period |
