@@ -50,7 +50,12 @@ async def test_unhandled_error_is_sanitized_and_request_id_survives():
         assert response.json()["detail"] == "An unexpected error occurred."
         assert "private" not in response.text
         assert len(response.headers["x-request-id"]) == 32
-        for method, path, status in [("GET", "/missing", 404), ("POST", "/healthz", 405)]:
+        for method, path, status, title in [
+            ("GET", "/missing", 404, "Not found"),
+            ("POST", "/healthz", 405, "Method not allowed"),
+        ]:
             result = await client.request(method, path)
             assert result.status_code == status
             assert result.headers["content-type"] == "application/problem+json"
+            assert result.json()["title"] == title
+            assert result.json()["type"] == "/problems/" + title.lower().replace(" ", "-")

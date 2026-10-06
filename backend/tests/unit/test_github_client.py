@@ -109,11 +109,21 @@ async def test_timeline_network_failure_is_not_treated_as_a_bad_pr(client, githu
     ],
 )
 async def test_backoff(client, status, headers, delays, exception):
-    route = client.router.post(URL).respond(status, headers=headers)
+    # GitHub's secondary-limit body; a header-less 403 is a rate limit only because of it.
+    body = "You have exceeded a secondary rate limit."
+    route = client.router.post(URL).respond(status, headers=headers, text=body)
     with pytest.raises(exception):
         await client.graphql("query", {})
     assert route.call_count == 4
     assert [call.args[0] for call in client.sleep.call_args_list] == delays
+
+
+async def test_forbidden_without_rate_limit_signals_fails_at_once(client):
+    route = client.router.post(URL).respond(403, text="Resource not accessible by token")
+    with pytest.raises(GitHubAuthError, match="access_forbidden"):
+        await client.graphql("query", {})
+    assert route.call_count == 1
+    client.sleep.assert_not_awaited()
 
 
 async def test_timeout(client):

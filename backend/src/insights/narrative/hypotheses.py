@@ -159,7 +159,7 @@ class SignalContext:
 
         def available(identifier: str) -> bool:
             """Test source availability for an evidence family, independently of item presence."""
-            return drivers if identifier in {"E48", "E49", "E50"} else True
+            return drivers if identifier == "E48" else True
 
         def signal(role: str, ids: tuple[str, ...], condition: bool) -> Signal:
             """Build a signal that is present only when its condition and all required IDs hold."""

@@ -45,11 +45,9 @@ async def test_transactional_derivation_is_idempotent(context):
         assert fact.derive_key == current_key(context["settings"])
         rows = (await session.scalars(select(PrInterval).order_by(PrInterval.seq))).all()
         assert [r.state for r in rows] == ["waiting_reviewer", "waiting_merge", "waiting_reviewer"]
-        approved = next((r.start_at for r in rows if r.state == "waiting_merge"), None)
         result = TimelineResult(
             fact.ready_at,
             tuple(Interval(r.state, r.start_at, r.end_at) for r in rows),
-            approved,
             fact.review_rounds,
         )
         assert not check_invariants(result, pr_input(page.prs[0]))

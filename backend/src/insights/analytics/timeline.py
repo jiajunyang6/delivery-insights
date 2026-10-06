@@ -60,7 +60,6 @@ class TimelineResult:
 
     ready_at: datetime | None
     intervals: tuple[Interval, ...]
-    approved_at: datetime | None
     review_rounds: int
 
 
@@ -136,7 +135,7 @@ def build_timeline(
             if (end_at is None or coding_start < end_at)
             else ()
         )
-        return TimelineResult(None, intervals, None, 0)
+        return TimelineResult(None, intervals, 0)
     output = [Interval("coding", coding_start, ready_at)] if coding_start < ready_at else []
     ordered = sorted(events, key=lambda e: (e.occurred_at, EVENT_ORDER[e.kind], e.dedup_key))
     # Only a close that is later reopened pauses the PR; the terminal close ends the timeline.
@@ -258,8 +257,7 @@ def build_timeline(
             current, segment_start = new, at
     if end_at is None or segment_start < end_at:
         output.append(Interval(current, segment_start, end_at))
-    approved = next((i.start_at for i in output if i.state == "waiting_merge"), None)
-    return TimelineResult(ready_at, tuple(output), approved, rounds)
+    return TimelineResult(ready_at, tuple(output), rounds)
 
 
 def ledger_hours(

@@ -43,6 +43,19 @@ __all__ = [
 logger = structlog.get_logger(__name__)
 
 
+def rate_limited(response: httpx.Response) -> bool:
+    """Whether a 403 is a rate limit rather than a permission error.
+
+    GitHub marks rate-limit 403s with Retry-After, an exhausted quota header or a rate-limit
+    message in the body. The body is only inspected, never logged.
+    """
+    return bool(
+        response.headers.get("retry-after")
+        or response.headers.get("x-ratelimit-remaining") == "0"
+        or "rate limit" in response.text.lower()
+    )
+
+
 class GitHubClient:
     """GraphQL client with retries, rate-limit waits and sanitized errors."""
 
@@ -108,6 +121,10 @@ class GitHubClient:
                 raise GitHubAuthError("authentication_failed")
             if response.status_code == 404:
                 raise GitHubNotFoundError("repository_not_found")
+            # A 403 without rate-limit signals means the token lacks access; retrying cannot
+            # help, and reporting it as an auth error points the user at GITHUB_TOKEN.
+            if response.status_code == 403 and not rate_limited(response):
+                raise GitHubAuthError("access_forbidden")
             # GitHub signals secondary rate limits with 403 as well as 429, so both are retried
             # as rate limits; 502-504 are short upstream outages.
             if response.status_code in {403, 429, 502, 503, 504}:
