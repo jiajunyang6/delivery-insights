@@ -1,14 +1,13 @@
 /** Render cited narrative evidence and explanations from local report responses. */
 import { useState, type ReactNode } from "react";
 import { fetchJson, message, useAbortable } from "../api";
-import { format, percent, signed, capitalize, states } from "../format";
+import { format, signed, capitalize } from "../format";
 import type {
   AbstainReason,
   Evidence,
   Hypothesis,
   Narrative,
   Insight,
-  State,
 } from "../types";
 
 const hypothesisTitles: Record<string, string> = {
@@ -44,17 +43,9 @@ const abstainText: Record<AbstainReason, { title: string; detail: string }> = {
       "Root causes need a previous period with data. Choose a later period or sync more history.",
   },
 };
-const waitingOn: Record<State, string> = {
-  waiting_reviewer: "waiting on reviewers",
-  waiting_author: "waiting on authors",
-  waiting_merge: "waiting to merge after approval",
-};
-
 /** "dir:crates/bevy_pbr" → "crates/bevy_pbr (directory)". Labels stay as they are. */
 function place(location: string): string {
   if (location.startsWith("dir:")) return location.slice(4) + " (directory)";
-  if (location.startsWith("codeowners:"))
-    return location.slice(11) + " (CODEOWNERS)";
   return location;
 }
 
@@ -96,25 +87,6 @@ function evidenceDetail(e: Evidence): string | null {
       "repeat reviews of a PR count separately. " +
       "The top reviewers may differ between periods.";
   return null;
-}
-
-/** When the narrative abstains, point to the largest waiting share as the place to start. */
-function LookFirst({ insight }: { insight: Insight }) {
-  const ledger = insight.time_ledger.states;
-  const largest = states
-    .filter((s) => ledger[s])
-    .sort((a, b) => ledger[b].share - ledger[a].share)[0];
-  if (!largest) return null;
-  return (
-    <aside className="look-first" aria-label="Where to look first">
-      <span className="eyebrow">WHERE TO LOOK FIRST</span>
-      <h3>Most PR time is spent {waitingOn[largest]}</h3>
-      <p>
-        <b>{percent(ledger[largest].share)}</b> of post-ready waiting time in merged PRs; see
-        where PR time goes below.
-      </p>
-    </aside>
-  );
 }
 
 /**
@@ -386,7 +358,6 @@ export function NarrativePanel({
               {abstainText[reason].detail}
             </p>
           )}
-          {data.abstained && <LookFirst insight={insight} />}
           <div className="hypotheses">
             {data.hypotheses.map((h) => (
               <HypothesisCard key={h.id} h={h} text={text} chip={chip} />

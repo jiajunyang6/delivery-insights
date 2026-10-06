@@ -43,9 +43,37 @@ export interface Pending {
   status: "pending";
   repos: PendingRepo[];
 }
+/** The deterministic headline of an insight: a factual statement and its numbers. */
+export interface InsightSummary {
+  statement: string;
+  largest_wait: {
+    state: State;
+    share: number;
+    previous_share: number | null;
+  } | null;
+  largest_change: { state: State; change_pp: number } | null;
+  cycle_time_p50_hours: {
+    value: number | null;
+    previous: number | null;
+    change_rel: number | null;
+    significant: boolean | null;
+    n: number;
+  };
+  merged_prs: { value: number; previous: number | null };
+}
 export interface Insight {
   snapshot_id: string;
+  repo: string;
+  period: {
+    from: string;
+    to: string;
+    days: number;
+    complete: boolean;
+    compared_to: { from: string; to: string };
+  };
+  as_of: string;
   comparison_available: boolean;
+  insight: InsightSummary;
   time_ledger: {
     total_pr_hours: number;
     states: Record<
