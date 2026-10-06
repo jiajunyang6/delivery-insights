@@ -168,10 +168,19 @@ class GitHubClient:
                 self.settings.github_graphql_url,
                 json={"query": query, "variables": variables},
             )
+            # A 200 with a non-JSON body is a truncated or edge-generated reply to a heavy query,
+            # not a bad query, so it is transient and the pager retries with a smaller page.
+            # Only its size and type are logged, never the body, to tell those cases apart.
             try:
                 body = response.json()
             except ValueError:
-                raise GitHubQueryError("invalid_json") from None
+                logger.warning(
+                    "github_invalid_json",
+                    status=response.status_code,
+                    content_length=len(response.content),
+                    content_type=response.headers.get("content-type"),
+                )
+                raise GitHubTransientError("invalid_json") from None
             if not isinstance(body, dict):
                 raise GitHubQueryError("invalid_graphql_response")
             errors = body.get("errors", [])

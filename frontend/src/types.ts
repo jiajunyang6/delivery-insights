@@ -31,6 +31,9 @@ export interface RepoList {
 export interface RepoStatus {
   repo: string;
   last_sync_status: string;
+  last_sync_error: string | null;
+  last_synced_at: string | null;
+  syncing: boolean;
 }
 export interface PendingRepo {
   repo: string;

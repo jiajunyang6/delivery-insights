@@ -14,21 +14,37 @@ export function useAbortable(
   }, dependencies);
 }
 
-// Same-origin by default: nginx (and the Vite dev server) proxy /api to FastAPI.
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
+// Same-origin by default: nginx (and the Vite dev server) proxy /api to FastAPI. Node tests
+// have no import.meta.env, hence the optional chaining.
+const API_BASE = import.meta.env?.VITE_API_BASE_URL ?? "/api";
 
 /** An RFC 9457 problem from the API, or a client-side failure shaped like one. */
 export class ApiProblem extends Error {
+  title: string;
+  detail: string;
+  status: number;
+  request_id?: string;
+  errors: { param: string; message: string }[];
+
+  /** Plain fields instead of parameter properties, so Node can strip the types in tests. */
   constructor(
-    public title: string,
-    public detail: string,
-    public status: number,
-    public request_id?: string,
-    public errors: { param: string; message: string }[] = [],
+    title: string,
+    detail: string,
+    status: number,
+    request_id?: string,
+    errors: { param: string; message: string }[] = [],
   ) {
     super(detail);
+    this.title = title;
+    this.detail = detail;
+    this.status = status;
+    this.request_id = request_id;
+    this.errors = errors;
   }
 }
+/** No usable reply: the API or its proxy is down or restarting, so a retry may succeed. */
+export class UnavailableProblem extends ApiProblem {}
+
 /** Normalize any thrown value to an ApiProblem the UI can display. */
 export function message(error: unknown): ApiProblem {
   return error instanceof ApiProblem
@@ -48,11 +64,22 @@ export async function fetchJson<T>(
   signal: AbortSignal,
   cache?: RequestCache,
 ) {
-  const response = await fetch(API_BASE + path, {
-    signal,
-    cache,
-    headers: { Accept: "application/json" },
-  });
+  let response: Response;
+  try {
+    response = await fetch(API_BASE + path, {
+      signal,
+      cache,
+      headers: { Accept: "application/json" },
+    });
+  } catch (error) {
+    if (signal.aborted) throw error;
+    // fetch rejects only when no HTTP reply arrived, typically while the containers restart.
+    throw new UnavailableProblem(
+      "Cannot reach the service",
+      "The dashboard could not reach the API. If the containers are restarting, wait a moment and refresh.",
+      0,
+    );
+  }
   const contentType = response.headers
     .get("Content-Type")
     ?.split(";")[0]
@@ -61,7 +88,7 @@ export async function fetchJson<T>(
   // Non-JSON replies (e.g. a proxy's HTML error page) become a readable problem instead of a
   // JSON parse error.
   if (contentType !== "application/json" && !contentType?.endsWith("+json")) {
-    throw new ApiProblem(
+    throw new UnavailableProblem(
       "Service temporarily unavailable",
       `The service is temporarily unavailable (HTTP ${response.status}). Try again shortly.`,
       response.status,
@@ -104,22 +131,56 @@ function wait(milliseconds: number, signal: AbortSignal) {
     if (signal.aborted) stop();
   });
 }
+/** How often and how many times in a row an unreachable API is retried. */
+export type RetryOptions = { retryMs?: number; maxRetries?: number };
+
+/**
+ * Run `request`, retrying an unreachable API every `retryMs` up to `maxRetries` times
+ * (about 30 s by default), which covers a container restart.
+ */
+export async function retryUnavailable<T>(
+  request: () => Promise<T>,
+  signal: AbortSignal,
+  { retryMs = 5_000, maxRetries = 6 }: RetryOptions = {},
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await request();
+    } catch (error) {
+      // Only a missing or non-JSON reply is retried; API problems such as 503
+      // data-unavailable are answers, not outages, and show at once.
+      if (!(error instanceof UnavailableProblem) || attempt >= maxRetries) throw error;
+      await wait(retryMs, signal);
+    }
+  }
+}
+/** Polling timing: outage retries, the Retry-After floor and the wait without an active sync. */
+export type PollOptions = RetryOptions & { minPollMs?: number; idleMs?: number };
+
 /**
  * Poll while the API answers 202 Pending (data still syncing), honoring Retry-After with a
- * 5 s floor, and give up after five minutes so the page never polls indefinitely.
+ * `minPollMs` floor. Polling continues while a sync job is queued or running, however long
+ * a backfill takes; with no active job nothing changes until the next scheduled sync, so it
+ * stops after `idleMs` (five minutes). Each request rides out a brief outage.
  */
 export async function loadInsights(
   params: Params,
   signal: AbortSignal,
   onPending: (p: Pending) => void,
   cache?: RequestCache,
+  { minPollMs = 5_000, idleMs = 300_000, ...retry }: PollOptions = {},
 ) {
-  const deadline = Date.now() + 300_000;
+  let deadline = Date.now() + idleMs;
   while (!signal.aborted) {
-    const result = await fetchJson<Insight | Pending>(
-      "/v1/insights/delivery?" + query(params),
+    const result = await retryUnavailable(
+      () =>
+        fetchJson<Insight | Pending>(
+          "/v1/insights/delivery?" + query(params),
+          signal,
+          cache,
+        ),
       signal,
-      cache,
+      retry,
     );
     if (result.status === 200) return result.data as Insight;
     if (result.status !== 202)
@@ -128,18 +189,24 @@ export async function loadInsights(
         "Please refresh.",
         result.status,
       );
-    onPending(result.data as Pending);
+    const pending = result.data as Pending;
+    onPending(pending);
+    // A queued or running job is making progress even when coverage has not moved yet, so
+    // it keeps the page waiting.
+    if (pending.repos.some((repo) => repo.job !== null)) deadline = Date.now() + idleMs;
     const remaining = deadline - Date.now();
     if (remaining <= 0) break;
     const raw = Number(result.headers.get("Retry-After") ?? 30);
-    const seconds = Number.isFinite(raw) ? Math.max(5, raw) : 30;
-    await wait(Math.min(remaining, seconds * 1000), signal);
+    const delay = Number.isFinite(raw) ? Math.max(minPollMs, raw * 1000) : 30_000;
+    await wait(Math.min(remaining, delay), signal);
     if (Date.now() >= deadline) break;
   }
   if (signal.aborted) throw new DOMException("Aborted", "AbortError");
   throw new ApiProblem(
-    "Sync is still in progress",
-    "Automatic retries stopped after five minutes. Refresh later.",
+    "No sync is running",
+    "The data for this period is not ready and no sync has been active for five minutes. " +
+      "The worker starts one on its schedule; refresh later, and check the Sync notice if " +
+      "the last sync failed.",
     202,
   );
 }

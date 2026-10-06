@@ -598,6 +598,9 @@ main {
   margin: 6px 0 8px;
   padding-left: 18px;
 }
+.setup-notice p {
+  margin: 6px 0 0;
+}
 .setup-notice small {
   color: var(--muted);
 }

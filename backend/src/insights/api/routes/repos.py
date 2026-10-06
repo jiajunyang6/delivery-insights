@@ -63,11 +63,18 @@ async def repositories(
     for name in configured:
         repo = repos.get(name.lower())
         status = repo.last_sync_status if repo else "never"
-        items.append(RepoStatus(repo=name, last_sync_status=status))
-        if status in SETUP_SYNC_PROBLEMS:
-            problems.append(
-                GithubProblem(repo=name, status=status, syncing=bool(repo and repo.id in syncing))
+        active = bool(repo and repo.id in syncing)
+        items.append(
+            RepoStatus(
+                repo=name,
+                last_sync_status=status,
+                last_sync_error=repo.last_sync_error if repo else None,
+                last_synced_at=repo.last_synced_at if repo else None,
+                syncing=active,
             )
+        )
+        if status in SETUP_SYNC_PROBLEMS:
+            problems.append(GithubProblem(repo=name, status=status, syncing=active))
     return RepoList(
         items=items,
         date_limits=DateLimits(

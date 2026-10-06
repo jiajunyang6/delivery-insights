@@ -1,5 +1,5 @@
-/** Configuration health turned into notices; plain logic so Node tests need no browser. */
-import type { SetupStatus } from "./types";
+/** Configuration and sync health turned into notices; plain logic so Node tests need no browser. */
+import type { RepoStatus, SetupStatus } from "./types";
 
 // Bedrock error codes grouped by the `.env` setting most likely to fix them.
 const AUTH_ERRORS = new Set([
@@ -12,7 +12,7 @@ const MODEL_ERRORS = new Set(["ValidationException", "ResourceNotFoundException"
 const ENDPOINT_ERRORS = new Set(["EndpointConnectionError", "NoRegionError"]);
 
 /** One notice line: a problem the user must fix, or information. */
-type SetupItem = { level: "problem" | "info"; text: string };
+export type SetupItem = { level: "problem" | "info"; text: string };
 
 /** Turn configuration health into fixes that name the exact `.env` variable to change. */
 export function setupItems(setup: SetupStatus): SetupItem[] {
@@ -66,4 +66,25 @@ export function setupItems(setup: SetupStatus): SetupItem[] {
     items.push({ level: "problem", text });
   }
   return items;
+}
+
+/**
+ * Describe a failed last sync of one repository, or return null when it did not fail.
+ * Auth, not-found and missing-token statuses are left to the Configuration notice.
+ */
+export function syncItem(repo: RepoStatus | undefined): SetupItem | null {
+  if (!repo || repo.last_sync_status !== "failed") return null;
+  const failure = `The last sync of ${repo.repo} failed (${repo.last_sync_error ?? "unknown error"}).`;
+  if (repo.syncing)
+    return {
+      level: "info",
+      text: `${failure} A new sync is running; this notice clears once it succeeds.`,
+    };
+  const stored = repo.last_synced_at
+    ? `Stored data is current to ${new Date(repo.last_synced_at).toISOString().slice(0, 16).replace("T", " ")} UTC.`
+    : "No data has been stored yet.";
+  return {
+    level: "problem",
+    text: `${failure} ${stored} The worker retries on its next scheduled sync; if the failure repeats, check docker compose logs worker.`,
+  };
 }

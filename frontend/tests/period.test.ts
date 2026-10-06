@@ -1,7 +1,7 @@
 /** Period presets and validation against the API's UTC date limits. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dateRange, isPeriodSelected, periodError } from "../src/format.ts";
+import { dateRange, defaultRange, isPeriodSelected, periodError } from "../src/format.ts";
 
 const limits = {
   earliest_from: "2026-09-03",
@@ -76,4 +76,12 @@ test("custom lengths and invalid dates do not select a preset", () => {
     for (const days of [7, 30, 60])
       assert.equal(isPeriodSelected(range, days), false);
   }
+});
+
+test("the default period is the longest preset the configured history supports", () => {
+  const long = { ...limits, earliest_from: "2026-06-05" };
+  assert.deepEqual(defaultRange(long), dateRange(60, long.latest_to));
+  assert.deepEqual(defaultRange(limits), dateRange(30, limits.latest_to));
+  const short = { ...limits, earliest_from: "2026-10-01" };
+  assert.deepEqual(defaultRange(short), dateRange(7, short.latest_to));
 });

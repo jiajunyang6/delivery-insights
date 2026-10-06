@@ -1,8 +1,8 @@
-/** Configuration notices: which `.env` variable each setup problem points to. */
+/** Configuration and sync notices: the `.env` variable to fix and failed-sync details. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { setupItems } from "../src/setup.ts";
-import type { SetupStatus } from "../src/types.ts";
+import { setupItems, syncItem } from "../src/setup.ts";
+import type { RepoStatus, SetupStatus } from "../src/types.ts";
 
 const healthy: SetupStatus = {
   github: { token_configured: true, problems: [] },
@@ -85,4 +85,23 @@ test("a connection failure says the model ID was not checked yet", () => {
   });
   assert.match(item.text, /Could not connect to Bedrock in region us-west-2/);
   assert.match(item.text, /BEDROCK_MODEL_ID was not checked yet/);
+});
+
+test("a failed sync shows its error code and when stored data was last current", () => {
+  const failed: RepoStatus = {
+    repo: "a/b",
+    last_sync_status: "failed",
+    last_sync_error: "GitHubTransientError: invalid_json",
+    last_synced_at: "2026-10-06T00:51:51.929349Z",
+    syncing: false,
+  };
+  const idle = syncItem(failed);
+  assert.equal(idle?.level, "problem");
+  assert.match(idle!.text, /a\/b failed \(GitHubTransientError: invalid_json\)/);
+  assert.match(idle!.text, /current to 2026-10-06 00:51 UTC/);
+  const retrying = syncItem({ ...failed, syncing: true });
+  assert.equal(retrying?.level, "info");
+  assert.match(retrying!.text, /A new sync is running/);
+  assert.equal(syncItem({ ...failed, last_sync_status: "ok" }), null);
+  assert.equal(syncItem({ ...failed, last_sync_status: "auth_error" }), null);
 });

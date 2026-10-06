@@ -218,11 +218,39 @@ async def test_repos_list_tracked_repositories(api):
     client, _, _, ctx = api
     ctx["settings"].tracked_repos = "a/b,c/d"
     repos = await client.get("/v1/repos")
-    RepoList.model_validate(repos.json())
-    assert repos.json()["items"] == [
-        {"repo": "a/b", "last_sync_status": "ok"},
-        {"repo": "c/d", "last_sync_status": "never"},
+    items = RepoList.model_validate(repos.json()).items
+    assert [item.model_dump() for item in items] == [
+        {
+            "repo": "a/b",
+            "last_sync_status": "ok",
+            "last_sync_error": None,
+            "last_synced_at": NOW,
+            "syncing": False,
+        },
+        {
+            "repo": "c/d",
+            "last_sync_status": "never",
+            "last_sync_error": None,
+            "last_synced_at": None,
+            "syncing": False,
+        },
     ]
+
+
+async def test_repos_report_failed_sync_code_and_retry(api):
+    client, _, _, ctx = api
+    async with ctx["session_factory"]() as session, session.begin():
+        await session.execute(
+            update(Repository).values(
+                last_sync_status="failed", last_sync_error="GitHubTransientError: invalid_json"
+            )
+        )
+    item = (await client.get("/v1/repos")).json()["items"][0]
+    assert item["last_sync_status"] == "failed" and item["syncing"] is False
+    assert item["last_sync_error"] == "GitHubTransientError: invalid_json"
+    async with ctx["session_factory"]() as session:
+        await enqueue_sync(ctx["redis"], session, "a/b", "incremental", now=NOW)
+    assert (await client.get("/v1/repos")).json()["items"][0]["syncing"] is True
 
 
 async def test_rate_limit_fail_open_and_redis_cache_fallback(api, monkeypatch):

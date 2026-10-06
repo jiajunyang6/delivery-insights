@@ -29,7 +29,7 @@ describes the product and submission, `docs/TECHNICAL_DETAILS.md` holds the curr
 | `backend/tests/` | Unit and integration tests, factories, golden snapshot (`tests/golden/`) |
 | `backend/eval/` | Synthetic scenarios and the narrative evaluation harness |
 | `frontend/src/` | React dashboard: components, `format.ts`, `api.ts` request cancellation |
-| `docs/` | `TECHNICAL_DETAILS.md` contracts, evaluation results and trade-offs; `diagrams/how-it-works.svg` architecture diagram |
+| `docs/` | `TECHNICAL_DETAILS.md` contracts, evaluation results and trade-offs; `diagrams/how-it-works.svg` architecture diagram; `screenshots/dashboard.jpeg` README screenshot |
 
 ## Commands
 
