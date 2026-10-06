@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 import httpx
 import orjson
 import pytest
+import structlog
 from pydantic import SecretStr
 
 from insights.config import Settings
@@ -184,6 +185,27 @@ async def test_adaptive_page_size_and_cursor(client, github_page):
     variables = [orjson.loads(c.request.content)["variables"] for c in route.calls]
     assert [v["pageSize"] for v in variables] == [25, 12, 6, 5, 5, 25]
     assert [v["cursor"] for v in variables[:4]] == ["cursor"] * 4
+
+
+async def test_non_json_page_retries_with_smaller_page(client, github_page):
+    truncated = '{"data": {"repository": "sensitive'
+    route = client.router.post(URL).mock(
+        side_effect=[
+            httpx.Response(200, text=truncated, headers={"content-type": "application/json"}),
+            httpx.Response(200, json=github_page),
+        ]
+    )
+    with structlog.testing.capture_logs() as logs:
+        page = await GitHubAdapter(client).pull_requests_page(
+            RepoRef("a", "b"), cursor=None, page_size=25
+        )
+    assert len(page.prs) == 1
+    variables = [orjson.loads(c.request.content)["variables"] for c in route.calls]
+    assert [v["pageSize"] for v in variables] == [25, 12]
+    event = next(log for log in logs if log["event"] == "github_invalid_json")
+    assert event["content_length"] == len(truncated)
+    assert event["content_type"] == "application/json"
+    assert "sensitive" not in str(logs)
 
 
 async def test_page_failure_resets_recovery_streak(client, github_page):
