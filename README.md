@@ -19,7 +19,7 @@ checked, the product, configuration and development;
 **Prerequisites:**
 
 - Docker with Compose v2 (Docker Desktop on Windows/macOS).
-- A GitHub fine-grained personal access token for live data: Settings → Developer settings → Fine-grained tokens,
+- A GitHub fine-grained personal access token for live data: Settings → Acess → Credential → Fine-grained tokens,
   **Repository access: Public repositories**, no extra permissions.
 - A Bedrock API key is required for LLM-generated narratives.
 
