@@ -7,7 +7,8 @@ ledger of reviewer, author and merge waiting, the largest wait and shift, and me
 time. A second endpoint adds a short narrative written by an LLM on Amazon Bedrock (Claude
 Sonnet 4.6 by default, configurable), with root-cause hypotheses, a confidence score and an
 evidence chain. Every number comes from code, and each claim in the narrative links to the
-number behind it.
+number behind it. See [the dashboard screenshot](docs/screenshots/dashboard.jpeg) for a
+report on `bevyengine/bevy`.
 
 Sections 1–4 are the submission notes. The sections after them cover how the output was
 checked, the product, configuration and development;
@@ -63,7 +64,9 @@ checked, the product, configuration and development;
     `postgres` and `redis` are running.
     The worker starts syncing `bevyengine/bevy` immediately: 7 days first, then 30, then
     `BACKFILL_DAYS=120`. Last 7/30 days become available first.
-    It might take up to 5 minutes to pull GitHub PR info and prepare the reports.
+    A full backfill of `bevyengine/bevy` took about six minutes in testing. The default
+    60-day view needs all of it, because coverage beyond 30 days is claimed only when the
+    120-day stage finishes; switch to the last 7 or 30 days to see a report sooner.
 
 4. **Open the dashboard** at <http://localhost:5173>. It shows sync progress until the reports
    are ready. If a setting from step 2 is missing or wrong, a configuration notice names the
@@ -182,7 +185,7 @@ I would do one of the following if I had one more day:
 
 ## How the output was checked
 
-- 323 backend tests, 63 of them on real Postgres 16 and Redis 7, plus 15 frontend tests.
+- 325 backend tests, 64 of them on real Postgres 16 and Redis 7, plus 22 frontend tests.
 - Strict ruff/mypy and the frontend typecheck and build.
 - The current 15-case offline and real Bedrock evaluations on prompt v13 pass all eight
   gates. The real run is first-valid in 14/15 cases, the one invalid first answer is
@@ -195,8 +198,11 @@ I would do one of the following if I had one more day:
 
 ## What you get
 
-- **Repository and period:** a tracked repository and the last 7, 30 (default) or 60 days, or
-  custom UTC dates, compared with the preceding period of equal length.
+![Dashboard: a report on bevyengine/bevy for 2026-09-03 to 2026-10-03](docs/screenshots/dashboard.jpeg)
+
+- **Repository and period:** a tracked repository and the last 7, 30 or 60 days (60 by
+  default, or the longest the configured history supports), or custom UTC dates, compared
+  with the preceding period of equal length.
 - **Sync progress:** until the period is covered, the page shows the sync stage and retries; a
   configuration notice names the `.env` setting to fix.
 - **Narrative:** root-cause hypotheses scored by fixed rules, with every claim cited to its

@@ -70,7 +70,8 @@ soon as a sync lands. Successful narratives and disabled-LLM templates have
 from HTTP cache directives.
 
 A `202` is a Pending object, not an insight. Inspect each repo's `reason` and `job` (status
-and phase). The UI polls for at most five minutes, then asks for a later refresh.
+and phase). The UI keeps polling while a sync job is queued or running, however long a backfill
+takes; with no active job it stops after five minutes and asks for a later refresh.
 
 ## Insight contract
 
@@ -200,6 +201,12 @@ narratives make no Bedrock call and would otherwise hide a bad key until a new s
 wording. The dashboard turns these into a Configuration notice that names the `.env` variable
 to fix.
 
+Each repository item also carries `last_sync_error` (the sanitized error code of the last failed
+sync, such as `GitHubTransientError: invalid_json`, never upstream text), `last_synced_at` and
+`syncing`. When the selected repository's last sync `failed`, the dashboard shows a Sync notice
+with that code: information while a new sync runs, otherwise a problem that says how current the
+stored data is. To trace a failure, see [Diagnosing a failed sync](#diagnosing-a-failed-sync).
+
 Read `/v1/repos` before judging missing data. Snapshots/narratives are retained for seven days
 and sync-job records for thirty days; source PR records are retained until the database is
 reset. Worker housekeeping expires retained data daily.
@@ -221,6 +228,8 @@ Tokens, headers, raw upstream responses and prose are not logged; exceptions exp
 | `stale` | The consistent sync watermark has not reached the requested period |
 | `missing_token` / 503 | Add GitHub credentials and recreate API/worker with the environment |
 | `auth_error` | GitHub returned 401, or 403 without rate-limit signals (`access_forbidden`): check the token and its repository access; rate-limit 403s are retried instead |
+| Cannot reach the service | The API or its proxy is down or restarting; the dashboard retries for about 30 s first. Check `docker compose ps` and the `migrate` and `api` logs (an invalid `.env` value stops `migrate`, so `api` never starts) |
+| `failed` / Sync notice | The error code in the notice; follow [Diagnosing a failed sync](#diagnosing-a-failed-sync) |
 | Always template | `meta.fallback_reason`, model access, validator violations and sanitized logs |
 | 404 for an old snapshot | Seven-day retention expired; request a new insight |
 | Incomplete comparison | More history is needed for the previous equal-length period |
@@ -232,6 +241,46 @@ head branches, merge commits, author associations, ownership rules or link field
 `UNIQUE(pr_id, seq)` also serves interval lookups by PR; no performance claim is made without
 representative EXPLAIN measurements. There is no authenticated administrative UI or backup
 orchestration in this demo.
+
+### Diagnosing a failed sync
+
+Work backwards from the label to the code. Each step narrows the cause; stop when it is clear.
+
+1. **Status.** The Sync notice (or `/v1/repos`) gives `last_sync_status`, the sanitized
+   `last_sync_error` code and whether a new sync is `syncing`. `auth_error`, `not_found` and
+   `missing_token` are configuration problems (see the table above); `failed` is everything else.
+2. **Worker log.** Only the worker calls GitHub, so its log holds the failure:
+
+   ```bash
+   docker compose logs worker --since 2h | grep -E '"level":"(error|warning)"'
+   ```
+
+   `sync_failed` names the job, repository and error code. The `github_request` lines before it
+   show quota (`rate_limit_remaining`); steady quota and no 401/403 rule out the token and rate
+   limits. `github_wait` records backoff, `github_invalid_json` the status, length and content
+   type of a reply that was not JSON, and `pr_normalize_failed` a PR skipped as malformed.
+3. **Job ledger.** The `stats` of the failed job show how far it got before failing:
+
+   ```bash
+   docker compose exec postgres psql -U insights -d insights -c "select kind, status, phase,
+     error, stats, finished_at from sync_jobs order by created_at desc limit 5"
+   ```
+
+   Pages and PRs fetched before the error mean the credentials work and a single reply failed.
+   A failure on the first page points to access or configuration instead.
+4. **Code.** Match the code to `sources/github/client.py`: `_request` maps HTTP statuses
+   (401/403/404 fail at once; rate-limit 403/429 and 502–504 back off and retry), and `graphql`
+   maps bodies. `GitHubTransientError` makes the PR pager halve the page (floor 5) and retry;
+   any other error fails the job, and `sync/queue.py` records it as the repository status.
+5. **Recovery.** No reset is needed: the next scheduled sync, or a worker restart (which
+   re-queues missing history), resumes from the stored `backfill_cursor`. The notice clears
+   once a sync succeeds.
+
+For example, a backfill of `bevyengine/bevy` failed with `invalid_json` after 44 pages: the
+quota was steady and no 401/403 appeared, so the token was fine, and `graphql` rejects a body
+only after `_request` has accepted a 2xx status. GitHub had answered 200 with a body that was
+not JSON, most likely a truncated reply to a large page (`GRAPHQL_PAGE_SIZE=50`). Such replies
+are now transient, so the pager retries with a smaller page.
 
 ## Security
 
