@@ -146,10 +146,18 @@ class Pending(Contract):
 
 
 class RepoStatus(Contract):
-    """A tracked repository and the status of its last finished sync."""
+    """A tracked repository and the status of its last finished sync.
+
+    `last_sync_error` is the sanitized error code of a failed sync (never upstream text),
+    `last_synced_at` the last stored checkpoint, and `syncing` whether a sync is queued or
+    running now.
+    """
 
     repo: str
     last_sync_status: str
+    last_sync_error: str | None
+    last_synced_at: datetime | None
+    syncing: bool
 
 
 class DateLimits(Contract):
