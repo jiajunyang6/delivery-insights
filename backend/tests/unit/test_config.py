@@ -1,3 +1,5 @@
+"""Settings parsing, validation and secret masking."""
+
 import pytest
 from pydantic import SecretStr, ValidationError
 

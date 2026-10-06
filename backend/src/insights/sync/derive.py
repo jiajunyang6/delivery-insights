@@ -1,4 +1,4 @@
-"""Transactional derivation of timelines, facts and revert/reland links.
+"""Transactional derivation of PR timelines and facts.
 
 Pure computation lives in analytics; this module loads its inputs and writes the results.
 """
@@ -9,22 +9,17 @@ from datetime import datetime
 from typing import Any, cast
 
 import structlog
-from sqlalchemy import Table, bindparam, delete, select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
 from insights.analytics import derive_key
-from insights.analytics.ci import union_intervals
-from insights.analytics.classify import LINK_FIELDS, LinkInput, link_prs
 from insights.analytics.facts import compute_facts
 from insights.analytics.timeline import build_timeline, check_invariants, pr_input
 from insights.config import Settings
-from insights.db.ci import load_ci_data
-from insights.db.models import OwnershipRule as StoredRule
 from insights.db.models import PrFact, PrInterval, PullRequest, Repository
-from insights.db.records import facts_from_row, load_records
-from insights.domain import OwnershipRule
+from insights.db.records import load_records
 from insights.sync.queue import (
     enqueue_precompute,
     enqueue_sync,
@@ -60,7 +55,6 @@ async def derive_prs(
 ) -> int:
     """Rebuild intervals and facts for the given PRs; return how many violate invariants.
 
-    Stored link fields are kept: they depend on other PRs and are owned by link_repo.
     The caller owns commit/rollback. Invariant violations are logged and counted, not rejected;
     intervals and facts are still rebuilt so the job can report all affected PRs.
     """
@@ -74,21 +68,12 @@ async def derive_prs(
         )
     }
     records = await load_records(session, prs)
-    ci = await load_ci_data(session, list(repositories), pr_ids=list(pr_ids))
-    rules: dict[int, list[OwnershipRule]] = {identifier: [] for identifier in repositories}
-    for row in await session.scalars(
-        select(StoredRule).where(StoredRule.repo_id.in_(repositories))
-    ):
-        rules[row.repo_id].append(
-            OwnershipRule(row.source, row.pattern, tuple(row.owners), row.line_no)
-        )
     fact_values: list[dict[str, Any]] = []
     interval_values: list[dict[str, Any]] = []
     invariant_violations = 0
     for pr in prs:
         record = records[pr.id]
-        ci_intervals = union_intervals(ci.by_pr.get(pr.id, ()))
-        result = build_timeline(pr_input(record), record.events, ci_intervals, now)
+        result = build_timeline(pr_input(record), record.events, now)
         errors = check_invariants(result, pr_input(record))
         if errors:
             invariant_violations += 1
@@ -103,9 +88,6 @@ async def derive_prs(
             record.events,
             result,
             default_branch=repositories[pr.repo_id].default_branch or "",
-            location_rules=rules[pr.repo_id],
-            ci_covered=bool(ci_intervals),
-            now=now,
             location_dimension=settings.location_dimension,
             directory_depth=settings.directory_depth,
         )
@@ -134,57 +116,11 @@ async def derive_prs(
                 set_={
                     name: getattr(statement.excluded, name)
                     for name in fact_values[0]
-                    if name not in {"pr_id", *LINK_FIELDS}
+                    if name != "pr_id"
                 },
             )
         )
     return invariant_violations
-
-
-async def link_repo(session: AsyncSession, repo_id: int, *, increment_version: bool = True) -> int:
-    """Recompute revert/reland links across the repository and clear `links_pending`.
-
-    Writes only changed link fields and returns their PR count. `data_version` is bumped on
-    change unless the caller bumps it itself.
-    """
-    repo = await session.get(Repository, repo_id)
-    if repo is None:
-        raise ValueError("Repository is missing")
-    prs = (await session.scalars(select(PullRequest).where(PullRequest.repo_id == repo_id))).all()
-    records = await load_records(session, prs)
-    stored = {
-        row.pr_id: facts_from_row(row)
-        for row in await session.scalars(select(PrFact).where(PrFact.repo_id == repo_id))
-    }
-    linked = link_prs(
-        [LinkInput(pr.id, records[pr.id], stored[pr.id]) for pr in prs if pr.id in stored],
-        repo_full_name=repo.full_name,
-        default_branch=repo.default_branch or "",
-    )
-    changed = [
-        {"target_id": identifier, **{name: getattr(facts, name) for name in LINK_FIELDS}}
-        for identifier, facts in linked.items()
-        if any(getattr(facts, name) != getattr(stored[identifier], name) for name in LINK_FIELDS)
-    ]
-    if changed:
-        table = cast(Table, PrFact.__table__)
-        await session.execute(
-            update(table)
-            .where(table.c.pr_id == bindparam("target_id"))
-            .values({name: bindparam(name) for name in LINK_FIELDS}),
-            changed,
-        )
-        if increment_version:
-            # Link changes affect historical waste/throughput even when raw PR rows are unchanged.
-            await session.execute(
-                update(Repository)
-                .where(Repository.id == repo_id)
-                .values(data_version=Repository.data_version + 1)
-            )
-    await session.execute(
-        update(Repository).where(Repository.id == repo_id).values(links_pending=False)
-    )
-    return len(changed)
 
 
 async def enqueue_rederivation(ctx: dict[str, Any]) -> None:
@@ -207,8 +143,8 @@ async def enqueue_rederivation(ctx: dict[str, Any]) -> None:
 async def rederive_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
     """arq entry point: rederive PRs whose facts lack the current derive key.
 
-    Commits keyset batches of 500, then relinks and sets `derived_key` only after verifying
-    no PR is still pending.
+    Commits keyset batches of 500, then sets `derived_key` only after verifying no PR is
+    still pending.
     """
     settings = cast(Settings, ctx["settings"])
     key = current_key(settings)
@@ -232,6 +168,8 @@ async def rederive_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job
                     .where(Repository.id == repo.id)
                     .values(derived_key=None if repo.derived_key == key else repo.derived_key)
                 )
+            # Keyset batches by PR id, each in its own short transaction, so a large repository
+            # never holds one long write transaction and a crash resumes where it stopped.
             after = 0
             while True:
                 async with sessions_for(ctx)() as session, session.begin():
@@ -251,8 +189,9 @@ async def rederive_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job
                     after = ids[-1]
                     processed += len(ids)
                     job.stats.update(prs_derived=processed, invariant_violations=violations)
+            # Mark the repository ready only after re-checking that nothing is pending; a sync
+            # that ran concurrently may have added PRs. The data_version bump retires old IDs.
             async with sessions_for(ctx)() as session, session.begin():
-                await link_repo(session, repo.id, increment_version=False)
                 if not await derivation_complete(session, repo.id, key):
                     raise RuntimeError("Repository derivation is incomplete")
                 await session.execute(

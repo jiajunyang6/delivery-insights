@@ -1,9 +1,10 @@
+"""GraphQL normalization: bots, dismissals, cross-references, hashing."""
+
 from dataclasses import asdict, replace
 
 import pytest
 
 from insights.domain import EventKind
-from insights.sources.github.actions import normalize_run
 from insights.sources.github.normalize import actor, normalize_pr, remove_nulls
 from insights.sync.store import content_hash
 
@@ -26,23 +27,22 @@ def test_bot_detection(node, extra, expected):
 
 def test_normalization_and_hash(github_page):
     node = github_page["data"]["repository"]["pullRequests"]["nodes"][0]
-    node["body"] = "z" * 4100
     node["author"] = None
     node["files"]["pageInfo"]["hasNextPage"] = True
     pr = normalize_pr(node)
     assert pr.author.login is None and not pr.author.is_bot
-    assert len(pr.body_excerpt) == 4000
     assert pr.labels == ("area-A",)
     assert pr.files == ("src/A/file.cs",)
     assert content_hash(pr) == content_hash(replace(pr, events=tuple(reversed(pr.events))))
-    assert pr.events[0].payload["reverts"] == ["1234567"]
+    assert pr.events[0].payload == {
+        "oid": "abcdef012345",
+        "authored_at": "2025-12-31T23:00:00Z",
+        "committed_at": "2026-01-01T00:00:00Z",
+    }
 
 
 def test_all_upstream_strings_are_cleaned_before_hashing(github_page):
     node = github_page["data"]["repository"]["pullRequests"]["nodes"][0]
-    node["body"] = "Body with text"
-    node["mergedBy"] = {"login": "merger"}
-    node["mergeCommit"] = {"oid": "abc"}
     node["timelineItems"]["nodes"].append(
         {
             "__typename": "LabeledEvent",
@@ -67,28 +67,6 @@ def test_all_upstream_strings_are_cleaned_before_hashing(github_page):
     assert asdict(dirty) == asdict(clean)
     assert content_hash(dirty) == content_hash(clean)
     assert remove_nulls({"nested\x00": ["a\x00", {"b": "c\x00"}]}) == {"nested": ["a", {"b": "c"}]}
-
-
-def test_workflow_strings_are_cleaned():
-    run = normalize_run(
-        {
-            "id": 1,
-            "name": "work\x00flow",
-            "event": "pull\x00_request",
-            "head_sha": "a\x00bc",
-            "status": "com\x00pleted",
-            "conclusion": "suc\x00cess",
-            "created_at": "2026-01-01T00:00:00Z",
-            "updated_at": "2026-01-01T01:00:00Z",
-        }
-    )
-    assert (run.workflow_name, run.event, run.head_sha, run.status, run.conclusion) == (
-        "workflow",
-        "pull_request",
-        "abc",
-        "completed",
-        "success",
-    )
 
 
 def test_dismissals_keep_original_decision_and_distinct_ids(github_page):

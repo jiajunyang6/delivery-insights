@@ -1,49 +1,45 @@
+/** Dashboard shell: report settings, sync progress, errors and the report itself. */
 import { useEffect, useState } from "react";
-import { useAbortable } from "./hooks/useAbortable";
 import {
   ApiProblem,
   fetchJson,
   loadInsights,
   message,
   pendingText,
+  useAbortable,
 } from "./api";
-import { dateRange } from "./format";
-import { periodError } from "./period";
+import { dateRange, periodError } from "./format";
 import type {
-  Audience,
   DateLimits,
   Params,
   Pending,
   RepoStatus,
   RepoList,
   SetupStatus,
-  Snapshot,
+  Insight,
 } from "./types";
 import { Controls } from "./components/Controls";
-import { Headline } from "./components/Headline";
-import { KpiGrid } from "./components/KpiGrid";
 import { TimeLedgerChart } from "./components/TimeLedgerChart";
-import { Bottlenecks } from "./components/Bottlenecks";
-import { ReviewQueueChart } from "./components/ReviewQueueChart";
-import { LocationsTable } from "./components/LocationsTable";
-import { AtRiskTable } from "./components/AtRiskTable";
 import { NarrativePanel } from "./components/NarrativePanel";
 import { SetupNotice } from "./components/SetupNotice";
 
+// The URL carries repo/from/to, so a report link can be shared or reloaded.
 const initial = new URLSearchParams(window.location.search);
 const defaults = dateRange(30);
+
+/**
+ * Load tracked repositories and date limits, then the insight for the selected period. While
+ * the API answers 202 the page shows sync progress and keeps polling.
+ */
 export default function App() {
   const [params, setParams] = useState<Params>({
     repo: initial.get("repo") ?? "",
     from: initial.get("from") ?? defaults.from,
     to: initial.get("to") ?? defaults.to,
   });
-  const [audience, setAudience] = useState<Audience>(
-    initial.get("audience") === "manager" ? "manager" : "director",
-  );
   const [repos, setRepos] = useState<RepoStatus[]>([]);
   const [dateLimits, setDateLimits] = useState<DateLimits | null>(null);
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [insight, setInsight] = useState<Insight | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<ApiProblem | null>(null);
   const [loading, setLoading] = useState(false);
@@ -52,6 +48,8 @@ export default function App() {
   const [setupCheck, setSetupCheck] = useState(0);
   const validationError = periodError(params, dateLimits);
   const invalid = validationError !== null;
+  // Repositories, date limits and setup health; reloaded by "Refresh report". An unknown
+  // repo from the URL falls back to the first tracked one.
   useAbortable((signal) => {
     fetchJson<RepoList>("/v1/repos", signal)
       .then((r) => {
@@ -94,11 +92,12 @@ export default function App() {
     [setupCheck],
   );
   useEffect(() => {
-    const query = new URLSearchParams({ ...params, audience });
-    window.history.replaceState(null, "", "?" + query);
-  }, [params, audience]);
+    window.history.replaceState(null, "", "?" + new URLSearchParams(params));
+  }, [params]);
+  // The report: waits for a repo, valid dates and the date limits, then polls through 202s.
+  // A manual refresh bypasses the browser cache so a just-finished sync shows at once.
   useAbortable((signal) => {
-    setSnapshot(null);
+    setInsight(null);
     setPending(null);
     if (!params.repo || invalid || !dateLimits) {
       if (params.repo && invalid) setError(null);
@@ -117,7 +116,7 @@ export default function App() {
     )
       .then((s) => {
         if (!signal.aborted) {
-          setSnapshot(s);
+          setInsight(s);
           setPending(null);
           // A finished sync may have resolved configuration problems shown earlier.
           setSetupCheck((n) => n + 1);
@@ -154,8 +153,6 @@ export default function App() {
           params={params}
           setParams={setParams}
           repos={repos}
-          audience={audience}
-          setAudience={setAudience}
           dateLimits={dateLimits}
           validationError={validationError}
           refresh={() => setRefresh((r) => r + 1)}
@@ -197,7 +194,7 @@ export default function App() {
             </p>
           </section>
         )}
-        {!snapshot && !pending && !error && (
+        {!insight && !pending && !error && (
           <div className="panel loading" role="status">
             <span className="spinner" />
             {loading
@@ -207,36 +204,16 @@ export default function App() {
                 : "Connecting to repositories…"}
           </div>
         )}
-        {snapshot && (
+        {insight && (
           <div className="report">
-            <Headline snapshot={snapshot} />
-            <KpiGrid snapshot={snapshot} />
             <NarrativePanel
-              snapshot={snapshot}
-              audience={audience}
+              insight={insight}
               onLlmError={() => setSetupCheck((n) => n + 1)}
             />
-            <TimeLedgerChart snapshot={snapshot} />
-            <Bottlenecks snapshot={snapshot} audience={audience} />
-            {audience === "manager" && (
-              <>
-                <ReviewQueueChart
-                  weeks={snapshot.bottleneck_analysis.review_queue.weeks}
-                />
-                <LocationsTable
-                  locations={snapshot.bottleneck_analysis.locations}
-                />
-                <AtRiskTable
-                  key={snapshot.snapshot_id}
-                  snapshot={snapshot}
-                  params={params}
-                  onRefresh={() => setRefresh((r) => r + 1)}
-                />
-              </>
-            )}
+            <TimeLedgerChart insight={insight} />
             <footer className="report-footer">
               <span>Delivery Insights · Evidence before conclusions.</span>
-              <code>{snapshot.snapshot_id}</code>
+              <code>{insight.snapshot_id}</code>
             </footer>
           </div>
         )}

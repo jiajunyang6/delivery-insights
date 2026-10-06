@@ -3,39 +3,28 @@
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import timedelta
+from math import ceil
 from typing import Any
 
-import numpy as np
-
-from insights.analytics import thresholds as t
-from insights.analytics.dataset import (
-    Dataset,
-    PrData,
-    Window,
-    closed,
-    hours,
-    merged,
-    reverted,
-    weeks,
+from insights.analytics import (
+    CHANGE_MIN_RELATIVE,
+    LARGE_PR_LINES,
+    MIN_RATE_DENOMINATOR,
+    MIN_RATE_EVENTS,
+    MIN_SAMPLES_P50,
+    REVIEW_CONCENTRATION_TOP_K,
 )
-from insights.analytics.stats import (
-    Statistic,
-    bootstrap_diff,
-    kaplan_meier,
-    percentile,
-    ratio,
-    seed_for,
-)
-
-Samples = tuple[float, ...] | tuple[tuple[float, float], ...]
+from insights.analytics.dataset import Dataset, PrData, Window, merged
+from insights.analytics.stats import Statistic, bootstrap_diff, percentile, seed_for
 
 
 @dataclass(frozen=True, slots=True)
 class Measure:
+    """A metric value with its sample size and raw samples for bootstrap tests."""
+
     value: float | int | None
     n: int
-    samples: Samples = ()
+    samples: tuple[float, ...] = ()
     extra: dict[str, Any] | None = None
 
 
@@ -62,7 +51,7 @@ def compare(
             current.samples, previous.samples, statistic, seed_for(params_hash, name)
         )
         # The CI rules out sampling noise; the minimum relative change rules out trivial shifts.
-        significant = bool((low > 0 or high < 0) and abs(relative) >= t.CHANGE_MIN_RELATIVE)
+        significant = bool((low > 0 or high < 0) and abs(relative) >= CHANGE_MIN_RELATIVE)
     return {
         "value": current.value,
         "unit": unit,
@@ -77,12 +66,12 @@ def compare(
     }
 
 
-def quantile(values: Sequence[float], q: float = 50, minimum: int = t.MIN_SAMPLES_P50) -> Measure:
+def quantile(values: Sequence[float], q: float = 50, minimum: int = MIN_SAMPLES_P50) -> Measure:
     """Wrap a percentile with its sample count and raw values; too few samples yield None."""
     return Measure(percentile(values, q, minimum), len(values), tuple(values))
 
 
-def mean(values: Sequence[float], minimum: int = t.MIN_SAMPLES_P50) -> Measure:
+def mean(values: Sequence[float], minimum: int = MIN_SAMPLES_P50) -> Measure:
     """Wrap the arithmetic mean and raw samples; return a missing value below minimum."""
     return Measure(
         sum(values) / len(values) if len(values) >= minimum else None, len(values), tuple(values)
@@ -93,7 +82,7 @@ def rate(values: Sequence[float], *, extra: dict[str, Any] | None = None) -> Mea
     """Compute a binary-event share only when denominator and event-count thresholds are met."""
     count, events = len(values), int(sum(values))
     return Measure(
-        events / count if count >= t.MIN_RATE_DENOMINATOR and events >= t.MIN_RATE_EVENTS else None,
+        events / count if count >= MIN_RATE_DENOMINATOR and events >= MIN_RATE_EVENTS else None,
         count,
         tuple(values),
         {"events": events, "denominator": count, **(extra or {})},
@@ -108,108 +97,54 @@ def values(prs: Sequence[PrData], field: str) -> list[float]:
 def measures(dataset: Dataset, window: Window) -> dict[str, Measure]:
     """Collect unrounded metric samples for one period-active cohort.
 
-    Duration/round metrics use merged PRs; closure and review metrics have their own samples.
+    PR metrics use merged PRs; review concentration counts review events.
     Keep these raw samples for bootstrap comparisons rather than resampling displayed values.
     """
-    prs, lost = merged(dataset, window), closed(dataset, window)
+    prs = merged(dataset, window)
     counts = Counter(r.reviewer for r in dataset.reviews_in(window))
     review_count = sum(counts.values())
-    pairs = []
-    # Aggregate hours before dividing: a long PR contributes more than a short PR. Author wait
-    # and pre-ready coding stay in the denominator but are not reviewer/CI/merge waiting.
-    for pr in prs:
-        ledger = hours(pr, end=window.end)
-        numerator = sum(ledger[s] for s in ("waiting_reviewer", "waiting_ci", "waiting_merge"))
-        denominator = sum(ledger.values()) + (pr.facts.coding_hours or 0)
-        pairs.append((numerator, denominator))
-    # Only PRs ready at least N days before the window ends had the full N days to merge.
-    eligible = [
-        p
-        for p in dataset.flow_in(window)
-        if p.facts.ready_at is not None
-        and window.start <= p.facts.ready_at <= window.end - timedelta(days=t.N_DAYS_MERGED)
-    ]
-    within = [
-        float(
-            p.facts.merged_at is not None
-            and p.facts.ready_at is not None
-            and p.facts.merged_at - p.facts.ready_at <= timedelta(days=t.N_DAYS_MERGED)
-        )
-        for p in eligible
-    ]
-    result = {
+    return {
         "merged_prs": Measure(len(prs), len(prs)),
-        "effective_throughput": Measure(
-            len(prs)
-            - sum(reverted(p, window.end) for p in prs)
-            - sum(p.facts.is_revert for p in prs),
-            len(prs),
-        ),
         "cycle_time_p50_hours": quantile(values(prs, "cycle_hours")),
-        "cycle_time_p90_hours": quantile(values(prs, "cycle_hours"), 90, t.MIN_SAMPLES_P90),
-        "merged_within_n_days": rate(within, extra={"n_days": t.N_DAYS_MERGED}),
-        "waiting_share": Measure(
-            ratio(sum(p[0] for p in pairs), sum(p[1] for p in pairs))
-            if len(prs) >= t.MIN_SAMPLES_P50
-            else None,
-            len(prs),
-            tuple(pairs),
-        ),
-        # Superseded closes are not waste: their work landed through another merged PR.
-        "waste_share": rate(
-            [float(p.facts.close_class != "superseded") for p in lost]
-            + [float(reverted(p, window.end)) for p in prs]
-        ),
+        "pickup": quantile(values(prs, "pickup_hours")),
         # Zero-round PRs remain in the sample; excluding them would inflate the average.
         "avg_review_rounds": mean(values(prs, "review_rounds")),
         "post_review_commit_share": rate(
             [float(p.facts.commits_after_first_review > 0) for p in prs]
         ),
         "review_concentration_top_k": Measure(
-            sum(v for _, v in counts.most_common(t.REVIEW_CONCENTRATION_TOP_K)) / review_count
-            if review_count >= t.MIN_RATE_DENOMINATOR
+            sum(v for _, v in counts.most_common(REVIEW_CONCENTRATION_TOP_K)) / review_count
+            if review_count >= MIN_RATE_DENOMINATOR
             else None,
             review_count,
-            extra={"k": t.REVIEW_CONCENTRATION_TOP_K},
+            extra={"k": REVIEW_CONCENTRATION_TOP_K},
         ),
-        "revert_rate": rate([float(reverted(p, window.end)) for p in prs]),
         "pr_size_p50_lines": quantile(values(prs, "size_lines")),
+        "large_pr_share": rate([float(p.facts.size_lines >= LARGE_PR_LINES) for p in prs]),
     }
-    for stage in ("coding", "pickup", "review", "merge"):
-        result[stage] = quantile(values(prs, stage + "_hours"))
-    return result
+
+
+# (output key, unit, bootstrap statistic). The measure name also seeds the bootstrap, so
+# renaming a measure would change its sampled draws; "pickup" keeps its original name.
+OUTPUTS: dict[str, tuple[str, str, Statistic | None]] = {
+    "merged_prs": ("merged_prs", "count", None),
+    "cycle_time_p50_hours": ("cycle_time_p50_hours", "hours", "median"),
+    "pickup": ("pickup_p50_hours", "hours", "median"),
+    "avg_review_rounds": ("avg_review_rounds", "rounds", "mean"),
+    "post_review_commit_share": ("post_review_commit_share", "share", "mean"),
+    "review_concentration_top_k": ("review_concentration_top_k", "share", None),
+    "pr_size_p50_lines": ("pr_size_p50_lines", "lines", "median"),
+    # Reported without a significance test; the size hypothesis reads its point change.
+    "large_pr_share": ("large_pr_share", "share", None),
+}
 
 
 def build_efficiency(dataset: Dataset, params_hash: str) -> dict[str, Any]:
     """Assemble current/previous metrics with units and the matching bootstrap statistic."""
     current = measures(dataset, dataset.current)
     previous = measures(dataset, dataset.previous) if dataset.comparison_available else {}
-    result: dict[str, Any] = {
-        "stage_p50_hours": {},
-        "predictability": predictability(dataset, params_hash),
-        "survival": {
-            "current": survival_cohort(dataset, dataset.current),
-            "previous": survival_cohort(dataset, dataset.previous)
-            if dataset.comparison_available
-            else None,
-        },
-    }
-    for name, measure in current.items():
-        unit = "share"
-        statistic: Statistic | None = "mean"
-        if name in {"merged_prs", "effective_throughput"}:
-            unit, statistic = "count", None
-        elif name == "review_concentration_top_k":
-            statistic = None
-        elif name == "avg_review_rounds":
-            unit = "rounds"
-        elif name == "pr_size_p50_lines":
-            unit, statistic = "lines", "median"
-        elif name == "waiting_share":
-            statistic = "ratio"
-        elif "hours" in name or name in {"coding", "pickup", "review", "merge"}:
-            unit, statistic = "hours", "p90" if "p90" in name else "median"
-        metric = compare(
+    return {
+        key: compare(
             measure,
             previous.get(name),
             unit=unit,
@@ -217,75 +152,22 @@ def build_efficiency(dataset: Dataset, params_hash: str) -> dict[str, Any]:
             params_hash=params_hash,
             statistic=statistic,
         )
-        if name in {"coding", "pickup", "review", "merge"}:
-            result["stage_p50_hours"][name] = metric
-        else:
-            result[name] = metric
-    return result
+        for name, measure in current.items()
+        for key, unit, statistic in [OUTPUTS[name]]
+    }
 
 
-def survival_cohort(dataset: Dataset, window: Window) -> dict[str, Any] | None:
-    """Estimate ready-to-merge duration for PRs ready in the window, including censored PRs.
+def slowest_decile_size_ratio(dataset: Dataset) -> float | None:
+    """Median size of the slowest 10% of merged PRs divided by the median size of the rest.
 
-    Unmerged PRs are censored at closure or period end; this differs from merged-only medians.
+    Needs at least 50 merged PRs, and ten sized PRs on each side; None otherwise or when the
+    rest's median is 0. The comparison is descriptive, not a causal effect of size.
     """
-    samples = []
-    for pr in dataset.flow_in(window):
-        f = pr.facts
-        if f.ready_at is None or not window.contains(f.ready_at):
-            continue
-        event = f.merged_at is not None and f.merged_at < window.end
-        end = f.merged_at if event else min(window.end, f.closed_at or window.end)
-        if end is not None:
-            samples.append((max(0, (end - f.ready_at).total_seconds() / 3600), event))
-    return kaplan_meier(samples) if len(samples) >= t.MIN_SAMPLES_P50 else None
-
-
-def predictability(dataset: Dataset, params_hash: str) -> dict[str, Any]:
-    """Compare delivery to pre-period history and full-week throughput variability.
-
-    Historical p85 uses the 90 days before each period; incomplete coverage yields None.
-    """
-
-    def historical(window: Window) -> Measure:
-        """Measure delivery within historical p85; missing baseline coverage yields no value."""
-        prs = merged(dataset, window)
-        start = window.start - timedelta(days=90)
-        if any(repo.covered_since > start for repo in dataset.repos):
-            return Measure(None, len(prs), extra={"reason": "baseline_not_covered"})
-        history = [cycle for _, at, cycle in dataset.history if start <= at < window.start]
-        baseline = percentile(history, 85, 30)
-        if baseline is None:
-            return Measure(None, len(prs), extra={"baseline_n": len(history)})
-        return rate(
-            [float(cycle <= baseline) for cycle in values(prs, "cycle_hours")],
-            extra={"baseline_p85_hours": baseline, "baseline_n": len(history)},
-        )
-
-    def weekly_cv(window: Window) -> Measure:
-        """Compute population standard deviation divided by mean for at least four full weeks."""
-        counts = [
-            len(merged(dataset, week, scope=window))
-            for week in weeks(window)
-            if week.end - week.start == timedelta(days=7)
-        ]
-        value = (
-            float(np.std(counts) / np.mean(counts))
-            if len(counts) >= 4 and sum(counts) > 0
-            else None
-        )
-        return Measure(value, len(counts))
-
-    result = {}
-    for name, unit, measure in (
-        ("within_hist_p85", "share", historical),
-        ("weekly_throughput_cv", "coefficient", weekly_cv),
-    ):
-        result[name] = compare(
-            measure(dataset.current),
-            measure(dataset.previous) if dataset.comparison_available else None,
-            unit=unit,
-            name=name,
-            params_hash=params_hash,
-        )
-    return result
+    prs = merged(dataset, dataset.current)
+    if len(prs) < 50:
+        return None
+    ordered = sorted(prs, key=lambda p: (-(p.facts.cycle_hours or 0), p.repo, p.number))
+    n = ceil(len(prs) * 0.1)
+    slow = percentile(values(ordered[:n], "size_lines"), 50, 10)
+    rest = percentile(values(ordered[n:], "size_lines"), 50, 10)
+    return slow / rest if slow is not None and rest else None

@@ -1,35 +1,41 @@
-"""Delivery snapshot and PR list endpoints; both answer 202 Pending while data syncs."""
+"""Delivery snapshots and their cited narratives; adapt service replies to HTTP."""
 
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, Query, Request
 from starlette.responses import Response
 
 from insights.analytics.dataset import SnapshotParams
 from insights.api import deps
-from insights.api.params import parse_filters, parse_params
-from insights.api.responses import response
-from insights.api.schemas import Pending, PrPage, Snapshot
+from insights.api.params import parse_params, validate_snapshot_id
+from insights.api.schemas import Insight, Narrative, Pending
+from insights.narrative.llm import LLMClient
+from insights.narrative.service import NarrativeService
+from insights.snapshots.caching import Reply
 from insights.snapshots.service import SnapshotService
 
-router = APIRouter(prefix="/v1/insights", tags=["Insights"])
+router = APIRouter(prefix="/v1")
 
 
 def parameters(
     request: Request,
     service: Annotated[SnapshotService, Depends(deps.get_snapshot_service)],
-    repo: Annotated[list[str] | None, Query()] = None,
-    org: str | None = None,
+    repo: str | None = None,
     from_date: Annotated[str | None, Query(alias="from")] = None,
     to: str | None = None,
 ) -> SnapshotParams:
+    """Parse the raw snapshot query and collect validation errors into one 422 response."""
     # The query arguments above only document the API in OpenAPI; parse_params reads the raw
     # query so every invalid field is reported together in one 422 problem.
-    """Parse the raw snapshot query and collect validation errors into one 422 response."""
     return parse_params(request.query_params, service.settings, service.now)
 
 
-@router.get("/delivery", response_model=Snapshot, responses={202: {"model": Pending}, 304: {}})
+@router.get(
+    "/insights/delivery",
+    response_model=Insight,
+    responses={202: {"model": Pending}, 304: {}},
+    tags=["Insights"],
+)
 async def delivery(
     request: Request,
     params: Annotated[SnapshotParams, Depends(parameters)],
@@ -39,19 +45,30 @@ async def delivery(
     return response(await service.delivery(params, request.headers.get("if-none-match")))
 
 
-@router.get("/delivery/prs", response_model=PrPage, responses={202: {"model": Pending}})
-async def prs(
+@router.get(
+    "/snapshots/{snapshot_id}/narrative",
+    response_model=Narrative,
+    responses={304: {}},
+    tags=["Snapshots"],
+)
+async def narrative(
     request: Request,
-    params: Annotated[SnapshotParams, Depends(parameters)],
+    snapshot_id: str,
     service: Annotated[SnapshotService, Depends(deps.get_snapshot_service)],
-    status: str | None = None,
-    at_risk: str = "false",
-    state: str | None = None,
-    location: str | None = None,
-    limit: str = "50",
-    cursor: str | None = None,
 ) -> Response:
-    # As in parameters(): filter arguments are declared for OpenAPI, parsed by parse_filters.
-    """Parse drilldown filters and serve a cursor page from the corresponding snapshot."""
-    filters, parsed_limit, parsed_cursor = parse_filters(request.query_params)
-    return response(await service.rows(params, filters, parsed_limit, parsed_cursor))
+    """Serve a retained snapshot's English narrative, honoring conditional ETags."""
+    sid = validate_snapshot_id(snapshot_id)
+    llm = cast(LLMClient | None, getattr(request.app.state, "llm", None))
+    return response(
+        await NarrativeService(service, llm).get(sid, request.headers.get("if-none-match"))
+    )
+
+
+def response(reply: Reply) -> Response:
+    """Convert domain reply bytes/status/headers into JSON, omitting media type for 304."""
+    return Response(
+        reply.body,
+        status_code=reply.status,
+        headers=reply.headers,
+        media_type=None if reply.status == 304 else "application/json",
+    )

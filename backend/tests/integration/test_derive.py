@@ -1,3 +1,5 @@
+"""Transactional derivation, rederive batches and checkpoints."""
+
 from unittest.mock import AsyncMock
 
 import pytest
@@ -28,7 +30,7 @@ async def seed(ctx, count=1):
         )
         for i in range(1, count + 1)
     )
-    page = PageResult(RepositoryInfo("a/b", "main", False), records, None, False, at(10), at(10), 1)
+    page = PageResult(RepositoryInfo("a/b", "main"), records, None, False, at(10), at(10), 1)
     async with ctx["session_factory"]() as session, session.begin():
         repo = await ensure_repo(session, "a/b", NOW)
         saved = await save_page(session, repo.id, page, now=NOW, settings=ctx["settings"])
@@ -36,7 +38,7 @@ async def seed(ctx, count=1):
     return repo_id, saved, page
 
 
-async def test_transactional_derivation_and_preserved_links(context):
+async def test_transactional_derivation_is_idempotent(context):
     repo_id, saved, page = await seed(context)
     async with context["session_factory"]() as session, session.begin():
         fact = await session.get(PrFact, saved.pr_ids[0])
@@ -46,16 +48,12 @@ async def test_transactional_derivation_and_preserved_links(context):
         result = TimelineResult(
             fact.ready_at,
             tuple(Interval(r.state, r.start_at, r.end_at) for r in rows),
-            fact.approved_at,
             fact.review_rounds,
-            fact.state_at_close,
         )
         assert not check_invariants(result, pr_input(page.prs[0]))
-        fact.reland_of_pr_id = saved.pr_ids[0]
-        await session.flush()
         await derive_prs(session, saved.pr_ids, settings=context["settings"], now=NOW)
         await session.refresh(fact)
-        assert fact.reland_of_pr_id == saved.pr_ids[0]
+        assert fact.derive_key == current_key(context["settings"])
         assert await derivation_complete(session, repo_id, current_key(context["settings"]))
         again = await save_page(session, repo_id, page, now=NOW, settings=context["settings"])
         assert not again.prs_changed

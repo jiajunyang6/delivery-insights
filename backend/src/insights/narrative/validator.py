@@ -1,4 +1,4 @@
-"""Validation of LLM tool output against the evidence pack and snapshot.
+"""Validation of LLM tool output against the evidence pack.
 
 Checks schema, length, language (CJK characters), citations, numbers, hedge wording, personal
 names and abstention, and returns violations for the repair prompt; output is never modified.
@@ -53,6 +53,8 @@ SUFFIXES = (
 
 
 class ToolModel(BaseModel):
+    """Strict base for the submit_narrative input: no extra or null fields."""
+
     model_config = ConfigDict(extra="forbid", strict=True)
 
     @model_validator(mode="before")
@@ -65,17 +67,23 @@ class ToolModel(BaseModel):
 
 
 class Downgrade(ToolModel):
+    """An LLM-proposed lower band with a cited reason."""
+
     level: Literal["medium", "low"]
     reason: str = Field(min_length=1, max_length=300)
 
 
 class HypothesisOutput(ToolModel):
+    """Wording for one library hypothesis."""
+
     id: str
     statement: str = Field(min_length=1, max_length=400)
     downgrade: Downgrade | None = None
 
 
 class OutsideHypothesis(ToolModel):
+    """An optional extra explanation outside the hypothesis library."""
+
     statement: str = Field(min_length=1, max_length=400)
     evidence_ids: list[Annotated[str, Field(pattern=r"^E[0-9]+$")]] = Field(
         min_length=2, max_length=8
@@ -83,6 +91,8 @@ class OutsideHypothesis(ToolModel):
 
 
 class ToolOutput(ToolModel):
+    """The full submit_narrative tool input."""
+
     narrative: str = Field(min_length=1, max_length=1200)
     hypotheses: list[HypothesisOutput] = Field(max_length=3)
     llm_hypothesis: OutsideHypothesis | None = None
@@ -90,6 +100,8 @@ class ToolOutput(ToolModel):
 
 @dataclass(frozen=True, slots=True)
 class Violation:
+    """One validation failure; the message doubles as repair feedback."""
+
     code: str
     message: str
 
@@ -140,6 +152,8 @@ def unit(suffix: str) -> str:
 
 @dataclass(frozen=True, slots=True)
 class AllowedNumber:
+    """A number a sentence may quote, in one unit, and where it comes from."""
+
     value: float
     category: str
     evidence: str = ""
@@ -320,13 +334,27 @@ def validate_hypotheses(
         if isinstance(downgrade, dict):
             proposed = downgrade.get("level")
             reason = downgrade.get("reason", "")
-            if (
+            # Messages name the fix, because they are the repair feedback; the rules are unchanged.
+            if final_level == "low":
+                fail(
+                    "V8:invalid_downgrade",
+                    f"{identifier} is already low, the lowest band: remove its downgrade field and "
+                    "cite any counter-evidence in the statement instead.",
+                )
+            elif (
                 proposed not in {"medium", "low"}
                 or LEVEL_ORDER[proposed] >= LEVEL_ORDER[final_level]
-                or not isinstance(reason, str)
-                or not citations(reason) & evidence.keys()
             ):
-                fail("V8:invalid_downgrade", f"Invalid downgrade for {identifier}.")
+                fail(
+                    "V8:invalid_downgrade",
+                    f"A downgrade for {identifier} must name a band below {final_level}.",
+                )
+            elif not isinstance(reason, str) or not citations(reason) & evidence.keys():
+                fail(
+                    "V8:invalid_downgrade",
+                    f"The downgrade reason for {identifier} must cite pack evidence in brackets, "
+                    "such as [E1].",
+                )
             else:
                 final_level = proposed
         levels.append(LEVEL_ORDER[final_level])
@@ -338,13 +366,7 @@ def validate_hypotheses(
     return levels
 
 
-def validate(
-    output: dict[str, Any] | None,
-    pack: Mapping[str, Any],
-    snapshot: Mapping[str, Any],
-    *,
-    audience: str,
-) -> list[Violation]:
+def validate(output: dict[str, Any] | None, pack: Mapping[str, Any]) -> list[Violation]:
     """Return every violation in one tool output, deduplicated; an empty list means valid.
 
     Schema errors do not stop the semantic checks, so a single repair message can list all
@@ -396,8 +418,8 @@ def validate(
     candidates = {c["id"]: c for c in pack["hypotheses"]}
     evidence = {e["id"]: e for e in pack["evidence"]}
     body_sentences = sentences(body)
-    low = (2 if candidates else 1) if audience == "director" else (3 if candidates else 2)
-    high = 4 if audience == "director" else 6
+    # Shape checks: length, sentence count, language, and a citation in every body sentence.
+    low, high = (2 if candidates else 1), 4
     if len(body) > 1200:
         fail("V2:length", "Narrative exceeds 1200 characters.")
     if not low <= len(body_sentences) <= high:
@@ -415,10 +437,7 @@ def validate(
         if not citations(sentence):
             fail("V4:sentence_without_citation", f"Body sentence {i} needs evidence.")
     # Narratives discuss areas and teams, never individuals. Logins never enter the pack, so
-    # any match is a guessed or coincidental name; logins under three characters are skipped
-    # to avoid matching ordinary words.
-    logins = {r["reviewer"] for r in snapshot["bottleneck_analysis"]["review_load"]["distribution"]}
-    logins.update(p["author"] for p in snapshot["at_risk_prs"] if p["author"])
+    # an @mention can only be a guessed name.
     for text in texts:
         for identifier in sorted(citations(text) - evidence.keys()):
             fail("V4:unknown_citation", f"Unknown citation {identifier}.")
@@ -426,13 +445,13 @@ def validate(
             errors.extend(check_numbers(sentence, pack, evidence))
         if DEFINITE.search(text):
             fail("V7b:overclaim", "Definite causal language is not supported.")
-        if re.search(r"@[A-Za-z0-9]", text) or any(
-            re.search(r"(?<![A-Za-z0-9-])" + re.escape(name) + r"(?![A-Za-z0-9-])", text, re.I)
-            for name in logins
-            if len(name) >= 3
-        ):
+        if re.search(r"@[A-Za-z0-9]", text):
             fail("V10:personal_name", "Personal login names must not appear.")
+    # Hypothesis checks return the final band of each statement; the body's causal wording
+    # may not be stronger than the strongest of them.
     levels = validate_hypotheses(hypotheses, candidates, evidence, body, errors)
+    # An outside hypothesis must rest on significant evidence from both metric families
+    # (efficiency and bottleneck) and is always worded at the low band.
     if outside:
         ids = outside.get("evidence_ids", [])
         ids = set(ids) if isinstance(ids, list) and all(isinstance(i, str) for i in ids) else set()
@@ -465,6 +484,7 @@ def validate(
             hedges = hedge_levels(sentence)
             if not levels or not hedges or max(hedges) > max(levels):
                 fail("V7b:overclaim", "Body causal language exceeds the supported level.")
+    # Without candidates the narrative must abstain: state the reason and name no cause.
     if not candidates:
         pattern = ABSTAIN_REQUIRED.get(abstention(pack)[0], ABSTAIN_REQUIRED["insufficient_signal"])
         required = pattern.search(body)

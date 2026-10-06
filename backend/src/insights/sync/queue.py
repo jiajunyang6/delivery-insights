@@ -25,10 +25,7 @@ logger = structlog.get_logger(__name__)
 JOB_ROUTES = {
     "backfill": ("sync_repo", "sync"),
     "incremental": ("sync_repo", "sync"),
-    "manual": ("sync_repo", "sync"),
     "rederive": ("rederive_repo", "rederive"),
-    "ci_runs": ("enrich_repo", "ci"),
-    "ownership": ("enrich_repo", "owners"),
 }
 
 
@@ -86,6 +83,8 @@ async def enqueue_sync(
         raise
     if enqueued is not None:
         return job, True
+    # arq refused the fixed job ID because the same job is already queued: drop the duplicate
+    # ledger row and report the job that already covers this request.
     await session.delete(job)
     await session.commit()
     related = [key for key, value in JOB_ROUTES.items() if value[1] == prefix]
@@ -188,19 +187,10 @@ async def enqueue_precompute(ctx: dict[str, Any], repo: Repository) -> None:
     )
 
 
-async def last_success(ctx: dict[str, Any], repo_id: int, kind: str) -> datetime | None:
-    """Return the latest successful finish time for this repository/job kind, or None."""
-    async with sessions_for(ctx)() as session:
-        return await session.scalar(
-            select(SyncJob.finished_at)
-            .where(SyncJob.repo_id == repo_id, SyncJob.kind == kind, SyncJob.status == "succeeded")
-            .order_by(SyncJob.finished_at.desc())
-            .limit(1)
-        )
-
-
 @dataclass
 class JobRun:
+    """One running job: its repository, ledger row and stats to persist."""
+
     ctx: dict[str, Any]
     repo: Repository
     job_id: str
@@ -213,10 +203,10 @@ class JobRun:
     ) -> None:
         """Persist terminal status and permitted stats, then mark this run finished.
 
-        Failure text is capped at 500 characters; failed enrichment preserves existing stats.
+        Failure text is capped at 500 characters.
         """
         values: dict[str, Any] = {"status": result, "finished_at": now_for(self.ctx)}
-        if include_stats and (result == "succeeded" or self.kind not in {"ownership", "ci_runs"}):
+        if include_stats:
             values["stats"] = self.stats
         if error is not None:
             values["error"] = error[:500]
@@ -244,7 +234,7 @@ async def run_job(
             yield None
             return
         values: dict[str, Any] = {"status": "running", "started_at": now_for(ctx)}
-        if kind in {"rederive", "ci_runs", "ownership"}:
+        if kind == "rederive":
             values["phase"] = kind
         await set_job(ctx, job_id, **values)
         run = JobRun(ctx, repo, job_id, kind)
@@ -254,33 +244,24 @@ async def run_job(
             # Follow-up queue failures after completion retain the original success ledger.
             if run.result != "running":
                 raise
-            sync = kind not in {"rederive", "ci_runs", "ownership"}
+            sync = kind != "rederive"
+            # GitHubError messages are sanitized codes and safe to store; any other exception
+            # is recorded by type only, so its text cannot leak into the ledger or the UI.
+            error = (
+                f"{type(exc).__name__}: {exc}"
+                if sync and isinstance(exc, GitHubError)
+                else type(exc).__name__
+            )
             if sync:
+                # Auth and not-found statuses drive the dashboard's configuration notice.
                 status = (
                     "auth_error"
                     if isinstance(exc, GitHubAuthError)
                     else ("not_found" if isinstance(exc, GitHubNotFoundError) else "failed")
                 )
-                error = (
-                    f"{type(exc).__name__}: {exc}"
-                    if isinstance(exc, GitHubError)
-                    else type(exc).__name__
-                )
                 await set_repo(ctx, repo.id, last_sync_status=status, last_sync_error=error[:500])
-            else:
-                error = (
-                    str(exc)
-                    if kind != "rederive" and isinstance(exc, GitHubError)
-                    else type(exc).__name__
-                )
             await run.finish("failed", error)
-            event = (
-                "sync_failed"
-                if sync
-                else "rederive_failed"
-                if kind == "rederive"
-                else "enrichment_failed"
-            )
+            event = "sync_failed" if sync else "rederive_failed"
             logger.error(event, repo=repo_full_name, job=job_id, error=error[:500])
         else:
             if run.result == "running":

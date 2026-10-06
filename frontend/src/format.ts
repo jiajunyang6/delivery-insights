@@ -1,34 +1,42 @@
-import type { Audience, State } from "./types";
+/** Display formatting, waiting-state labels and colors, and UTC date-range helpers. */
+import type { DateLimits, Params, State } from "./types";
 
+/** Waiting states in display order. */
 export const states: State[] = [
   "waiting_reviewer",
   "waiting_author",
-  "waiting_ci",
   "waiting_merge",
 ];
 export const stateLabels: Record<State, string> = {
   waiting_reviewer: "Reviewer",
   waiting_author: "Author",
-  waiting_ci: "CI",
   waiting_merge: "Merge",
 };
 export const stateColors: Record<State, string> = {
   waiting_reviewer: "#208577",
   waiting_author: "#9db9bd",
-  waiting_ci: "#dfae55",
   waiting_merge: "#657299",
 };
+/** Format a number with up to `digits` decimals; missing values show as an em dash. */
 export function number(value: number | null | undefined, digits = 1): string {
   return value == null
     ? "—"
     : value.toLocaleString("en-US", { maximumFractionDigits: digits });
 }
+/** Format a fraction (0.12) as a percentage ("12%"). */
 export function percent(value: number | null | undefined): string {
   return value == null ? "—" : number(value * 100) + "%";
 }
+
+/** Format elapsed hours with an "h" suffix. */
 export function hours(value: number | null | undefined): string {
   return value == null ? "—" : number(value) + " h";
 }
+
+/**
+ * Format an evidence value by its API unit. Review rounds keep two decimals, because one
+ * decimal can hide a real change between periods.
+ */
 export function format(value: number | null | undefined, unit: string): string {
   if (unit === "share" || unit === "change") return percent(value);
   if (unit === "hours") return hours(value);
@@ -57,35 +65,7 @@ export function signed(
     ? "—"
     : (value > 0 ? "+" : "") + number(value * scale) + suffix;
 }
-export function timestamp(value: string): string {
-  return (
-    new Date(value).toLocaleString("en-US", {
-      timeZone: "UTC",
-      dateStyle: "medium",
-      timeStyle: "short",
-    }) + " UTC"
-  );
-}
-/**
- * Link targets come from API data, so only plain https://github.com URLs become anchors;
- * other schemes, look-alike hosts, credentials or ports are rendered as text.
- */
-export function safeGithubUrl(value: string): boolean {
-  if (!value.startsWith("https://github.com/")) return false;
-  try {
-    const url = new URL(value);
-    return (
-      url.protocol === "https:" &&
-      url.hostname === "github.com" &&
-      !url.username &&
-      !url.password &&
-      !url.port
-    );
-  } catch {
-    return false;
-  }
-}
-// Inclusive range of UTC calendar days, matching the API's UTC date handling.
+/** Inclusive range of `days` UTC calendar days ending on `to`, matching the API's dates. */
 export function dateRange(days: number, to = new Date().toISOString().slice(0, 10)) {
   const from = new Date(Date.parse(to + "T00:00:00Z") - (days - 1) * 86_400_000)
     .toISOString()
@@ -93,24 +73,48 @@ export function dateRange(days: number, to = new Date().toISOString().slice(0, 1
   return { from, to };
 }
 
-
-export const viewLabels: Record<Audience, string> = {
-  director: "Delivery Overview",
-  manager: "PR & Review Details",
-};
-
-export const viewDescriptions: Record<Audience, string> = {
-  director: "Delivery outcomes and the top three bottlenecks",
-  manager: "All bottlenecks, review queues, areas, and at-risk pull requests",
-};
-
+/** Upper-case the first character. */
 export function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-export const chartColors = {
-  grid: "#e4e9e7",
-  inflow: "#a3c4bd",
-  outflow: stateColors.waiting_reviewer,
-  queue: "#b17b28",
-};
+const DAY = 86_400_000;
+/**
+ * Check a YYYY-MM-DD string. It round-trips through UTC so impossible dates such as
+ * 2024-02-31 are rejected.
+ */
+function validDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(value + "T00:00:00Z");
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+/** Whether the selected range spans exactly `days` days, so its preset button shows active. */
+export function isPeriodSelected(
+  params: Pick<Params, "from" | "to">,
+  days: number,
+): boolean {
+  if (!validDate(params.from) || !validDate(params.to)) return false;
+  return (Date.parse(params.to) - Date.parse(params.from)) / DAY + 1 === days;
+}
+
+/**
+ * Mirrors the API's period checks against the UTC date limits from /v1/repos, so invalid
+ * ranges are caught before a request. ISO dates compare correctly as strings.
+ */
+export function periodError(
+  params: Pick<Params, "from" | "to">,
+  limits: DateLimits | null,
+): string | null {
+  if (!validDate(params.from) || !validDate(params.to) || params.from > params.to)
+    return "Choose a valid date range with From no later than To.";
+  if (!limits) return null;
+  if (params.from < limits.earliest_from)
+    return `History is configured from ${limits.earliest_from} (UTC). Choose a later From date.`;
+  if (params.to > limits.latest_to)
+    return `To must not be later than ${limits.latest_to} (UTC).`;
+  const days = (Date.parse(params.to) - Date.parse(params.from)) / DAY + 1;
+  if (days > limits.max_days)
+    return `Choose a period of at most ${limits.max_days} days.`;
+  return null;
+}

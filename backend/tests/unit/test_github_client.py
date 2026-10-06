@@ -1,5 +1,7 @@
+"""GitHub client and adapter: retries, timeouts, paging, bad PRs."""
+
 from copy import deepcopy
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import httpx
 import orjson
@@ -8,8 +10,8 @@ from pydantic import SecretStr
 
 from insights.config import Settings
 from insights.domain import RepoRef
-from insights.sources.github.adapter import GitHubAdapter
 from insights.sources.github.client import (
+    GitHubAdapter,
     GitHubAuthError,
     GitHubClient,
     GitHubNotFoundError,
@@ -107,11 +109,21 @@ async def test_timeline_network_failure_is_not_treated_as_a_bad_pr(client, githu
     ],
 )
 async def test_backoff(client, status, headers, delays, exception):
-    route = client.router.post(URL).respond(status, headers=headers)
+    # GitHub's secondary-limit body; a header-less 403 is a rate limit only because of it.
+    body = "You have exceeded a secondary rate limit."
+    route = client.router.post(URL).respond(status, headers=headers, text=body)
     with pytest.raises(exception):
         await client.graphql("query", {})
     assert route.call_count == 4
     assert [call.args[0] for call in client.sleep.call_args_list] == delays
+
+
+async def test_forbidden_without_rate_limit_signals_fails_at_once(client):
+    route = client.router.post(URL).respond(403, text="Resource not accessible by token")
+    with pytest.raises(GitHubAuthError, match="access_forbidden"):
+        await client.graphql("query", {})
+    assert route.call_count == 1
+    client.sleep.assert_not_awaited()
 
 
 async def test_timeout(client):
@@ -273,31 +285,6 @@ async def test_large_timeline_keeps_source_id_and_actor_type(client, github_page
     assert "fragment ActorFields on Actor { __typename login }" in " ".join(
         requests[0]["query"].split()
     )
-
-
-async def test_rest_etag_cache(client):
-    body = {"workflow_runs": []}
-    redis = MagicMock()
-    redis.hgetall = AsyncMock(side_effect=[{}, {b"etag": b'"abc"', b"body": orjson.dumps(body)}])
-    pipeline = MagicMock()
-    pipeline.__aenter__ = AsyncMock(return_value=pipeline)
-    pipeline.__aexit__ = AsyncMock(return_value=False)
-    pipeline.execute = AsyncMock()
-    redis.pipeline.return_value = pipeline
-    client.redis = redis
-    route = client.router.get("https://api.github.com/repos/a/b/actions/runs").mock(
-        side_effect=[httpx.Response(200, json=body, headers={"etag": '"abc"'}), httpx.Response(304)]
-    )
-    first = await client.rest_get("/repos/a/b/actions/runs")
-    second = await client.rest_get("/repos/a/b/actions/runs")
-    assert first.body == second.body == body
-    assert route.calls[1].request.headers["if-none-match"] == '"abc"'
-
-
-@pytest.mark.parametrize("path", ["https://evil.example/a", "//evil.example/a", "relative"])
-async def test_rest_rejects_absolute_urls(client, path):
-    with pytest.raises(ValueError):
-        await client.rest_get(path)
 
 
 async def test_public_repo_token_retains_team_request_without_org_scope(client, github_page):

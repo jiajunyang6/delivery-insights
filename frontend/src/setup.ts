@@ -1,3 +1,4 @@
+/** Configuration health turned into notices; plain logic so Node tests need no browser. */
 import type { SetupStatus } from "./types";
 
 // Bedrock error codes grouped by the `.env` setting most likely to fix them.
@@ -10,7 +11,8 @@ const AUTH_ERRORS = new Set([
 const MODEL_ERRORS = new Set(["ValidationException", "ResourceNotFoundException"]);
 const ENDPOINT_ERRORS = new Set(["EndpointConnectionError", "NoRegionError"]);
 
-export type SetupItem = { level: "problem" | "info"; text: string };
+/** One notice line: a problem the user must fix, or information. */
+type SetupItem = { level: "problem" | "info"; text: string };
 
 /** Turn configuration health into fixes that name the exact `.env` variable to change. */
 export function setupItems(setup: SetupStatus): SetupItem[] {
@@ -45,6 +47,7 @@ export function setupItems(setup: SetupStatus): SetupItem[] {
         text: `${p.repo} last synced without a token and no new sync is queued. Run docker compose up -d so the worker reads GITHUB_TOKEN, then refresh the page.`,
       });
   }
+  // A missing Bedrock key is a valid setup (template narratives), so it is only information.
   if (!llm.key_configured) {
     items.push({
       level: "info",

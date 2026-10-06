@@ -4,24 +4,23 @@ from bisect import bisect_left
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
-from insights.analytics import ANALYTICS_VERSION
-from insights.analytics.classify import is_flow
-from insights.analytics.thresholds import THRESHOLDS_VERSION
-from insights.analytics.timeline import Interval, is_open_at, ledger_hours
-from insights.analytics.types import PrFacts
-from insights.domain import CiRun
+from insights.analytics import ANALYTICS_VERSION, THRESHOLDS_VERSION
+from insights.analytics.facts import PrFacts, is_flow
+from insights.analytics.timeline import Interval, ledger_hours
 
 
 @dataclass(frozen=True, slots=True)
 class SnapshotParams:
+    """Request parameters that, with versions, identify a snapshot."""
+
     repos: tuple[str, ...]
     period_from: date
     period_to: date
     location_dimension: str = "label:area-"
     directory_depth: int = 2
-    ci_source: str = "none"
+    sampling_profile: Literal["default", "github"] = field(default="default", kw_only=True)
 
     def canonical_dict(self) -> dict[str, Any]:
         """Return normalized parameters and versions used to identify deterministic snapshots."""
@@ -31,7 +30,7 @@ class SnapshotParams:
             "to": self.period_to.isoformat(),
             "location_dimension": self.location_dimension,
             "directory_depth": self.directory_depth,
-            "ci_source": self.ci_source,
+            "sampling_profile": self.sampling_profile,
             "analytics_version": ANALYTICS_VERSION,
             "thresholds_version": THRESHOLDS_VERSION,
         }
@@ -39,26 +38,25 @@ class SnapshotParams:
 
 @dataclass(frozen=True, slots=True)
 class RepoData:
+    """Sync state of one repository as seen when the snapshot was computed."""
+
     repo: str
     data_version: int
     covered_since: datetime
     last_synced_at: datetime
     last_sync_status: str = "ok"
-    owners: tuple[tuple[str, int], ...] = ()
     repo_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class PrData:
+    """One PR's facts, intervals and human-activity times for cohort selection."""
+
     pr_id: int
     repo: str
     facts: PrFacts
     intervals: tuple[Interval, ...]
     number: int
-    title: str
-    url: str
-    author: str | None
-    is_draft: bool
     created_at: datetime
     human_activity_at: tuple[datetime, ...] = ()
 
@@ -69,41 +67,35 @@ class PrData:
 
 @dataclass(frozen=True, slots=True)
 class Review:
+    """One human review event on a flow PR, for review-concentration metrics."""
+
     reviewer: str
     occurred_at: datetime
     pr_id: int
 
 
 @dataclass(frozen=True, slots=True)
-class Baseline:
-    repo: str
-    state: str
-    end_at: datetime
-    hours: float
-
-
-@dataclass(frozen=True, slots=True)
 class Window:
+    """A half-open UTC time window [start, end)."""
+
     start: datetime
     end: datetime
 
     def contains(self, at: datetime | None) -> bool:
-        # Half-open [start, end): adjacent periods and weeks never both count a boundary event.
         """Test membership in [start, end); None never belongs to a window."""
+        # Half-open [start, end): adjacent periods and weeks never both count a boundary event.
         return at is not None and self.start <= at < self.end
 
 
 @dataclass(frozen=True, slots=True)
 class Dataset:
+    """Everything one snapshot reads, loaded in one consistent database view."""
+
     repos: tuple[RepoData, ...]
     prs: tuple[PrData, ...]
     reviews: tuple[Review, ...]
-    baselines: tuple[Baseline, ...]
     period_from: date
     period_to: date
-    ci_runs: tuple[tuple[str, CiRun], ...] = ()
-    history: tuple[tuple[str, datetime, float], ...] = ()
-    current_day: bool = False
     # init=False gives every dataclasses.replace() an empty, independent cache.
     cohort_cache: dict[Window, tuple[tuple[PrData, ...], tuple[Review, ...] | None]] = field(
         default_factory=dict, init=False, compare=False, repr=False
@@ -121,8 +113,8 @@ class Dataset:
 
     @property
     def as_of(self) -> datetime:
-        # Clamp to the least recently synced repo so no repo is read past its synced data.
         """Observation cutoff: the earlier of report end and the least-recent repository sync."""
+        # Clamp to the least recently synced repo so no repo is read past its synced data.
         return min(self.to_excl, min(r.last_synced_at for r in self.repos))
 
     @property
@@ -192,30 +184,11 @@ def merged(dataset: Dataset, window: Window, *, scope: Window | None = None) -> 
     return tuple(p for p in dataset.flow_in(scope or window) if window.contains(p.facts.merged_at))
 
 
-def closed(dataset: Dataset, window: Window) -> tuple[PrData, ...]:
-    """Select active flow PRs closed without merging during this half-open window."""
-    return tuple(
-        p
-        for p in dataset.flow_in(window)
-        if p.facts.merged_at is None and window.contains(p.facts.closed_at)
-    )
-
-
-def open_at(pr: PrData, at: datetime) -> bool:
-    """Test whether a ready PR occupies a waiting state at this historical instant."""
-    return is_open_at(pr.facts.ready_at, pr.facts.end_at, pr.intervals, at)
-
-
 def hours(pr: PrData, *, end: datetime) -> dict[str, float]:
     """Sum post-ready elapsed waiting hours, clipped to lifecycle end and the supplied cutoff."""
     return ledger_hours(
         pr.intervals, start=pr.facts.ready_at or end, end=min(pr.facts.end_at or end, end)
     )
-
-
-def reverted(pr: PrData, at: datetime) -> bool:
-    """Test whether a linked revert was merged strictly before the supplied cutoff."""
-    return pr.facts.reverted_at is not None and pr.facts.reverted_at < at
 
 
 def effective_review(pr: PrData) -> datetime | None:

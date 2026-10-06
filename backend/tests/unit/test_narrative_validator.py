@@ -1,3 +1,5 @@
+"""Validator rules for numbers, citations, hedges and abstention."""
+
 from copy import deepcopy
 
 import pytest
@@ -6,13 +8,13 @@ from tests.narrative_factory import entry, validation_fixture
 from insights.narrative.validator import check_numbers, sentences, validate
 
 
-def codes(output, pack, snapshot):
-    return {v.code for v in validate(output, pack, snapshot, audience="director")}
+def codes(output, pack):
+    return {v.code for v in validate(output, pack)}
 
 
 def test_valid_and_abbreviation_decimal_splitting():
-    snapshot, pack, output = validation_fixture()
-    assert not codes(output, pack, snapshot)
+    pack, output = validation_fixture()
+    assert not codes(output, pack)
     assert len(sentences("It was 41.3 h vs. 35.1 h, e.g. early work [E1]. Next [E1].")) == 2
 
 
@@ -41,7 +43,7 @@ def test_valid_and_abbreviation_decimal_splitting():
     ],
 )
 def test_sentence_local_numbers_units_rounding_and_direction(text, expected):
-    _, pack, _ = validation_fixture()
+    pack, _ = validation_fixture()
     evidence = {e["id"]: e for e in pack["evidence"]}
     actual = {v.code for v in check_numbers(text, pack, evidence)}
     assert actual == ({expected} if expected else set())
@@ -58,7 +60,6 @@ def test_sentence_local_numbers_units_rounding_and_direction(text, expected):
         ("sentences", "V2:sentence_count"),
         ("non_english", "V3:language"),
         ("personal", "V10:personal_name"),
-        ("login", "V10:personal_name"),
         ("unknown_h", "V6:unknown_hypothesis"),
         ("duplicate", "V6:duplicate_hypothesis"),
         ("missing_h", "V6:missing_required_hypothesis"),
@@ -70,7 +71,7 @@ def test_sentence_local_numbers_units_rounding_and_direction(text, expected):
     ],
 )
 def test_validation_rules(mutation, expected):
-    snapshot, pack, output = validation_fixture()
+    pack, output = validation_fixture()
     if mutation == "unknown":
         output["narrative"] += " Unknown [E999]."
     elif mutation == "missing_cite":
@@ -87,8 +88,6 @@ def test_validation_rules(mutation, expected):
         output["hypotheses"][0]["statement"] += chr(0x4E00)
     elif mutation == "personal":
         output["narrative"] += " @someone [E1]."
-    elif mutation == "login":
-        output["narrative"] += f" {snapshot['at_risk_prs'][0]['author'].upper()} [E1]."
     elif mutation == "unknown_h":
         output["hypotheses"][0]["id"] = "H_fake"
     elif mutation == "duplicate":
@@ -106,53 +105,51 @@ def test_validation_rules(mutation, expected):
         )
     elif mutation == "bad_downgrade":
         output["hypotheses"][0]["downgrade"] = {"level": "medium", "reason": "No citation."}
-    assert expected in codes(output, pack, snapshot)
+    assert expected in codes(output, pack)
 
 
 def test_downgrade_counterevidence_body_causal_ceiling_and_abstain():
-    snapshot, pack, output = validation_fixture()
+    pack, output = validation_fixture()
     h = output["hypotheses"][0]
     h["downgrade"] = {"level": "low", "reason": "The first-review evidence is limited [E15]."}
     h["statement"] = "There are early signs that review capacity is the main cause [E1][E15]."
-    assert "V7b:overclaim" in codes(output, pack, snapshot)
+    assert "V7b:overclaim" in codes(output, pack)
     output["narrative"] = (
         "Median cycle time rose 18% [E1]. There are early signs of a review capacity cause [E15]."
     )
-    assert not codes(output, pack, snapshot)
+    assert not codes(output, pack)
     pack["hypotheses"][0]["counter_evidence"] = ["E53"]
-    assert "V6:counter_evidence_not_cited" in codes(output, pack, snapshot)
+    assert "V6:counter_evidence_not_cited" in codes(output, pack)
     h["statement"] += " There is counter-evidence [E53]."
-    assert not codes(output, pack, snapshot)
+    assert not codes(output, pack)
     pack["hypotheses"] = []
     output = {
         "narrative": "There are insufficient signals to establish a root cause [E1].",
         "hypotheses": [],
     }
-    assert not codes(output, pack, snapshot)
+    assert not codes(output, pack)
     output["narrative"] += " Review capacity may be the cause [E15]."
-    assert "V12:abstain" in codes(output, pack, snapshot)
+    assert "V12:abstain" in codes(output, pack)
 
 
 def test_outside_library_requires_significant_evidence_on_both_sides():
-    snapshot, pack, output = validation_fixture()
+    pack, output = validation_fixture()
     output["llm_hypothesis"] = {
         "statement": "There are early signs that scheduling may explain the delay [E1][E15].",
         "evidence_ids": ["E1", "E15"],
     }
-    assert "V9:invalid_llm_hypothesis" in codes(
-        output, pack, snapshot
-    )  # medium hedge is too strong
+    assert "V9:invalid_llm_hypothesis" in codes(output, pack)  # medium hedge is too strong
     output["llm_hypothesis"]["statement"] = (
         "There are early signs of a scheduling constraint [E1][E15]."
     )
-    assert not codes(output, pack, snapshot)
+    assert not codes(output, pack)
     pack["evidence"][1]["significant"] = False
     pack["observations"] = []
-    assert "V9:invalid_llm_hypothesis" in codes(output, pack, snapshot)
+    assert "V9:invalid_llm_hypothesis" in codes(output, pack)
 
 
 def test_extra_number_units_labels_and_multiple_direction_entries():
-    _, pack, _ = validation_fixture()
+    pack, _ = validation_fixture()
     evidence = {e["id"]: e for e in pack["evidence"]}
     evidence["E90"] = entry(
         "E90", 90, 120, unit="minutes", extra={"n_days": 3}, label="500 lines within 10 minutes"
@@ -194,7 +191,7 @@ def test_extra_number_units_labels_and_multiple_direction_entries():
     ],
 )
 def test_explicit_plan_numeric_examples(text):
-    _, pack, _ = validation_fixture()
+    pack, _ = validation_fixture()
     evidence = {e["id"]: e for e in pack["evidence"]}
     evidence.update(
         {
@@ -212,14 +209,14 @@ def test_explicit_plan_numeric_examples(text):
 
 
 def test_direction_only_checks_reported_changes_and_statement_numbers():
-    snapshot, pack, output = validation_fixture()
+    pack, output = validation_fixture()
     evidence = {e["id"]: e for e in pack["evidence"]}
     evidence["E19"] = entry("E19", 0.21, 0.25, unit="share")
     assert not check_numbers(
         "Cycle was 41.3 h while author waiting decreased 4 pp [E1][E19].", pack, evidence
     )
     output["hypotheses"][0]["statement"] += " It took 999 hours [E1]."
-    assert "V5:number_not_in_evidence" in codes(output, pack, snapshot)
+    assert "V5:number_not_in_evidence" in codes(output, pack)
     assert "V5:number_not_in_evidence" in {
         v.code for v in check_numbers("It was 42 h [E1].", pack, evidence)
     }
@@ -229,15 +226,15 @@ def test_direction_only_checks_reported_changes_and_statement_numbers():
 
 
 def test_all_low_omitted_has_no_causal_license():
-    snapshot, pack, output = validation_fixture()
+    pack, output = validation_fixture()
     pack["hypotheses"][0]["level"] = "low"
     output["hypotheses"] = []
-    assert "V7b:overclaim" in codes(output, pack, snapshot)
+    assert "V7b:overclaim" in codes(output, pack)
     output["narrative"] = (
         "Median cycle time was 41.3 h [E1]. "
         "The signals are not strong enough to support a root cause [E1]."
     )
-    assert not codes(output, pack, snapshot)
+    assert not codes(output, pack)
 
 
 @pytest.mark.parametrize(
@@ -249,38 +246,55 @@ def test_all_low_omitted_has_no_causal_license():
     ],
 )
 def test_abstention_words_do_not_exempt_claims_with_a_low_hypothesis(sentence):
-    snapshot, pack, output = validation_fixture()
+    pack, output = validation_fixture()
     pack["hypotheses"][0]["level"] = "low"
     output["hypotheses"][0]["statement"] = (
         "There are early signs that review capacity is the main cause [E1][E15]."
     )
     output["narrative"] = "Median cycle time was 41.3 h [E1]. " + sentence
-    assert codes(output, pack, snapshot) == {"V7b:overclaim"}
+    assert codes(output, pack) == {"V7b:overclaim"}
 
 
 def test_schema_repair_feedback_identifies_field_and_limit_without_echoing_input():
-    snapshot, pack, output = validation_fixture()
+    pack, output = validation_fixture()
     output["hypotheses"][0]["statement"] = "untrusted-payload" * 30
-    errors = validate(output, pack, snapshot, audience="director")
+    errors = validate(output, pack)
     schema = [v.message for v in errors if v.code == "V1:schema"]
     assert any("hypotheses.0.statement" in message and "400" in message for message in schema)
     assert all("untrusted-payload" not in message for message in schema)
 
 
 def test_medium_wording_and_same_level_downgrade():
-    snapshot, pack, output = validation_fixture()
+    pack, output = validation_fixture()
     pack["hypotheses"][0]["level"] = "medium"
     output["narrative"] = "Cycle time was 41.3 h [E1]. Review capacity may be the cause [E15]."
-    assert "V7:hedge_mismatch" in codes(output, pack, snapshot)
+    assert "V7:hedge_mismatch" in codes(output, pack)
     output["hypotheses"][0]["statement"] = "Review capacity may be the cause [E15]."
-    assert not codes(output, pack, snapshot)
+    assert not codes(output, pack)
     output["hypotheses"][0]["downgrade"] = {"level": "medium", "reason": "Limited signals [E15]."}
-    assert "V8:invalid_downgrade" in codes(output, pack, snapshot)
+    assert "V8:invalid_downgrade" in codes(output, pack)
+
+
+@pytest.mark.parametrize("stronger", ["likely", "may", "might", "possibly", "could"])
+def test_low_statement_rejects_stronger_words_even_with_a_high_primary(stronger):
+    pack, output = validation_fixture()
+    secondary = deepcopy(pack["hypotheses"][0])
+    secondary.update(id="H_pr_size_growth", level="low")
+    pack["hypotheses"].append(secondary)
+    statement = (
+        "There are early signs that larger PRs are the main cause of slower cycle time [E1]."
+    )
+    output["hypotheses"].append({"id": secondary["id"], "statement": statement})
+    assert not codes(output, pack)
+    output["hypotheses"][1]["statement"] = statement.replace(
+        "larger PRs are", f"larger PRs {stronger} drive"
+    )
+    assert "V7:hedge_mismatch" in codes(output, pack)
 
 
 @pytest.mark.parametrize("field", ["narrative", "statement", "downgrade", "outside"])
 def test_non_english_text_is_rejected_in_every_generated_field(field):
-    snapshot, pack, output = validation_fixture()
+    pack, output = validation_fixture()
     unsupported_character = chr(0x4E00)
     if field == "narrative":
         output["narrative"] += unsupported_character
@@ -296,4 +310,27 @@ def test_non_english_text_is_rejected_in_every_generated_field(field):
             "statement": "Early signs of " + unsupported_character + " [E1][E15].",
             "evidence_ids": ["E1", "E15"],
         }
-    assert "V3:language" in codes(output, pack, snapshot)
+    assert "V3:language" in codes(output, pack)
+
+
+def test_invalid_downgrades_explain_the_fix_for_repair():
+    pack, output = validation_fixture()
+
+    def messages(level, downgrade):
+        pack["hypotheses"][0]["level"] = level
+        output["hypotheses"][0]["downgrade"] = downgrade
+        return [v.message for v in validate(output, pack) if v.code == "V8:invalid_downgrade"]
+
+    # The reproduced Bedrock failure: a low candidate "downgraded" to low, uncited reason.
+    low = messages("low", {"level": "low", "reason": "Counter-evidence E30 explains it."})
+    assert low == [
+        "H_review_capacity is already low, the lowest band: remove its downgrade field and "
+        "cite any counter-evidence in the statement instead."
+    ]
+    same = messages("medium", {"level": "medium", "reason": "Limited signals [E15]."})
+    assert same == ["A downgrade for H_review_capacity must name a band below medium."]
+    uncited = messages("high", {"level": "medium", "reason": "E15 is limited."})
+    assert uncited == [
+        "The downgrade reason for H_review_capacity must cite pack evidence in brackets, "
+        "such as [E1]."
+    ]

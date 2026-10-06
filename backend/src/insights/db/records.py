@@ -7,7 +7,7 @@ from dataclasses import fields
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from insights.analytics.types import PrFacts
+from insights.analytics.facts import PrFacts
 from insights.db.models import PrEvent, PrFact, PrFile, PullRequest
 from insights.domain import Actor, Event, EventKind, PullRequestRecord
 

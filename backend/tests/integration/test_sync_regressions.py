@@ -14,7 +14,6 @@ from tests.integration.test_sync import NOW, load_state, queued
 
 from insights.db.models import PrEvent, PrFact, PrFile, PrInterval, PullRequest, Repository
 from insights.domain import PageResult, RepoRef, RepositoryInfo
-from insights.sync.derive import link_repo
 from insights.sync.jobs import SyncRun
 from insights.sync.store import save_page
 
@@ -24,26 +23,13 @@ pytestmark = pytest.mark.integration
 def page(*records, cursor=None, more=False):
     dates = [pr.updated_at for pr in records]
     return PageResult(
-        RepositoryInfo("a/b", "main", False),
+        RepositoryInfo("a/b", "main"),
         tuple(records),
         cursor,
         more,
         min(dates, default=None),
         max(dates, default=None),
         1,
-    )
-
-
-def revert(merged=True):
-    return record(
-        number=2,
-        title='Revert "Change"',
-        body_excerpt="Reverts a/b#1",
-        created_at=at(20),
-        updated_at=at(30),
-        state="MERGED" if merged else "OPEN",
-        merged_at=at(30) if merged else None,
-        closed_at=at(30) if merged else None,
     )
 
 
@@ -58,24 +44,6 @@ async def finalize(ctx, repo_id, job_id):
     run = SyncRun(ctx, repo, str(job_id))
     run.incremental = AsyncMock()
     await run.checkpoint()
-
-
-async def test_existing_revert_merge_relinks_original(context):
-    job, _ = await queued(context)
-    repo, _ = await load_state(context)
-    saved = await save(context, repo.id, page(record(), revert(merged=False)))
-    await finalize(context, repo.id, job.id)
-    async with context["session_factory"]() as session:
-        assert not (await session.get(Repository, repo.id)).links_pending
-        assert (await session.get(PrFact, saved.pr_ids[0])).reverted_by_pr_id is None
-    changed = await save(context, repo.id, page(revert()))
-    assert changed.prs_created == 0 and changed.prs_changed == 1
-    await finalize(context, repo.id, job.id)
-    async with context["session_factory"]() as session:
-        original = await session.get(PrFact, saved.pr_ids[0])
-        assert original.reverted_by_pr_id == saved.pr_ids[1]
-        assert original.reverted_at == at(30)
-        assert not (await session.get(Repository, repo.id)).links_pending
 
 
 async def test_stale_page_preserves_events_files_facts_and_data_version(context):
@@ -100,7 +68,6 @@ async def test_stale_page_preserves_events_files_facts_and_data_version(context)
     assert ignored.pr_ids == ()
     async with context["session_factory"]() as session:
         assert (await session.get(Repository, repo.id)).data_version == version
-        assert not (await session.get(Repository, repo.id)).links_pending
         assert (await session.get(PullRequest, saved.pr_ids[0])).title == "fresh"
         assert (await session.scalars(select(PrFile.path))).all() == ["fresh.py"]
         assert len((await session.scalars(select(PrEvent))).all()) == 1
@@ -112,30 +79,6 @@ async def test_stale_page_preserves_events_files_facts_and_data_version(context)
         assert [
             (row.seq, row.state, row.start_at, row.end_at) for row in intervals
         ] == expected_intervals
-
-
-async def test_failed_linking_retains_pending_work_for_retry(context, monkeypatch):
-    import insights.sync.jobs as jobs
-
-    job, _ = await queued(context)
-    repo, _ = await load_state(context)
-    saved = await save(context, repo.id, page(record(), revert()))
-
-    async def fail_after_link(session, repo_id):
-        await link_repo(session, repo_id)
-        raise RuntimeError("link rollback")
-
-    monkeypatch.setattr(jobs, "link_repo", fail_after_link)
-    with pytest.raises(RuntimeError, match="link rollback"):
-        await finalize(context, repo.id, job.id)
-    async with context["session_factory"]() as session:
-        assert (await session.get(Repository, repo.id)).links_pending
-        assert (await session.get(PrFact, saved.pr_ids[0])).reverted_by_pr_id is None
-    monkeypatch.setattr(jobs, "link_repo", link_repo)
-    await finalize(context, repo.id, job.id)
-    async with context["session_factory"]() as session:
-        assert not (await session.get(Repository, repo.id)).links_pending
-        assert (await session.get(PrFact, saved.pr_ids[0])).reverted_by_pr_id == saved.pr_ids[1]
 
 
 @pytest.mark.parametrize("prefetch", [False, True])

@@ -1,6 +1,5 @@
 """Convert raw GraphQL PR nodes into domain records, including bot detection and event dedup."""
 
-import re
 from datetime import UTC, datetime
 from hashlib import sha1
 from typing import Any
@@ -96,11 +95,14 @@ def normalize_events(
     event and is dropped without one. Cross-references are kept only from pull requests.
     """
     nodes = remove_nulls(nodes)
+    # A dismissed review reports state DISMISSED; its dismissal event remembers what the
+    # review originally was (approval or change request), which the timeline needs.
     dismissed = {
         n["review"]["id"]: n
         for n in nodes
         if n and n.get("__typename") == "ReviewDismissedEvent" and n.get("review")
     }
+    # Keyed by dedup_key, so an event repeated across timeline pages is kept once.
     output: dict[str, Event] = {}
     for node in nodes:
         if not node:
@@ -149,10 +151,6 @@ def normalize_events(
                 "oid": commit["oid"],
                 "authored_at": commit["authoredDate"],
                 "committed_at": commit["committedDate"],
-                "reverts": re.findall(
-                    r"This reverts commit ([0-9a-f]{7,40})",
-                    commit.get("messageHeadline", "") + "\n" + commit.get("messageBody", ""),
-                ),
             }
         elif kind in {EventKind.LABELED, EventKind.UNLABELED}:
             payload = {"label": node["label"]["name"]}
@@ -173,31 +171,28 @@ def normalize_events(
         timestamp = parse_time(occurred)
         key = dedup_key(kind, timestamp, person.login, node["id"])
         output[key] = Event(kind, timestamp, person, payload, key)
+    # A total order independent of GitHub's page order keeps content hashes and timelines stable.
     return tuple(sorted(output.values(), key=lambda e: (e.occurred_at, e.kind, e.dedup_key)))
 
 
 def normalize_pr(
     node: dict[str, Any], extra_bots: frozenset[str] = frozenset()
 ) -> PullRequestRecord:
-    """Convert a GraphQL PR node to a record, clipping the body excerpt to 4,000 characters."""
+    """Convert a GraphQL PR node to an immutable source record with normalized events."""
     node = remove_nulls(node)
     author = node.get("author") or {}
     return PullRequestRecord(
         number=node["number"],
         title=node["title"],
-        body_excerpt=(node.get("body") or "")[:4000],
         url=node["url"],
         state=node["state"],
         is_draft=node["isDraft"],
         author=actor(author, extra_bots),
-        author_association=node["authorAssociation"],
         base_ref=node["baseRefName"],
-        head_ref=node["headRefName"],
         created_at=parse_time(node["createdAt"]),
         updated_at=parse_time(node["updatedAt"]),
         closed_at=parse_time(node["closedAt"]) if node.get("closedAt") else None,
         merged_at=parse_time(node["mergedAt"]) if node.get("mergedAt") else None,
-        merge_commit_oid=(node.get("mergeCommit") or {}).get("oid"),
         additions=node["additions"],
         deletions=node["deletions"],
         labels=tuple(dict.fromkeys(n["name"] for n in node["labels"]["nodes"])),

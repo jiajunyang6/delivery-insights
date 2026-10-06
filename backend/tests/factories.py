@@ -1,3 +1,5 @@
+"""Builders for domain records and events on a fixed UTC hour grid."""
+
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
@@ -7,10 +9,12 @@ ORIGIN = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 def at(hours):
+    """Return ORIGIN plus the given number of hours."""
     return ORIGIN + timedelta(hours=hours)
 
 
 def event(kind, hour, actor="reviewer", *, state=None, review_id=None, **payload):
+    """Build an Event with the payload fields its kind needs; logins ending [bot] are bots."""
     kind = EventKind(kind)
     if kind == EventKind.REVIEW:
         payload.update(
@@ -23,7 +27,6 @@ def event(kind, hour, actor="reviewer", *, state=None, review_id=None, **payload
             "oid": "a" * 40,
             "authored_at": at(hour).isoformat(),
             "committed_at": at(hour).isoformat(),
-            "reverts": [],
             **payload,
         }
     return Event(
@@ -36,22 +39,19 @@ def event(kind, hour, actor="reviewer", *, state=None, review_id=None, **payload
 
 
 def record(**changes):
+    """Build a merged PullRequestRecord, overriding any field."""
     base = PullRequestRecord(
         number=1,
         title="Change",
-        body_excerpt="",
         url="https://github.com/a/b/pull/1",
         state="MERGED",
         is_draft=False,
         author=Actor("author", False),
-        author_association="MEMBER",
         base_ref="main",
-        head_ref="feature",
         created_at=at(0),
         updated_at=at(10),
         closed_at=at(10),
         merged_at=at(10),
-        merge_commit_oid=None,
         additions=20,
         deletions=5,
         labels=("area-A",),

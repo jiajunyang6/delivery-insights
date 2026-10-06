@@ -1,964 +1,178 @@
 {
   "as_of": "2026-03-02T00:00:00Z",
-  "at_risk_prs": [
-    {
-      "age_hours": 928.93,
-      "author": "dev33",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "locations": [
-        "area-C"
-      ],
-      "number": 2604,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 2604 in area-C",
-      "url": "https://github.com/synthetic/repo/pull/2604"
-    },
-    {
-      "age_hours": 905.87,
-      "author": "dev40",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "locations": [
-        "area-A"
-      ],
-      "number": 2647,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 2647 in area-A",
-      "url": "https://github.com/synthetic/repo/pull/2647"
-    },
-    {
-      "age_hours": 892.72,
-      "author": "ext21",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "locations": [
-        "area-B"
-      ],
-      "number": 2661,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 2661 in area-B",
-      "url": "https://github.com/synthetic/repo/pull/2661"
-    },
-    {
-      "age_hours": 848.39,
-      "author": "dev37",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "locations": [
-        "area-B"
-      ],
-      "number": 2658,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 2658 in area-B",
-      "url": "https://github.com/synthetic/repo/pull/2658"
-    },
-    {
-      "age_hours": 830.81,
-      "author": "ext20",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "locations": [
-        "area-B"
-      ],
-      "number": 2669,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 2669 in area-B",
-      "url": "https://github.com/synthetic/repo/pull/2669"
-    },
-    {
-      "age_hours": 817.43,
-      "author": "ext01",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "locations": [
-        "area-A"
-      ],
-      "number": 2670,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 2670 in area-A",
-      "url": "https://github.com/synthetic/repo/pull/2670"
-    },
-    {
-      "age_hours": 747.15,
-      "author": "dev18",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "locations": [
-        "area-D"
-      ],
-      "number": 2716,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 2716 in area-D",
-      "url": "https://github.com/synthetic/repo/pull/2716"
-    },
-    {
-      "age_hours": 957.02,
-      "author": "dev20",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 37.5,
-      "locations": [
-        "area-B"
-      ],
-      "number": 2622,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_reviewer",
-      "threshold_hours": 17.37,
-      "title": "Change 2622 in area-B",
-      "url": "https://github.com/synthetic/repo/pull/2622"
-    },
-    {
-      "age_hours": 629.72,
-      "author": "dev30",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "locations": [
-        "area-A"
-      ],
-      "number": 2796,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 2796 in area-A",
-      "url": "https://github.com/synthetic/repo/pull/2796"
-    },
-    {
-      "age_hours": 891.96,
-      "author": "dev23",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 37.5,
-      "locations": [
-        "area-B"
-      ],
-      "number": 2663,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_reviewer",
-      "threshold_hours": 17.37,
-      "title": "Change 2663 in area-B",
-      "url": "https://github.com/synthetic/repo/pull/2663"
-    },
-    {
-      "age_hours": 838.6,
-      "author": "dev10",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 37.5,
-      "locations": [
-        "area-E"
-      ],
-      "number": 2676,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_reviewer",
-      "threshold_hours": 17.37,
-      "title": "Change 2676 in area-E",
-      "url": "https://github.com/synthetic/repo/pull/2676"
-    },
-    {
-      "age_hours": 542.34,
-      "author": "dev07",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "locations": [
-        "area-A"
-      ],
-      "number": 2838,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 2838 in area-A",
-      "url": "https://github.com/synthetic/repo/pull/2838"
-    },
-    {
-      "age_hours": 738.84,
-      "author": "dev16",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 37.5,
-      "locations": [
-        "area-A"
-      ],
-      "number": 2729,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_reviewer",
-      "threshold_hours": 17.37,
-      "title": "Change 2729 in area-A",
-      "url": "https://github.com/synthetic/repo/pull/2729"
-    },
-    {
-      "age_hours": 705.77,
-      "author": "dev24",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 37.5,
-      "locations": [
-        "area-B"
-      ],
-      "number": 2756,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_reviewer",
-      "threshold_hours": 17.37,
-      "title": "Change 2756 in area-B",
-      "url": "https://github.com/synthetic/repo/pull/2756"
-    },
-    {
-      "age_hours": 465.11,
-      "author": "dev31",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "locations": [
-        "area-A"
-      ],
-      "number": 2844,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 2844 in area-A",
-      "url": "https://github.com/synthetic/repo/pull/2844"
-    },
-    {
-      "age_hours": 460.34,
-      "author": "dev12",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "locations": [
-        "area-E"
-      ],
-      "number": 2869,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 2869 in area-E",
-      "url": "https://github.com/synthetic/repo/pull/2869"
-    },
-    {
-      "age_hours": 456.69,
-      "author": "dev13",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "locations": [
-        "area-E"
-      ],
-      "number": 2872,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 2872 in area-E",
-      "url": "https://github.com/synthetic/repo/pull/2872"
-    },
-    {
-      "age_hours": 769.1,
-      "author": "dev18",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 40.28,
-      "locations": [
-        "area-B"
-      ],
-      "number": 2714,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_author",
-      "threshold_hours": 20.73,
-      "title": "Change 2714 in area-B",
-      "url": "https://github.com/synthetic/repo/pull/2714"
-    },
-    {
-      "age_hours": 599.18,
-      "author": "dev30",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 37.5,
-      "locations": [
-        "area-D"
-      ],
-      "number": 2823,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_reviewer",
-      "threshold_hours": 17.37,
-      "title": "Change 2823 in area-D",
-      "url": "https://github.com/synthetic/repo/pull/2823"
-    },
-    {
-      "age_hours": 381.22,
-      "author": "dev30",
-      "baseline_source": "90d",
-      "critical_threshold_hours": 20.96,
-      "locations": [
-        "area-C"
-      ],
-      "number": 2924,
-      "repo": "synthetic/repo",
-      "severity": "critical",
-      "state": "waiting_merge",
-      "threshold_hours": 11.71,
-      "title": "Change 2924 in area-C",
-      "url": "https://github.com/synthetic/repo/pull/2924"
-    }
-  ],
-  "at_risk_summary": {
-    "critical": 38,
-    "total": 40
-  },
   "bottleneck_analysis": {
-    "ci": null,
     "locations": [
       {
-        "at_risk_prs": 14,
-        "inflow": 152,
         "location": "area-A",
-        "merged_prs": 126,
-        "outflow": 139,
-        "owners_count": null,
-        "pickup_p50_hours": 5.55,
-        "pickup_ratio_vs_rest": 0.96,
-        "previous_waiting_reviewer_pr_hours": 1549.87,
-        "waiting_reviewer_pr_hours": 1941.77,
-        "waiting_reviewer_share": 0.2702
+        "merged_prs": 109,
+        "pickup_p50_hours": 6.61,
+        "pickup_ratio_vs_rest": 1.12,
+        "previous_waiting_reviewer_pr_hours": 1518.9,
+        "waiting_reviewer_pr_hours": 1921.69
       },
       {
-        "at_risk_prs": 12,
-        "inflow": 118,
         "location": "area-B",
-        "merged_prs": 94,
-        "outflow": 109,
-        "owners_count": null,
-        "pickup_p50_hours": 5.83,
-        "pickup_ratio_vs_rest": 1.03,
-        "previous_waiting_reviewer_pr_hours": 2023.77,
-        "waiting_reviewer_pr_hours": 1572.62,
-        "waiting_reviewer_share": 0.2188
-      },
-      {
-        "at_risk_prs": 4,
-        "inflow": 114,
-        "location": "area-C",
-        "merged_prs": 100,
-        "outflow": 108,
-        "owners_count": null,
-        "pickup_p50_hours": 5.51,
-        "pickup_ratio_vs_rest": 0.96,
-        "previous_waiting_reviewer_pr_hours": 1375.03,
-        "waiting_reviewer_pr_hours": 1497.31,
-        "waiting_reviewer_share": 0.2083
-      },
-      {
-        "at_risk_prs": 4,
-        "inflow": 88,
-        "location": "area-D",
-        "merged_prs": 76,
-        "outflow": 81,
-        "owners_count": null,
-        "pickup_p50_hours": 4.96,
-        "pickup_ratio_vs_rest": 0.85,
-        "previous_waiting_reviewer_pr_hours": 935.35,
-        "waiting_reviewer_pr_hours": 1090.84,
-        "waiting_reviewer_share": 0.1518
-      },
-      {
-        "at_risk_prs": 7,
-        "inflow": 54,
-        "location": "area-E",
-        "merged_prs": 45,
-        "outflow": 50,
-        "owners_count": null,
-        "pickup_p50_hours": 5.7,
-        "pickup_ratio_vs_rest": 1.0,
-        "previous_waiting_reviewer_pr_hours": 712.88,
-        "waiting_reviewer_pr_hours": 530.74,
-        "waiting_reviewer_share": 0.0738
-      },
-      {
-        "at_risk_prs": 1,
-        "inflow": 12,
-        "location": "dir:src/D",
-        "merged_prs": 11,
-        "outflow": 11,
-        "owners_count": null,
-        "pickup_p50_hours": 7.58,
+        "merged_prs": 88,
+        "pickup_p50_hours": 8.08,
         "pickup_ratio_vs_rest": 1.36,
-        "previous_waiting_reviewer_pr_hours": 62.66,
-        "waiting_reviewer_pr_hours": 336.59,
-        "waiting_reviewer_share": 0.0468
+        "previous_waiting_reviewer_pr_hours": 2023.77,
+        "waiting_reviewer_pr_hours": 1537.16
       },
       {
-        "at_risk_prs": 0,
-        "inflow": 16,
+        "location": "area-C",
+        "merged_prs": 89,
+        "pickup_p50_hours": 4.4,
+        "pickup_ratio_vs_rest": 0.66,
+        "previous_waiting_reviewer_pr_hours": 1373.03,
+        "waiting_reviewer_pr_hours": 1166.56
+      },
+      {
+        "location": "area-D",
+        "merged_prs": 64,
+        "pickup_p50_hours": 6.04,
+        "pickup_ratio_vs_rest": 0.97,
+        "previous_waiting_reviewer_pr_hours": 907.8,
+        "waiting_reviewer_pr_hours": 903.39
+      },
+      {
+        "location": "area-E",
+        "merged_prs": 35,
+        "pickup_p50_hours": 5.74,
+        "pickup_ratio_vs_rest": 0.93,
+        "previous_waiting_reviewer_pr_hours": 711.88,
+        "waiting_reviewer_pr_hours": 416.06
+      },
+      {
         "location": "other",
-        "merged_prs": 14,
-        "outflow": 15,
-        "owners_count": null,
-        "pickup_p50_hours": 5.58,
-        "pickup_ratio_vs_rest": 0.98,
-        "previous_waiting_reviewer_pr_hours": 195.08,
-        "waiting_reviewer_pr_hours": 217.11,
-        "waiting_reviewer_share": 0.0302
+        "merged_prs": 19,
+        "pickup_p50_hours": 4.85,
+        "pickup_ratio_vs_rest": 0.78,
+        "previous_waiting_reviewer_pr_hours": 256.74,
+        "waiting_reviewer_pr_hours": 296.76
       }
     ],
-    "merge_blockers": {
-      "post_approval_update_share": 0.1049,
-      "second_approval_share": 0.2835
-    },
-    "review_load": {
-      "distribution": [
-        {
-          "reviewer": "rev-x1",
-          "reviews": 184,
-          "share": 0.1903
-        },
-        {
-          "reviewer": "rev-x2",
-          "reviews": 61,
-          "share": 0.0631
-        },
-        {
-          "reviewer": "rev-a3",
-          "reviews": 60,
-          "share": 0.062
-        },
-        {
-          "reviewer": "rev-c2",
-          "reviews": 52,
-          "share": 0.0538
-        },
-        {
-          "reviewer": "rev-b1",
-          "reviews": 49,
-          "share": 0.0507
-        },
-        {
-          "reviewer": "rev-a1",
-          "reviews": 45,
-          "share": 0.0465
-        },
-        {
-          "reviewer": "rev-c3",
-          "reviews": 45,
-          "share": 0.0465
-        },
-        {
-          "reviewer": "rev-x3",
-          "reviews": 44,
-          "share": 0.0455
-        },
-        {
-          "reviewer": "rev-d2",
-          "reviews": 41,
-          "share": 0.0424
-        },
-        {
-          "reviewer": "rev-a4",
-          "reviews": 36,
-          "share": 0.0372
-        }
-      ],
-      "reviewers": 24,
-      "reviews": 967
-    },
     "review_queue": {
-      "net_inflow_share": 0.0714,
-      "weeks": [
-        {
-          "days": 7,
-          "inflow": 94,
-          "open_at_week_end": 6,
-          "outflow": 88,
-          "week_start": "2026-01-19"
-        },
-        {
-          "days": 7,
-          "inflow": 86,
-          "open_at_week_end": 8,
-          "outflow": 80,
-          "week_start": "2026-01-26"
-        },
-        {
-          "days": 7,
-          "inflow": 73,
-          "open_at_week_end": 10,
-          "outflow": 69,
-          "week_start": "2026-02-02"
-        },
-        {
-          "days": 7,
-          "inflow": 109,
-          "open_at_week_end": 21,
-          "outflow": 93,
-          "week_start": "2026-02-09"
-        },
-        {
-          "days": 7,
-          "inflow": 80,
-          "open_at_week_end": 13,
-          "outflow": 84,
-          "week_start": "2026-02-16"
-        },
-        {
-          "days": 7,
-          "inflow": 90,
-          "open_at_week_end": 21,
-          "outflow": 80,
-          "week_start": "2026-02-23"
-        }
-      ],
-      "weeks_inflow_exceeds_outflow": 5,
+      "weeks_inflow_exceeds_outflow": 6,
       "weeks_total": 6
     }
   },
-  "bottlenecks": [
-    {
-      "evidence": [
-        {
-          "label": "Average review rounds",
-          "ref": "/efficiency/avg_review_rounds",
-          "unit": "rounds",
-          "value": 0.75
-        },
-        {
-          "label": "Share with commits after first review",
-          "ref": "/efficiency/post_review_commit_share",
-          "unit": "share",
-          "value": 0.5179
-        }
-      ],
-      "id": "rework_high",
-      "impact_pr_hours": 4167.99,
-      "impact_share": 0.244,
-      "location": null,
-      "rank": 1,
-      "recommendation": "Agree on the approach before coding (issue or design note) and keep PRs small to cut review rounds.",
-      "severity": "medium",
-      "title": "High rework after review",
-      "type": "rework_high",
-      "what_if": null
-    },
-    {
-      "evidence": [
-        {
-          "label": "Waste share",
-          "ref": "/efficiency/waste_share",
-          "unit": "share",
-          "value": 0.1028
-        },
-        {
-          "label": "PRs lost while waiting for review",
-          "ref": "/waste/lost_while_waiting",
-          "unit": "count",
-          "value": 12
-        }
-      ],
-      "id": "waste_high",
-      "impact_pr_hours": 3155.39,
-      "impact_share": 0.1847,
-      "location": null,
-      "rank": 2,
-      "recommendation": "Inspect PRs closed after long waits and reverted changes; check review coverage, closure reasons and revert causes before choosing an action.",
-      "severity": "medium",
-      "title": "Waiting time on unmerged or reverted PRs",
-      "type": "waste_high",
-      "what_if": null
-    },
-    {
-      "evidence": [
-        {
-          "label": "Share of merged-PR waiting time spent waiting to merge",
-          "ref": "/time_ledger/states/waiting_merge/share",
-          "unit": "share",
-          "value": 0.1909
-        },
-        {
-          "label": "Median approval-to-merge time",
-          "ref": "/efficiency/stage_p50_hours/merge",
-          "unit": "hours",
-          "value": 3.89
-        },
-        {
-          "label": "Share with a second approval",
-          "ref": "/bottleneck_analysis/merge_blockers/second_approval_share",
-          "unit": "share",
-          "value": 0.2835
-        }
-      ],
-      "id": "merge_blocked",
-      "impact_pr_hours": 2678.79,
-      "impact_share": 0.1568,
-      "location": null,
-      "rank": 3,
-      "recommendation": "Reduce post-approval rebase friction, for example with a merge queue.",
-      "severity": "medium",
-      "title": "Approved PRs wait long to merge",
-      "type": "merge_blocked",
-      "what_if": {
-        "affected_prs": 104,
-        "change_rel": -0.0264,
-        "cycle_p50_after_hours": 38.9,
-        "cycle_p50_before_hours": 39.95,
-        "location": null,
-        "stage": "merge",
-        "target_hours": 8.0
-      }
-    }
-  ],
   "drivers": {
-    "assignment": {
-      "assigned": {
-        "n": 317,
-        "pickup_p50_hours": 5.86
-      },
-      "ratio": 0.95,
-      "unassigned": {
-        "n": 131,
-        "pickup_p50_hours": 5.55
-      }
-    },
-    "review_round_cost": {
-      "re_review_wait_p50_hours": 4.88
-    },
-    "slowest_decile": {
-      "features": [
-        {
-          "feature": "size_lines_p50",
-          "ratio": 1.6,
-          "rest": 80.0,
-          "slowest": 128.0
-        },
-        {
-          "feature": "external_share",
-          "ratio": 0.46,
-          "rest": 0.1935,
-          "slowest": 0.0889
-        },
-        {
-          "feature": "multi_location_share",
-          "ratio": 0.53,
-          "rest": 0.0422,
-          "slowest": 0.0222
-        },
-        {
-          "feature": "review_rounds_p50",
-          "ratio": 1.0,
-          "rest": 1.0,
-          "slowest": 1.0
-        },
-        {
-          "feature": "unrequested_share",
-          "ratio": 0.99,
-          "rest": 0.2928,
-          "slowest": 0.2889
-        }
-      ],
-      "n": 45
-    }
+    "slowest_decile_size_ratio": 1.73
   },
   "efficiency": {
     "avg_review_rounds": {
       "change_abs": 0.05,
-      "change_rel": 0.073,
+      "change_rel": 0.0767,
       "extra": {},
-      "n": 448,
-      "n_previous": 426,
-      "previous": 0.69,
+      "n": 386,
+      "n_previous": 410,
+      "previous": 0.71,
       "significant": false,
       "status": "ok",
       "unit": "rounds",
-      "value": 0.75
+      "value": 0.77
     },
     "cycle_time_p50_hours": {
-      "change_abs": -0.78,
-      "change_rel": -0.019,
+      "change_abs": -1.04,
+      "change_rel": -0.025,
       "extra": {},
-      "n": 448,
-      "n_previous": 426,
-      "previous": 40.73,
+      "n": 386,
+      "n_previous": 410,
+      "previous": 41.49,
       "significant": false,
       "status": "ok",
       "unit": "hours",
-      "value": 39.95
+      "value": 40.45
     },
-    "cycle_time_p90_hours": {
-      "change_abs": 1.66,
-      "change_rel": 0.0176,
-      "extra": {},
-      "n": 448,
-      "n_previous": 426,
-      "previous": 94.42,
-      "significant": false,
-      "status": "ok",
-      "unit": "hours",
-      "value": 96.08
-    },
-    "effective_throughput": {
-      "change_abs": 12,
-      "change_rel": 0.0291,
-      "extra": {},
-      "n": 448,
-      "n_previous": 426,
-      "previous": 412,
+    "large_pr_share": {
+      "change_abs": 0.0021,
+      "change_rel": 0.0622,
+      "extra": {
+        "denominator": 386,
+        "events": 14
+      },
+      "n": 386,
+      "n_previous": 410,
+      "previous": 0.0341,
       "significant": null,
       "status": "ok",
-      "unit": "count",
-      "value": 424
+      "unit": "share",
+      "value": 0.0363
     },
     "merged_prs": {
-      "change_abs": 22,
-      "change_rel": 0.0516,
+      "change_abs": -24,
+      "change_rel": -0.0585,
       "extra": {},
-      "n": 448,
-      "n_previous": 426,
-      "previous": 426,
+      "n": 386,
+      "n_previous": 410,
+      "previous": 410,
       "significant": null,
       "status": "ok",
       "unit": "count",
-      "value": 448
+      "value": 386
     },
-    "merged_within_n_days": {
-      "change_abs": -0.0486,
-      "change_rel": -0.06,
-      "extra": {
-        "denominator": 508,
-        "events": 387,
-        "n_days": 3
-      },
-      "n": 508,
-      "n_previous": 459,
-      "previous": 0.8105,
+    "pickup_p50_hours": {
+      "change_abs": -0.3,
+      "change_rel": -0.0462,
+      "extra": {},
+      "n": 386,
+      "n_previous": 410,
+      "previous": 6.45,
       "significant": false,
       "status": "ok",
-      "unit": "share",
-      "value": 0.7618
+      "unit": "hours",
+      "value": 6.15
     },
     "post_review_commit_share": {
-      "change_abs": 0.0413,
-      "change_rel": 0.0867,
+      "change_abs": 0.0536,
+      "change_rel": 0.11,
       "extra": {
-        "denominator": 448,
-        "events": 232
+        "denominator": 386,
+        "events": 209
       },
-      "n": 448,
-      "n_previous": 426,
-      "previous": 0.4765,
+      "n": 386,
+      "n_previous": 410,
+      "previous": 0.4878,
       "significant": false,
       "status": "ok",
       "unit": "share",
-      "value": 0.5179
+      "value": 0.5415
     },
     "pr_size_p50_lines": {
-      "change_abs": 8.5,
-      "change_rel": 0.1111,
+      "change_abs": -1.5,
+      "change_rel": -0.0195,
       "extra": {},
-      "n": 448,
-      "n_previous": 426,
-      "previous": 76.5,
+      "n": 386,
+      "n_previous": 410,
+      "previous": 77.0,
       "significant": false,
       "status": "ok",
       "unit": "lines",
-      "value": 85.0
-    },
-    "predictability": {
-      "weekly_throughput_cv": {
-        "change_abs": -0.0751,
-        "change_rel": -0.3991,
-        "extra": {},
-        "n": 6,
-        "n_previous": 6,
-        "previous": 0.1881,
-        "significant": null,
-        "status": "ok",
-        "unit": "coefficient",
-        "value": 0.113
-      },
-      "within_hist_p85": {
-        "change_abs": -0.0038,
-        "change_rel": -0.0045,
-        "extra": {
-          "baseline_n": 893,
-          "baseline_p85_hours": 80.39,
-          "denominator": 448,
-          "events": 379
-        },
-        "n": 448,
-        "n_previous": 426,
-        "previous": 0.8498,
-        "significant": null,
-        "status": "ok",
-        "unit": "share",
-        "value": 0.846
-      }
-    },
-    "revert_rate": {
-      "change_abs": 0.0081,
-      "change_rel": 0.4943,
-      "extra": {
-        "denominator": 448,
-        "events": 11
-      },
-      "n": 448,
-      "n_previous": 426,
-      "previous": 0.0164,
-      "significant": false,
-      "status": "ok",
-      "unit": "share",
-      "value": 0.0246
+      "value": 75.5
     },
     "review_concentration_top_k": {
-      "change_abs": 0.0273,
-      "change_rel": 0.1208,
+      "change_abs": 0.0274,
+      "change_rel": 0.1191,
       "extra": {
         "k": 2
       },
-      "n": 967,
-      "n_previous": 898,
-      "previous": 0.2261,
+      "n": 836,
+      "n_previous": 879,
+      "previous": 0.2298,
       "significant": null,
       "status": "ok",
       "unit": "share",
-      "value": 0.2534
-    },
-    "stage_p50_hours": {
-      "coding": {
-        "change_abs": 0.18,
-        "change_rel": 0.0145,
-        "extra": {},
-        "n": 448,
-        "n_previous": 426,
-        "previous": 12.16,
-        "significant": false,
-        "status": "ok",
-        "unit": "hours",
-        "value": 12.34
-      },
-      "merge": {
-        "change_abs": 0.25,
-        "change_rel": 0.0701,
-        "extra": {},
-        "n": 448,
-        "n_previous": 426,
-        "previous": 3.63,
-        "significant": false,
-        "status": "ok",
-        "unit": "hours",
-        "value": 3.89
-      },
-      "pickup": {
-        "change_abs": -0.64,
-        "change_rel": -0.1009,
-        "extra": {},
-        "n": 448,
-        "n_previous": 426,
-        "previous": 6.36,
-        "significant": false,
-        "status": "ok",
-        "unit": "hours",
-        "value": 5.71
-      },
-      "review": {
-        "change_abs": 1.64,
-        "change_rel": 0.4113,
-        "extra": {},
-        "n": 448,
-        "n_previous": 426,
-        "previous": 4.0,
-        "significant": false,
-        "status": "ok",
-        "unit": "hours",
-        "value": 5.64
-      }
-    },
-    "survival": {
-      "current": {
-        "median_hours": 27.23,
-        "n": 532
-      },
-      "previous": {
-        "median_hours": 25.35,
-        "n": 484
-      }
-    },
-    "waiting_share": {
-      "change_abs": 0.0019,
-      "change_rel": 0.0043,
-      "extra": {},
-      "n": 448,
-      "n_previous": 426,
-      "previous": 0.4399,
-      "significant": false,
-      "status": "ok",
-      "unit": "share",
-      "value": 0.4418
-    },
-    "waste_share": {
-      "change_abs": 0.0145,
-      "change_rel": 0.1637,
-      "extra": {
-        "denominator": 496,
-        "events": 51
-      },
-      "n": 496,
-      "n_previous": 464,
-      "previous": 0.0884,
-      "significant": false,
-      "status": "ok",
-      "unit": "share",
-      "value": 0.1028
+      "value": 0.2572
     }
   },
-  "guardrail": {
-    "cycle_time_p50_change_rel": -0.019,
-    "revert_rate": 0.0246,
-    "verdict": "ok"
-  },
-  "headline": "Median cycle time is 40.0h (-2% vs previous period, no meaningful change). The largest share of finished PR waiting time (24%) is on PRs waiting for authors to rework after review.",
-  "links": {
-    "narrative": "/v1/snapshots/s_b5619709f895dc1b/narrative",
-    "self": "/v1/snapshots/s_b5619709f895dc1b"
-  },
   "meta": {
-    "analytics_version": "1.5.3",
-    "ci_source": "none",
+    "analytics_version": "1.9.0",
     "comparison_available": true,
-    "data_freshness": [
-      {
-        "covered_since": "2025-09-08T00:00:00Z",
-        "data_version": 1,
-        "last_sync_status": "ok",
-        "last_synced_at": "2026-03-02T00:00:00Z",
-        "repo": "synthetic/repo"
-      }
-    ],
     "location_dimension": "label:area-",
     "sample": {
-      "merged_prs": 448,
-      "open_prs_at_as_of": 45
+      "merged_prs": 386
     },
-    "schema_version": "1",
-    "thresholds_version": "1.0.0",
-    "time_basis": "utc_wall_clock"
+    "thresholds_version": "1.0.0"
   },
   "period": {
     "compared_to": {
@@ -973,385 +187,203 @@
   "repos": [
     "synthetic/repo"
   ],
-  "rework": {
-    "revert_chains": [
-      {
-        "revert": {
-          "number": 3191,
-          "url": "https://github.com/synthetic/repo/pull/3191"
-        }
-      },
-      {
-        "revert": {
-          "number": 3190,
-          "url": "https://github.com/synthetic/repo/pull/3190"
-        }
-      },
-      {
-        "revert": {
-          "number": 3188,
-          "url": "https://github.com/synthetic/repo/pull/3188"
-        }
-      },
-      {
-        "revert": {
-          "number": 3186,
-          "url": "https://github.com/synthetic/repo/pull/3186"
-        }
-      },
-      {
-        "revert": {
-          "number": 3187,
-          "url": "https://github.com/synthetic/repo/pull/3187"
-        }
-      },
-      {
-        "revert": {
-          "number": 3184,
-          "url": "https://github.com/synthetic/repo/pull/3184"
-        }
-      },
-      {
-        "revert": {
-          "number": 3182,
-          "url": "https://github.com/synthetic/repo/pull/3182"
-        }
-      },
-      {
-        "revert": {
-          "number": 3180,
-          "url": "https://github.com/synthetic/repo/pull/3180"
-        }
-      },
-      {
-        "revert": {
-          "number": 3176,
-          "url": "https://github.com/synthetic/repo/pull/3176"
-        }
-      },
-      {
-        "revert": {
-          "number": 3174,
-          "url": "https://github.com/synthetic/repo/pull/3174"
-        }
-      }
-    ]
-  },
   "series": {
     "current": [
       {
-        "cycle_p50_hours": 39.26,
-        "merged": 80,
-        "pickup_p50_hours": 5.13,
-        "pr_size_p50_lines": 82.5,
-        "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.4402,
+        "cycle_p50_hours": 48.14,
+        "merged": 64,
+        "pickup_p50_hours": 4.59,
+        "pr_size_p50_lines": 70.5,
+        "waiting_reviewer_share": 0.3795,
         "week_start": "2026-01-19"
       },
       {
-        "cycle_p50_hours": 37.67,
-        "merged": 72,
-        "pickup_p50_hours": 6.15,
-        "pr_size_p50_lines": 57.0,
-        "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5556,
+        "cycle_p50_hours": 44.42,
+        "merged": 68,
+        "pickup_p50_hours": 8.05,
+        "pr_size_p50_lines": 66.5,
+        "waiting_reviewer_share": 0.4823,
         "week_start": "2026-01-26"
       },
       {
-        "cycle_p50_hours": 45.51,
-        "merged": 63,
-        "pickup_p50_hours": 5.57,
-        "pr_size_p50_lines": 101.0,
-        "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.4887,
+        "cycle_p50_hours": 39.23,
+        "merged": 65,
+        "pickup_p50_hours": 7.39,
+        "pr_size_p50_lines": 99.0,
+        "waiting_reviewer_share": 0.5203,
         "week_start": "2026-02-02"
       },
       {
-        "cycle_p50_hours": 42.64,
-        "merged": 87,
-        "pickup_p50_hours": 6.71,
-        "pr_size_p50_lines": 95.0,
-        "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5488,
+        "cycle_p50_hours": 36.89,
+        "merged": 71,
+        "pickup_p50_hours": 6.06,
+        "pr_size_p50_lines": 88.0,
+        "waiting_reviewer_share": 0.4989,
         "week_start": "2026-02-09"
       },
       {
-        "cycle_p50_hours": 40.48,
-        "merged": 80,
-        "pickup_p50_hours": 6.32,
-        "pr_size_p50_lines": 88.0,
-        "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5382,
+        "cycle_p50_hours": 38.69,
+        "merged": 56,
+        "pickup_p50_hours": 6.67,
+        "pr_size_p50_lines": 70.0,
+        "waiting_reviewer_share": 0.5139,
         "week_start": "2026-02-16"
       },
       {
-        "cycle_p50_hours": 39.07,
-        "merged": 66,
-        "pickup_p50_hours": 4.88,
-        "pr_size_p50_lines": 93.5,
-        "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5001,
+        "cycle_p50_hours": 38.4,
+        "merged": 62,
+        "pickup_p50_hours": 5.25,
+        "pr_size_p50_lines": 61.5,
+        "waiting_reviewer_share": 0.5035,
         "week_start": "2026-02-23"
       }
     ],
     "previous": [
       {
         "cycle_p50_hours": 45.73,
-        "merged": 73,
+        "merged": 71,
         "pickup_p50_hours": 6.9,
         "pr_size_p50_lines": 86.0,
-        "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5561,
+        "waiting_reviewer_share": 0.5691,
         "week_start": "2025-12-08"
       },
       {
-        "cycle_p50_hours": 35.09,
-        "merged": 67,
-        "pickup_p50_hours": 5.93,
-        "pr_size_p50_lines": 82.0,
-        "waiting_ci_share": 0.0,
+        "cycle_p50_hours": 36.41,
+        "merged": 65,
+        "pickup_p50_hours": 6.05,
+        "pr_size_p50_lines": 71.0,
         "waiting_reviewer_share": 0.5335,
         "week_start": "2025-12-15"
       },
       {
-        "cycle_p50_hours": 45.07,
-        "merged": 63,
-        "pickup_p50_hours": 6.38,
-        "pr_size_p50_lines": 84.0,
-        "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.4746,
+        "cycle_p50_hours": 48.9,
+        "merged": 59,
+        "pickup_p50_hours": 6.45,
+        "pr_size_p50_lines": 90.0,
+        "waiting_reviewer_share": 0.4739,
         "week_start": "2025-12-22"
       },
       {
-        "cycle_p50_hours": 38.92,
-        "merged": 70,
-        "pickup_p50_hours": 7.87,
-        "pr_size_p50_lines": 63.5,
-        "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5821,
+        "cycle_p50_hours": 40.05,
+        "merged": 68,
+        "pickup_p50_hours": 7.94,
+        "pr_size_p50_lines": 66.0,
+        "waiting_reviewer_share": 0.5823,
         "week_start": "2025-12-29"
       },
       {
-        "cycle_p50_hours": 37.03,
-        "merged": 98,
-        "pickup_p50_hours": 5.47,
+        "cycle_p50_hours": 38.07,
+        "merged": 94,
+        "pickup_p50_hours": 6.1,
         "pr_size_p50_lines": 76.5,
-        "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.4317,
+        "waiting_reviewer_share": 0.4318,
         "week_start": "2026-01-05"
       },
       {
-        "cycle_p50_hours": 46.02,
-        "merged": 55,
+        "cycle_p50_hours": 47.11,
+        "merged": 53,
         "pickup_p50_hours": 5.85,
-        "pr_size_p50_lines": 78.0,
-        "waiting_ci_share": 0.0,
-        "waiting_reviewer_share": 0.5237,
+        "pr_size_p50_lines": 76.0,
+        "waiting_reviewer_share": 0.5226,
         "week_start": "2026-01-12"
       }
     ]
   },
-  "signals": {
-    "at_risk_reviewer_top_location_share": {
-      "change_abs": 0.0957,
-      "change_rel": 0.3509,
-      "extra": {},
-      "n": 19,
-      "n_previous": 11,
-      "previous": 0.2727,
-      "significant": null,
-      "status": "ok",
-      "unit": "share",
-      "value": 0.3684
-    },
-    "external_pickup_ratio": {
-      "change_abs": 0.29,
-      "change_rel": 0.3215,
-      "extra": {},
-      "n": 448,
-      "n_previous": 426,
-      "previous": 0.9,
-      "significant": null,
-      "status": "ok",
-      "unit": "ratio",
-      "value": 1.2
-    },
-    "fast_large_approval_share": {
-      "change_abs": null,
-      "change_rel": null,
-      "extra": {
-        "denominator": 448,
-        "events": 0
-      },
-      "n": 448,
-      "n_previous": 426,
-      "previous": null,
-      "significant": null,
-      "status": "insufficient_sample",
-      "unit": "share",
-      "value": null
-    },
-    "large_pr_share": {
-      "change_abs": 0.0027,
-      "change_rel": 0.0777,
-      "extra": {
-        "denominator": 448,
-        "events": 17
-      },
-      "n": 448,
-      "n_previous": 426,
-      "previous": 0.0352,
-      "significant": null,
-      "status": "ok",
-      "unit": "share",
-      "value": 0.0379
-    },
-    "merged_without_approval_share": {
-      "change_abs": null,
-      "change_rel": null,
-      "extra": {
-        "denominator": 448,
-        "events": 0
-      },
-      "n": 448,
-      "n_previous": 426,
-      "previous": null,
-      "significant": null,
-      "status": "insufficient_sample",
-      "unit": "share",
-      "value": null
-    }
-  },
-  "snapshot_id": "s_b5619709f895dc1b",
+  "snapshot_id": "s_2fbf92de14264513",
   "time_ledger": {
-    "ci_coverage": 0.0,
-    "ci_data_available": false,
-    "merged_prs": 448,
+    "merged_prs": 386,
     "states": {
       "waiting_author": {
-        "change_pp": 2.16,
-        "pr_hours": 4167.99,
-        "previous_pr_hours": 3670.42,
-        "previous_share": 0.2754,
-        "share": 0.297
-      },
-      "waiting_ci": {
-        "change_pp": 0.0,
-        "pr_hours": 0.0,
-        "previous_pr_hours": 0.0,
-        "previous_share": 0.0,
-        "share": 0.0
+        "change_pp": 4.33,
+        "pr_hours": 4133.3,
+        "previous_pr_hours": 3613.76,
+        "previous_share": 0.2748,
+        "share": 0.3181
       },
       "waiting_merge": {
-        "change_pp": -1.95,
-        "pr_hours": 2678.79,
-        "previous_pr_hours": 2804.5,
-        "previous_share": 0.2104,
-        "share": 0.1909
+        "change_pp": -0.7,
+        "pr_hours": 2620.6,
+        "previous_pr_hours": 2744.4,
+        "previous_share": 0.2087,
+        "share": 0.2017
       },
       "waiting_reviewer": {
-        "change_pp": -0.21,
-        "pr_hours": 7186.98,
-        "previous_pr_hours": 6854.65,
-        "previous_share": 0.5142,
-        "share": 0.5121
+        "change_pp": -3.62,
+        "pr_hours": 6241.61,
+        "previous_pr_hours": 6792.12,
+        "previous_share": 0.5165,
+        "share": 0.4803
       }
     },
-    "total_pr_hours": 14033.76
+    "total_pr_hours": 12995.51
   },
   "trend": {
     "attribution": {
       "basis": "mean_hours_per_merged_pr",
-      "cycle_mean_hours": {
-        "change": -1.7,
-        "current": 49.84,
-        "previous": 51.54
-      },
       "large_prs": {
-        "change": -0.46,
-        "current": 1.3,
-        "previous": 1.76,
+        "change": 0.67,
+        "current": 2.47,
+        "previous": 1.81,
         "share_of_increase": 0
       },
       "locations": [
         {
-          "change": 0.7,
+          "change": 1.27,
           "location": "area-A",
           "share_of_increase": 0.0
         },
         {
-          "change": -1.24,
+          "change": -0.95,
           "location": "area-B",
           "share_of_increase": 0.0
         },
         {
-          "change": 0.11,
+          "change": -0.33,
           "location": "area-C",
           "share_of_increase": 0.0
         },
         {
-          "change": 0.24,
+          "change": 0.13,
           "location": "area-D",
           "share_of_increase": 0.0
         },
         {
-          "change": -0.49,
+          "change": -0.66,
           "location": "area-E",
           "share_of_increase": 0.0
         },
         {
-          "change": 0.6,
-          "location": "dir:src/D",
-          "share_of_increase": 0.0
-        },
-        {
-          "change": 0.03,
+          "change": 0.14,
           "location": "other",
           "share_of_increase": 0.0
         }
       ],
       "states": {
         "coding": {
-          "change": -1.73,
-          "current": 18.52,
-          "previous": 20.25,
-          "share_of_decrease": 0.7266,
+          "change": -2.83,
+          "current": 17.81,
+          "previous": 20.63,
           "share_of_increase": 0.0
         },
         "waiting_author": {
-          "change": 0.69,
-          "current": 9.3,
-          "previous": 8.62,
-          "share_of_decrease": 0.0,
-          "share_of_increase": 1.0
-        },
-        "waiting_ci": {
-          "change": 0.0,
-          "current": 0.0,
-          "previous": 0.0,
-          "share_of_decrease": 0.0,
-          "share_of_increase": 0.0
+          "change": 1.89,
+          "current": 10.71,
+          "previous": 8.81,
+          "share_of_increase": 0.952
         },
         "waiting_merge": {
-          "change": -0.6,
-          "current": 5.98,
-          "previous": 6.58,
-          "share_of_decrease": 0.2532,
-          "share_of_increase": 0.0
+          "change": 0.1,
+          "current": 6.79,
+          "previous": 6.69,
+          "share_of_increase": 0.048
         },
         "waiting_reviewer": {
-          "change": -0.05,
-          "current": 16.04,
-          "previous": 16.09,
-          "share_of_decrease": 0.0203,
+          "change": -0.4,
+          "current": 16.17,
+          "previous": 16.57,
           "share_of_increase": 0.0
         }
       }
     }
-  },
-  "waste": {
-    "late_rejections": 0,
-    "lost_while_waiting": 12,
-    "wasted_pr_hours": 3155.39
   }
 }

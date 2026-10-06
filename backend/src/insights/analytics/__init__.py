@@ -1,8 +1,25 @@
-"""Analytics package versioning; analytics modules are pure computation with no DB or HTTP I/O."""
+"""Analytics versions and shared thresholds; analytics modules do no DB or HTTP I/O."""
 
-from insights.analytics.thresholds import THRESHOLDS_VERSION
+ANALYTICS_VERSION = "1.9.0"
+# Feeds snapshot IDs, bootstrap seeds and the derive key; bump it with any threshold change.
+THRESHOLDS_VERSION = "1.0.0"
 
-ANALYTICS_VERSION = "1.5.3"
+MIN_SAMPLES_P50 = 20
+MIN_SAMPLES_LOCATION_P50 = 10
+MIN_SAMPLES_WEEKLY_P50 = 5
+MIN_RATE_DENOMINATOR = 30
+MIN_RATE_EVENTS = 5
+CHANGE_MIN_RELATIVE = 0.10
+BOOTSTRAP_ITERATIONS = 1000
+BOOTSTRAP_CI = 0.90
+
+MIN_LOCATION_PRS = 10
+MAX_LOCATIONS_IN_SNAPSHOT = 15
+DIRECTORY_LOCATIONS_PER_PR = 3
+
+REVIEW_CONCENTRATION_TOP_K = 2
+LARGE_PR_LINES = 500
+REVIEW_CAPACITY_MIN_WAIT_SHARE = 0.15
 
 
 def derive_key(location_dimension: str, directory_depth: int) -> str:

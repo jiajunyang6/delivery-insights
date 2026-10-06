@@ -1,3 +1,5 @@
+"""Alembic environment: runs migrations with the app's async engine settings."""
+
 import asyncio
 
 from alembic import context
@@ -12,6 +14,7 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
+    """Emit SQL for the migrations without a database connection."""
     context.configure(
         url=Settings().database_url,
         target_metadata=target_metadata,
@@ -23,12 +26,14 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    """Run the migrations on an open synchronous connection."""
     context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
     with context.begin_transaction():
         context.run_migrations()
 
 
 async def run_async_migrations() -> None:
+    """Connect with the async engine and run the migrations."""
     engine = create_async_engine(Settings().database_url, poolclass=pool.NullPool)
     async with engine.connect() as connection:
         await connection.run_sync(do_run_migrations)

@@ -2,7 +2,7 @@
 
 import re
 from functools import lru_cache
-from typing import Literal, Self
+from typing import Self
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -12,8 +12,6 @@ MAX_PERIOD_DAYS = 366
 REPO_RE = re.compile(
     r"^(?P<owner>[A-Za-z0-9][A-Za-z0-9-]{0,38})/(?P<name>(?!\.{1,2}$)[A-Za-z0-9._-]{1,100})$"
 )
-OWNER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]{0,38}$")
-NAME_RE = re.compile(r"^(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$")
 
 
 def split_list(value: str) -> list[str]:
@@ -22,9 +20,10 @@ def split_list(value: str) -> list[str]:
 
 
 class Settings(BaseSettings):
+    """Environment-driven settings, validated once at startup."""
+
     model_config = SettingsConfigDict(case_sensitive=False, env_ignore_empty=True)
     github_token: SecretStr | None = None
-    github_api_url: str = "https://api.github.com"
     github_graphql_url: str = "https://api.github.com/graphql"
     tracked_repos: str = "bevyengine/bevy"
     location_dimension: str = "label:area-"
@@ -42,12 +41,7 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int = Field(default=60, ge=1)
     cors_origins: str = "http://localhost:5173"
     rate_limit_per_minute: int = Field(default=120, ge=1)
-    manual_sync_cooldown_seconds: int = Field(default=300, ge=1)
-    max_repos_per_request: int = Field(default=20, ge=1)
     precompute_days: str = "7,30,60"
-    ci_source: Literal["actions", "none"] = "actions"
-    ci_complete: bool = False
-    area_owners_path: str = "docs/area-owners.md"
     log_level: str = "INFO"
 
     @model_validator(mode="after")
@@ -63,10 +57,10 @@ class Settings(BaseSettings):
             raise ValueError("SYNC_INTERVAL_MINUTES must divide 60")
         if self.open_sweep_minutes % self.sync_interval_minutes:
             raise ValueError("OPEN_SWEEP_MINUTES must be a multiple of SYNC_INTERVAL_MINUTES")
-        if self.location_dimension not in {"directory", "codeowners"} and not (
+        if self.location_dimension != "directory" and not (
             self.location_dimension.startswith("label:") and self.location_label_prefix
         ):
-            raise ValueError("LOCATION_DIMENSION must be label:<prefix>, codeowners or directory")
+            raise ValueError("LOCATION_DIMENSION must be label:<prefix> or directory")
         if any(
             not value.isdigit() or not 1 <= int(value) <= MAX_PERIOD_DAYS
             for value in split_list(self.precompute_days)

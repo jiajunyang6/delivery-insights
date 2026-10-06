@@ -1,4 +1,4 @@
-"""Assemble the snapshot payload and PR rows from a Dataset; deterministic, no I/O."""
+"""Assemble the snapshot payload from a Dataset; deterministic, no I/O."""
 
 import hashlib
 import math
@@ -7,17 +7,11 @@ from typing import Any
 
 import orjson
 
-from insights.analytics import ANALYTICS_VERSION
+from insights.analytics import ANALYTICS_VERSION, THRESHOLDS_VERSION
 from insights.analytics import bottlenecks as b
-from insights.analytics import thresholds as t
-from insights.analytics.bottlenecks import at_risk, location_names
-from insights.analytics.ci import build_ci
-from insights.analytics.dataset import Dataset, SnapshotParams, hours, merged, open_at, reverted
-from insights.analytics.drivers import build_drivers
-from insights.analytics.efficiency import build_efficiency
-from insights.analytics.findings import build_findings, headline
+from insights.analytics.dataset import Dataset, SnapshotParams, merged
+from insights.analytics.efficiency import build_efficiency, slowest_decile_size_ratio
 from insights.analytics.stats import SAMPLING_SEED_VERSION
-from insights.analytics.timeline import state_at
 
 
 def iso(at: datetime) -> str:
@@ -73,6 +67,9 @@ def sampling_hash(params: SnapshotParams) -> str:
     """
     seed_params = params.canonical_dict()
     seed_params["analytics_version"] = SAMPLING_SEED_VERSION
+    # Replay both historical parameter shapes without retaining CI collection or metrics.
+    profile = seed_params.pop("sampling_profile")
+    seed_params["ci_source"] = "actions" if profile == "github" else "none"
     return digest(seed_params)[:16]
 
 
@@ -88,11 +85,6 @@ def rounded(value: Any, key: str = "", unit: str = "") -> Any:
     current, previous and delta values can differ from arithmetic on the displayed values.
     """
     if isinstance(value, dict):
-        if str(value.get("feature", "")).endswith("_share"):
-            return {
-                k: rounded(v, k, "share" if k in {"slowest", "rest"} else "")
-                for k, v in value.items()
-            }
         current_unit = value.get("unit", unit)
         return {
             k: rounded(v, k, current_unit if k in {"value", "previous", "change_abs"} else "")
@@ -127,19 +119,15 @@ def rounded(value: Any, key: str = "", unit: str = "") -> Any:
 def build_snapshot(dataset: Dataset, *, params: SnapshotParams) -> dict[str, Any]:
     """Build the JSON-ready snapshot payload; pure and deterministic for a dataset and params.
 
-    Findings and the headline are derived from the assembled snapshot before rounding.
+    It holds the time ledger shown on the dashboard and every metric the narrative evidence
+    catalog reads; values are rounded once, after computation.
     """
     snapshot_id, _, _ = identifiers(dataset, params)
     # Seed from the sampling hash, not the snapshot ID, so analytics-only releases keep the
     # same bootstrap seeds.
     params_hash = sampling_hash(params)
-    efficiency = build_efficiency(dataset, params_hash)
-    risks = b.at_risk(dataset, at=dataset.as_of, exclude_current_drafts=dataset.current_day)
     ledger = b.time_ledger(dataset)
-    ledger["ci_data_available"] = params.ci_source != "none" and ledger["ci_coverage"] > 0
-    locations = b.locations(dataset, risks, ledger)
-    waste, rework = b.waste_rework(dataset)
-    current = merged(dataset, dataset.current)
+    locations = b.locations(dataset)
     snapshot: dict[str, Any] = {
         "snapshot_id": snapshot_id,
         "repos": sorted(r.repo for r in dataset.repos),
@@ -154,121 +142,24 @@ def build_snapshot(dataset: Dataset, *, params: SnapshotParams) -> dict[str, Any
             },
         },
         "as_of": dataset.as_of,
-        "headline": "",
-        "efficiency": efficiency,
+        "efficiency": build_efficiency(dataset, params_hash),
         "time_ledger": ledger,
-        "bottlenecks": [],
         "bottleneck_analysis": {
             "review_queue": b.review_queue(dataset, dataset.current),
             "locations": locations,
-            "merge_blockers": b.merge_blockers(dataset),
-            "review_load": b.review_load(dataset),
-            "ci": build_ci(dataset, params_hash) if params.ci_source == "actions" else None,
         },
-        "drivers": build_drivers(dataset),
-        "at_risk_prs": risks[: t.AT_RISK_MAX_ITEMS],
-        "at_risk_summary": b.risk_summary(risks),
-        "waste": waste,
-        "rework": rework,
-        "guardrail": b.guardrail(efficiency),
-        "trend": b.trend(dataset, ledger, locations),
-        "signals": b.signals(dataset, risks, params_hash),
+        "drivers": {"slowest_decile_size_ratio": slowest_decile_size_ratio(dataset)},
+        "trend": {"attribution": b.attribution(dataset, ledger, locations)},
         "series": {
             "current": b.series(dataset, dataset.current),
             "previous": b.series(dataset, dataset.previous) if dataset.comparison_available else [],
         },
-        "links": {
-            "self": f"/v1/snapshots/{snapshot_id}",
-            "narrative": f"/v1/snapshots/{snapshot_id}/narrative",
-        },
         "meta": {
-            "schema_version": "1",
             "analytics_version": ANALYTICS_VERSION,
-            "thresholds_version": t.THRESHOLDS_VERSION,
+            "thresholds_version": THRESHOLDS_VERSION,
             "location_dimension": params.location_dimension,
-            "time_basis": "utc_wall_clock",
             "comparison_available": dataset.comparison_available,
-            "ci_source": params.ci_source,
-            "data_freshness": freshness(dataset),
-            "sample": {
-                "merged_prs": len(current),
-                "open_prs_at_as_of": sum(open_at(p, dataset.as_of) for p in dataset.flow),
-            },
+            "sample": {"merged_prs": len(merged(dataset, dataset.current))},
         },
     }
-    snapshot["bottlenecks"] = build_findings(snapshot, dataset)
-    snapshot["headline"] = headline(snapshot)
     return dict(rounded(snapshot))
-
-
-def build_pr_rows(dataset: Dataset) -> list[dict[str, Any]]:
-    """Rows for period-active flow PRs merged or closed unmerged in the period, or open at as_of.
-
-    Sorted by repo and number; values are rounded like the snapshot.
-    """
-    risks = {
-        (p["repo"], p["number"]): p
-        for p in at_risk(dataset, at=dataset.as_of, exclude_current_drafts=dataset.current_day)
-    }
-    rows = []
-    for pr in sorted(dataset.flow, key=lambda p: (p.repo, p.number)):
-        f = pr.facts
-        status = (
-            "merged"
-            if dataset.current.contains(f.merged_at)
-            else "closed"
-            if f.merged_at is None and dataset.current.contains(f.closed_at)
-            else "open"
-            if open_at(pr, dataset.as_of)
-            else None
-        )
-        if status is None:
-            continue
-        interval = state_at(pr.intervals, dataset.as_of) if status == "open" else None
-        risk = risks.get((pr.repo, pr.number))
-        rows.append(
-            {
-                "repo": pr.repo,
-                "number": pr.number,
-                "title": pr.title,
-                "url": pr.url,
-                "author": pr.author,
-                "status": status,
-                "created_at": pr.created_at,
-                "ready_at": f.ready_at,
-                "merged_at": f.merged_at if f.merged_at and f.merged_at < dataset.as_of else None,
-                "closed_at": f.closed_at if f.closed_at and f.closed_at < dataset.as_of else None,
-                "size_lines": f.size_lines,
-                "size_bucket": f.size_bucket,
-                "locations": list(location_names(pr, dataset)),
-                "external_contributor": f.external_contributor,
-                "is_revert": f.is_revert,
-                "reverted": reverted(pr, dataset.as_of),
-                "close_class": f.close_class,
-                "review_rounds": f.review_rounds,
-                "human_reviews": f.human_reviews,
-                "cycle_hours": f.cycle_hours if status == "merged" else None,
-                "stage_hours": {
-                    stage: getattr(f, stage + "_hours")
-                    for stage in ("coding", "pickup", "review", "merge")
-                },
-                "ledger_hours": hours(pr, end=dataset.as_of),
-                "current_state": interval.state if interval else None,
-                "current_state_age_hours": (dataset.as_of - interval.start_at).total_seconds()
-                / 3600
-                if interval
-                else None,
-                "at_risk": {
-                    key: risk[key]
-                    for key in (
-                        "severity",
-                        "threshold_hours",
-                        "critical_threshold_hours",
-                        "baseline_source",
-                    )
-                }
-                if risk
-                else None,
-            }
-        )
-    return list(rounded(rows))

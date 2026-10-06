@@ -1,3 +1,5 @@
+"""Narrative generation: repair, fallback, downgrades and assembly."""
+
 from copy import deepcopy
 from datetime import UTC, datetime
 
@@ -12,6 +14,7 @@ from insights.narrative.hypotheses import score_hypotheses
 from insights.narrative.llm import LLMReply, LLMUnavailable
 from insights.narrative.service import assemble, generate
 from insights.narrative.template import build_template
+from insights.narrative.validator import citations
 
 NOW = datetime(2026, 3, 2, tzinfo=UTC)
 
@@ -19,8 +22,8 @@ NOW = datetime(2026, 3, 2, tzinfo=UTC)
 @pytest.mark.parametrize("mode", ["disabled", "first", "repair", "failed", "error", "second_error"])
 async def test_generation_repair_fallback_and_grounded_output(mode):
     snapshot = golden()
-    pack, _ = build_evidence_pack(snapshot, "director", False)
-    valid = build_template(pack, snapshot)
+    pack, _ = build_evidence_pack(snapshot)
+    valid = build_template(pack)
     bad = {"narrative": "Definitely 999 hours.", "hypotheses": []}
     script = {
         "first": [valid],
@@ -30,9 +33,8 @@ async def test_generation_repair_fallback_and_grounded_output(mode):
         "second_error": [bad, LLMUnavailable("ReadTimeout")],
     }
     llm = FakeLLMClient(script[mode]) if mode != "disabled" else None
-    result = await generate(snapshot, audience="director", llm=llm, ci_complete=False, now=NOW)
+    result = await generate(snapshot, llm=llm, now=NOW)
     Narrative.model_validate(result.payload)
-    assert result.payload["lang"] == "en"
     meta = result.payload["meta"]
     assert meta["pack_hash"] == digest(pack)[:16]
     assert meta["generated_at"] == "2026-03-02T00:00:00Z"
@@ -47,20 +49,14 @@ async def test_generation_repair_fallback_and_grounded_output(mode):
         assert meta["validation"] == "failed" and meta["violations"]
     if mode in {"error", "second_error"}:
         assert meta["fallback_reason"] == "llm_error" and meta["validation"] == "not_run"
-    if llm:
-        request = str(llm.calls[0]["messages"])
-        assert all(
-            p["title"] not in request and p["author"] not in request
-            for p in snapshot["at_risk_prs"]
-        )
     ids = {e["id"] for e in result.payload["evidence"]}
-    assert ids == {"E1", "E71"}
+    assert ids == citations(valid["narrative"])
 
 
 async def test_missing_tool_use_repairs_with_text_message():
     snapshot = golden()
-    pack, _ = build_evidence_pack(snapshot, "director", False)
-    valid = build_template(pack, snapshot)
+    pack, _ = build_evidence_pack(snapshot)
+    valid = build_template(pack)
 
     class NoToolFirst(FakeLLMClient):
         async def submit(self, **kwargs):
@@ -76,18 +72,18 @@ async def test_missing_tool_use_repairs_with_text_message():
             return await super().submit(**kwargs)
 
     llm = NoToolFirst([valid])
-    result = await generate(snapshot, audience="director", llm=llm, ci_complete=False, now=NOW)
+    result = await generate(snapshot, llm=llm, now=NOW)
     assert result.payload["meta"]["validation"] == "passed"
     assert "text" in llm.calls[-1]["messages"][-1]["content"][0]
 
 
 @pytest.mark.parametrize(("target", "expected"), [("medium", 0.74), ("low", 0.5)])
 async def test_generate_downgrade_is_code_owned(target, expected, monkeypatch):
-    snapshot, pack, output = validation_fixture()
+    snapshot, (pack, output) = golden(), validation_fixture()
     synthetic, evidence = scoring_fixture()
-    candidates, _ = score_hypotheses(synthetic, evidence, ci_complete=False)
+    candidates, _ = score_hypotheses(synthetic, evidence)
     candidates[0]["chain"] = pack["hypotheses"][0]["chain"]
-    pack.update(audience="director", lang="en", abstain_reason=None, top_bottlenecks=[])
+    pack.update(lang="en", abstain_reason=None)
     import insights.narrative.service as service
 
     monkeypatch.setattr(service, "build_evidence_pack", lambda *args, **kwargs: (pack, candidates))
@@ -99,9 +95,7 @@ async def test_generate_downgrade_is_code_owned(target, expected, monkeypatch):
         else "There are early signs that review capacity is the main cause [E1][E15]."
     )
     output["narrative"] = "Median cycle time rose 18% [E1]. " + h["statement"]
-    result = await generate(
-        snapshot, audience="director", llm=FakeLLMClient([output]), ci_complete=False, now=NOW
-    )
+    result = await generate(snapshot, llm=FakeLLMClient([output]), now=NOW)
     assert result.payload["meta"]["generated_by"] == "llm"
     final = result.payload["hypotheses"][0]
     assert final["confidence"] == expected
@@ -110,7 +104,7 @@ async def test_generate_downgrade_is_code_owned(target, expected, monkeypatch):
 
 def test_assembly_resorts_after_downgrade_and_keeps_outside_score_fixed():
     snapshot, evidence = scoring_fixture()
-    candidates, _ = score_hypotheses(snapshot, evidence, ci_complete=False)
+    candidates, _ = score_hypotheses(snapshot, evidence)
     second = deepcopy(candidates[0])
     second.update(
         id="H_pr_size_growth",
@@ -119,7 +113,7 @@ def test_assembly_resorts_after_downgrade_and_keeps_outside_score_fixed():
         confidence_level="medium",
     )
     candidates.append(second)
-    pack, _ = build_evidence_pack(snapshot, "director", False)
+    pack, _ = build_evidence_pack(snapshot)
     output = {
         "narrative": "Cycle data [E1].",
         "hypotheses": [
@@ -145,3 +139,16 @@ def test_assembly_resorts_after_downgrade_and_keeps_outside_score_fixed():
     )
     assert outside["action"] is None
     assert result["hypotheses"][1]["alternatives_open"] == candidates[0]["alternatives_open"]
+
+
+def test_low_candidates_are_marked_as_not_downgradable_in_the_request():
+    from insights.narrative.prompt import SYSTEM_PROMPT, user_message
+
+    pack, _ = validation_fixture()
+    pack.update(lang="en", abstain_reason=None)
+    pack["hypotheses"][0]["level"] = "low"
+    text = user_message(pack)["content"][0]["text"]
+    assert "H_review_capacity is optional and already low: omit downgrade." in text
+    pack["hypotheses"][0]["level"] = "high"
+    assert "already low" not in user_message(pack)["content"][0]["text"]
+    assert "never send a downgrade for a low candidate" in SYSTEM_PROMPT

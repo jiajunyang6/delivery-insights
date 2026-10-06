@@ -15,14 +15,13 @@ from sqlalchemy import select, update
 from insights.config import Settings
 from insights.db.models import Repository
 from insights.domain import PageResult, RepoRef
-from insights.sources.base import SourceAdapter
+from insights.sources import SourceAdapter
 from insights.sources.github.client import GitHubError
-from insights.sync.derive import current_key, derivation_complete, enqueue_rederivation, link_repo
+from insights.sync.derive import current_key, derivation_complete, enqueue_rederivation
 from insights.sync.queue import (
     enqueue_precompute,
     enqueue_sync,
     ensure_repo,
-    last_success,
     now_for,
     run_job,
     sessions_for,
@@ -161,7 +160,7 @@ class SyncRun:
     async def checkpoint(self, **values: Any) -> None:
         """Catch up on changes since the previous checkpoint, then publish progress.
 
-        Relinks if pages changed, sets `derived_key` only when every PR is derived with the
+        Sets `derived_key` only when every PR is derived with the
         current key (otherwise queues a rederive), and writes `values` with `last_synced_at`.
         """
         # Taken before the catch-up, so last_synced_at never claims changes made during it.
@@ -169,11 +168,6 @@ class SyncRun:
         await self.incremental(self.previous_checkpoint)
         key = current_key(self.settings)
         async with sessions_for(self.ctx)() as session, session.begin():
-            # Linking scans every PR in the repository, so it runs per checkpoint, not per page.
-            if await session.scalar(
-                select(Repository.links_pending).where(Repository.id == self.repo.id)
-            ):
-                await link_repo(session, self.repo.id)
             complete = await derivation_complete(session, self.repo.id, key)
             if complete:
                 values["derived_key"] = key
@@ -199,6 +193,8 @@ class SyncRun:
         A phase is checkpointed as `covered_since` only once a stored page reaches past its
         threshold or the listing ends, so coverage never includes a range still downloading.
         """
+        # Only phases not yet covered remain (7, 30, then BACKFILL_DAYS); thresholds are rounded
+        # to the minute so a resumed run computes the same boundaries.
         phases = [
             days
             for days in self.settings.backfill_phases
@@ -234,6 +230,8 @@ class SyncRun:
                 if self.repo.sync_watermark is None and page.newest_updated_at:
                     self.repo.sync_watermark = page.newest_updated_at
                     await set_repo(self.ctx, self.repo.id, sync_watermark=self.repo.sync_watermark)
+                # One page can complete several short phases at once, so claim each phase whose
+                # threshold this page has reached before reading the next page.
                 while index < len(phases):
                     threshold = (self.started - timedelta(days=phases[index])).replace(
                         second=0, microsecond=0
@@ -257,10 +255,12 @@ class SyncRun:
 
         Completing incremental pagination alone does not establish historical period coverage.
         """
+        # Recent changes first, so already covered periods stay fresh while backfill continues.
         if self.repo.sync_watermark:
             await set_job(self.ctx, self.job_id, phase="incremental")
             await self.incremental(self.repo.sync_watermark)
         await self.backfill()
+        # Open PRs that nobody touched never show up in the updated-at walk; sweep them hourly.
         if self.repo.last_open_sweep_at is None or self.repo.last_open_sweep_at < (
             now_for(self.ctx) - timedelta(minutes=self.settings.open_sweep_minutes)
         ):
@@ -315,23 +315,11 @@ async def incremental_sync_all(ctx: dict[str, Any]) -> None:
             )
 
 
-async def enqueue_enrichment(ctx: dict[str, Any], repo: Repository) -> None:
-    """Queue due CI and ownership refreshes based on their last successful completion times."""
-    settings = cast(Settings, ctx["settings"])
-    async with sessions_for(ctx)() as session:
-        for kind, interval in (("ci_runs", timedelta(hours=1)), ("ownership", timedelta(days=1))):
-            if kind == "ci_runs" and settings.ci_source != "actions":
-                continue
-            previous = await last_success(ctx, repo.id, kind)
-            if previous is None or previous < now_for(ctx) - interval:
-                await enqueue_sync(ctx["redis"], session, repo.full_name, kind, now=now_for(ctx))
-
-
 async def sync_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id: str) -> str:
-    """arq entry point for backfill, incremental and manual syncs of one repository.
+    """arq entry point for backfill and incremental syncs of one repository.
 
     Returns the job result, "skipped_locked" or "missing_token". Snapshots are precomputed only
-    when the run changed `data_version`; due CI and ownership enrichment is queued afterwards.
+    when the run changed `data_version`.
     """
     async with run_job(ctx, repo_full_name, kind, job_id) as job:
         if job is None:
@@ -357,6 +345,5 @@ async def sync_repo(ctx: dict[str, Any], repo_full_name: str, kind: str, job_id:
             )
         if version != repo.data_version:
             await enqueue_precompute(ctx, repo)
-        await enqueue_enrichment(ctx, repo)
         logger.info("sync_completed", job=job_id, repo=repo_full_name, phase=kind, **run.stats)
     return job.result

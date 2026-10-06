@@ -1,3 +1,4 @@
+/** Configuration notices: which `.env` variable each setup problem points to. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { setupItems } from "../src/setup.ts";
@@ -10,7 +11,6 @@ const healthy: SetupStatus = {
     region: "us-west-2",
     model_id: "us.anthropic.claude-sonnet-4-6",
     last_error: null,
-    last_error_at: null,
   },
 };
 

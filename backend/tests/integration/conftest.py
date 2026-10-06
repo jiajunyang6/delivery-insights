@@ -1,3 +1,5 @@
+"""Integration fixtures: Postgres and Redis containers and a worker ctx."""
+
 import asyncio
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock
@@ -13,28 +15,31 @@ from testcontainers.redis import RedisContainer
 
 from insights.config import Settings
 from insights.db.models import Base
-from insights.sources.github.adapter import GitHubAdapter
-from insights.sources.github.client import GitHubClient
+from insights.sources.github.client import GitHubAdapter, GitHubClient
 
 
 @pytest.fixture(scope="session")
 def postgres_url():
+    """Start one Postgres container for the session."""
     with PostgresContainer("postgres:16-alpine", driver="asyncpg") as container:
         yield container.get_connection_url()
 
 
 @pytest.fixture(scope="session")
 def redis_url():
+    """Start one Redis container for the session."""
     with RedisContainer("redis:7-alpine") as container:
         yield f"redis://{container.get_container_host_ip()}:{container.get_exposed_port(6379)}/0"
 
 
 @pytest.fixture
 def migrated_database(postgres_url, monkeypatch):
+    """Migrate the database to head and empty every table."""
     monkeypatch.setenv("DATABASE_URL", postgres_url)
     command.upgrade(Config("alembic.ini"), "head")
 
     async def clear():
+        """Delete all rows, children before parents."""
         engine = create_async_engine(postgres_url)
         async with engine.begin() as connection:
             for table in reversed(Base.metadata.sorted_tables):
@@ -47,6 +52,7 @@ def migrated_database(postgres_url, monkeypatch):
 
 @pytest.fixture
 async def context(migrated_database, redis_url, respx_mock):
+    """Build a worker job context against the containers with mocked GitHub HTTP."""
     settings = Settings(
         database_url=migrated_database,
         redis_url=redis_url,
@@ -56,7 +62,7 @@ async def context(migrated_database, redis_url, respx_mock):
     engine = create_async_engine(migrated_database)
     redis = await create_pool(RedisSettings.from_dsn(redis_url))
     await redis.flushdb()
-    client = GitHubClient(settings, redis, sleep=AsyncMock())
+    client = GitHubClient(settings, sleep=AsyncMock())
     ctx = {
         "settings": settings,
         "engine": engine,

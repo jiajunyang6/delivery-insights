@@ -1,13 +1,12 @@
-"""Snapshot delivery: readiness checks, cache and database lookup, computation and row paging."""
+"""Snapshot delivery: readiness checks, cache and database lookup, and pure computation."""
 
 import asyncio
 from collections.abc import AsyncIterator, Awaitable
-from contextlib import asynccontextmanager, suppress
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any, cast
 
-import orjson
 import structlog
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
@@ -17,28 +16,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from insights.analytics import ANALYTICS_VERSION, derive_key
 from insights.analytics.dataset import Dataset, RepoData, SnapshotParams
-from insights.analytics.snapshot import (
-    build_pr_rows,
-    build_snapshot,
-    canonical,
-    etag,
-    identifiers,
-    rounded,
-)
+from insights.analytics.insight import insight_view
+from insights.analytics.snapshot import build_snapshot, canonical, etag, identifiers, rounded
 from insights.config import Settings
 from insights.db.dataset import load_dataset
 from insights.db.models import Repository, Snapshot, SyncJob
-from insights.redis import rows_key, snapshot_key
-from insights.snapshots.caching import (
-    Reply,
-    alive,
-    cache_ttl,
-    matches_etag,
-    page_rows,
-    snapshot_reply,
-)
+from insights.redis import snapshot_key
+from insights.snapshots.caching import Reply, alive, cache_ttl, matches_etag, snapshot_reply
 from insights.snapshots.errors import ResourceError
-from insights.snapshots.filters import PrFilters
 
 logger = structlog.get_logger(__name__)
 
@@ -63,6 +48,8 @@ async def consistent_read(
 
 
 class SnapshotService:
+    """Serves snapshots for one request or job at a fixed observation time."""
+
     def __init__(
         self,
         sessions: async_sessionmaker[AsyncSession],
@@ -108,6 +95,7 @@ class SnapshotService:
         repo_data = []
         for name in params.repos:
             repo = repositories.get(name.lower())
+            # The first unmet condition is the reason shown to the user; order matters.
             reason = None
             if repo is None or repo.covered_since is None or repo.last_synced_at is None:
                 reason = "never_synced"
@@ -123,11 +111,7 @@ class SnapshotService:
                 status = repo.last_sync_status if repo else "never"
                 job = None
                 if repo is not None:
-                    kinds = (
-                        ["rederive"]
-                        if reason == "rederive"
-                        else ["manual", "incremental", "backfill"]
-                    )
+                    kinds = ["rederive"] if reason == "rederive" else ["incremental", "backfill"]
                     job = await session.scalar(
                         select(SyncJob)
                         .where(
@@ -154,14 +138,7 @@ class SnapshotService:
                         "open_sweep_done": bool(repo and repo.last_open_sweep_at),
                         "last_sync_status": status,
                         "reason": reason,
-                        "job": {
-                            "id": str(job.id),
-                            "status": job.status,
-                            "phase": job.phase,
-                            "url": f"/v1/sync-jobs/{job.id}",
-                        }
-                        if job
-                        else None,
+                        "job": {"status": job.status, "phase": job.phase} if job else None,
                     }
                 )
             elif (
@@ -188,9 +165,6 @@ class SnapshotService:
                 extensions={"repos": blocked},
             )
         if pending:
-            headers = {"Retry-After": "30"}
-            if pending[0]["job"]:
-                headers["Location"] = pending[0]["job"]["url"]
             return Reply(
                 canonical(
                     rounded(
@@ -203,16 +177,14 @@ class SnapshotService:
                     )
                 ),
                 202,
-                headers,
+                {"Retry-After": "30"},
             )
         return Dataset(
             tuple(repo_data),
             (),
             (),
-            (),
             params.period_from,
             params.period_to,
-            current_day=params.period_to == self.now.date(),
         )
 
     @staticmethod
@@ -223,22 +195,30 @@ class SnapshotService:
         except (ValueError, TypeError):
             return None
 
-    async def put_cache(self, sid: str, body: bytes, tag: str, created_at: datetime) -> None:
-        """Best-effort cache of snapshot body/ETag/creation time, bounded by remaining retention."""
+    async def put_cache(
+        self, sid: str, body: bytes, view: bytes, tag: str, created_at: datetime
+    ) -> None:
+        """Best-effort cache of the full snapshot, its public view and the view's ETag.
+
+        Entries expire with the snapshot's remaining retention.
+        """
         ttl = cache_ttl(created_at, self.now)
         if ttl:
             pipe = self.redis.pipeline()
             pipe.hset(
                 snapshot_key(sid),
-                mapping={"body": body, "etag": tag, "created_at": created_at.isoformat()},
+                mapping={
+                    "body": body,
+                    "view": view,
+                    "etag": tag,
+                    "created_at": created_at.isoformat(),
+                },
             )
             pipe.expire(snapshot_key(sid), ttl)
             await self.cache(pipe.execute())
 
-    async def cached_reply(
-        self, sid: str, conditional: str | None, *, immutable: bool
-    ) -> Reply | None:
-        """Serve a retained Redis snapshot or matching 304; return None on a miss/cache failure."""
+    async def cached_reply(self, sid: str, conditional: str | None) -> Reply | None:
+        """Serve a retained Redis view or matching 304; return None on a miss/cache failure."""
         key = snapshot_key(sid)
         if conditional:
             fields = await self.cache(
@@ -252,45 +232,56 @@ class SnapshotService:
             ):
                 tag = fields[0].decode()
                 if matches_etag(conditional, tag):
-                    return snapshot_reply(sid, b"", tag, conditional, immutable=immutable)
-        cached = await self.cache(cast(Awaitable[Any], self.redis.hgetall(key)))
+                    return snapshot_reply(sid, b"", tag, conditional)
+        fields = await self.cache(
+            cast(Awaitable[Any], self.redis.hmget(key, ["view", "etag", "created_at"]))
+        )
         if (
-            cached
-            and (created := self.cache_created(cached.get(b"created_at")))
+            fields
+            and fields[0] is not None
+            and fields[1]
+            and (created := self.cache_created(fields[2]))
             and alive(created, self.now)
         ):
-            body, tag = cached.get(b"body"), cached.get(b"etag")
-            if body is not None and tag:
-                return snapshot_reply(sid, body, tag.decode(), conditional, immutable=immutable)
+            return snapshot_reply(sid, fields[0], fields[1].decode(), conditional)
         return None
 
-    async def persisted_reply(
-        self, session: AsyncSession, sid: str, conditional: str | None, *, immutable: bool
-    ) -> Reply | None:
-        """Serve a retained database snapshot and warm Redis; return None if absent or expired."""
+    async def persisted(self, session: AsyncSession, sid: str) -> tuple[bytes, bytes, str] | None:
+        """Load a retained database snapshot as (body, view, etag) and warm Redis.
+
+        Returns None when the row is absent or expired.
+        """
         row = await session.get(Snapshot, sid)
         if row is None or not alive(row.created_at, self.now):
             return None
-        body = canonical(row.payload)
-        await self.put_cache(sid, body, row.etag, row.created_at)
-        return snapshot_reply(sid, body, row.etag, conditional, immutable=immutable)
+        body, view = canonical(row.payload), canonical(insight_view(row.payload))
+        await self.put_cache(sid, body, view, row.etag, row.created_at)
+        return body, view, row.etag
 
-    async def by_id(self, sid: str, conditional: str | None = None) -> Reply:
-        """Read an existing snapshot within retention; never recompute it from newer repo data.
+    async def by_id(self, sid: str) -> bytes:
+        """Return the full internal snapshot within retention for narrative evidence.
 
-        Old analytics-version snapshots remain readable by ID until they expire.
+        It never recomputes from newer repo data; old analytics-version snapshots remain
+        readable by ID until they expire. Raises 404 when absent or expired.
         """
-        cached = await self.cached_reply(sid, conditional, immutable=True)
-        if cached is not None:
-            return cached
+        fields = await self.cache(
+            cast(Awaitable[Any], self.redis.hmget(snapshot_key(sid), ["body", "created_at"]))
+        )
+        if (
+            fields
+            and fields[0] is not None
+            and (created := self.cache_created(fields[1]))
+            and alive(created, self.now)
+        ):
+            return cast(bytes, fields[0])
         async with self.sessions() as session:
-            stored = await self.persisted_reply(session, sid, conditional, immutable=True)
+            stored = await self.persisted(session, sid)
         if stored is None:
             raise not_found()
-        return stored
+        return stored[0]
 
     async def delivery(self, params: SnapshotParams, conditional: str | None = None) -> Reply:
-        """Return the snapshot for params, computing and persisting it on a cache and DB miss.
+        """Return the public insight for params, computing and persisting the snapshot on a miss.
 
         The ID comes from repo metadata alone, so Redis and the snapshots table are checked
         before PRs are loaded. Returns a 202 Reply while data is pending.
@@ -300,22 +291,27 @@ class SnapshotService:
             metadata = await self.metadata(session, params)
             if isinstance(metadata, Reply):
                 return metadata
+            # Cheapest source first: Redis, then the snapshots table, then a full computation.
             sid, _, _ = identifiers(metadata, params)
-            cached = await self.cached_reply(sid, conditional, immutable=False)
+            cached = await self.cached_reply(sid, conditional)
             if cached is not None:
                 return cached
-            stored = await self.persisted_reply(session, sid, conditional, immutable=False)
+            stored = await self.persisted(session, sid)
             if stored is not None:
-                return stored
+                _, view, tag = stored
+                return snapshot_reply(sid, view, tag, conditional)
+            # Load in the same REPEATABLE READ view that produced the ID, so the data matches it.
             load_started = perf_counter()
-            dataset = await load_dataset(session, params, now=self.now, metadata=metadata)
+            dataset = await load_dataset(session, params, metadata=metadata)
             load_ms = (perf_counter() - load_started) * 1000
             compute_started = perf_counter()
             # SQL has already materialized immutable records; the CPU work uses no DB session
             # and runs off the event loop while retaining the metadata view used for this ID.
             payload = await asyncio.to_thread(build_snapshot, dataset, params=params)
             compute_ms = (perf_counter() - compute_started) * 1000
-        body, tag = canonical(payload), etag(canonical(payload))
+        # The full snapshot stays internal; the ETag identifies the public view's bytes.
+        body, view = canonical(payload), canonical(insight_view(payload))
+        tag = etag(view)
         async with self.sessions() as session, session.begin():
             statement = insert(Snapshot).values(
                 snapshot_id=sid,
@@ -335,7 +331,7 @@ class SnapshotService:
                     set_={"created_at": statement.excluded.created_at},
                 )
             )
-        await self.put_cache(sid, body, tag, self.now)
+        await self.put_cache(sid, body, view, tag, self.now)
         logger.info(
             "snapshot_computed",
             snapshot_id=sid,
@@ -344,31 +340,4 @@ class SnapshotService:
             compute_ms=compute_ms,
             merged_prs=payload["meta"]["sample"]["merged_prs"],
         )
-        return snapshot_reply(sid, body, tag, conditional, immutable=False)
-
-    async def rows(
-        self, params: SnapshotParams, filters: PrFilters, limit: int, cursor: str | None
-    ) -> Reply:
-        """One page of PR rows for the snapshot that delivery would serve for params.
-
-        Rows are cached in Redis per snapshot ID for an hour. Returns a 202 Reply while pending.
-        """
-        async with consistent_read(self.sessions) as session:
-            metadata = await self.metadata(session, params)
-            if isinstance(metadata, Reply):
-                return metadata
-            sid, _, _ = identifiers(metadata, params)
-            cached = await self.cache(self.redis.get(rows_key(sid)))
-            rows = None
-            if cached:
-                with suppress(orjson.JSONDecodeError):
-                    rows = orjson.loads(cached)
-            if rows is None:
-                dataset = await load_dataset(session, params, now=self.now, metadata=metadata)
-                rows = await asyncio.to_thread(build_pr_rows, dataset)
-                await self.cache(self.redis.set(rows_key(sid), canonical(rows), ex=3600))
-        page = page_rows(
-            cast(list[dict[str, Any]], rows), sid, metadata.as_of, filters, limit, cursor
-        )
-        # Param-addressed like the delivery reply, so the browser must not reuse it after a sync.
-        return Reply(canonical(rounded(page)), 200, {"Cache-Control": "private, no-cache"})
+        return snapshot_reply(sid, view, tag, conditional)

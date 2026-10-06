@@ -7,6 +7,8 @@ from typing import Any
 
 
 class EventKind(StrEnum):
+    """Timeline event kinds kept from GitHub; values are stored in pr_events.kind."""
+
     READY_FOR_REVIEW = "ready_for_review"
     CONVERT_TO_DRAFT = "convert_to_draft"
     REVIEW_REQUESTED = "review_requested"
@@ -26,6 +28,8 @@ class EventKind(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class RepoRef:
+    """Owner/name pair identifying a repository at the source."""
+
     owner: str
     name: str
 
@@ -37,19 +41,24 @@ class RepoRef:
 
 @dataclass(frozen=True, slots=True)
 class RepositoryInfo:
+    """Repository metadata returned with each page, used to detect backports."""
+
     full_name: str
     default_branch: str
-    is_archived: bool
 
 
 @dataclass(frozen=True, slots=True)
 class Actor:
+    """Who performed an event; login is None for commits and deleted accounts."""
+
     login: str | None
     is_bot: bool
 
 
 @dataclass(frozen=True, slots=True)
 class Event:
+    """One normalized timeline event; dedup_key is stable across re-reads."""
+
     kind: EventKind
     occurred_at: datetime
     actor: Actor
@@ -59,21 +68,19 @@ class Event:
 
 @dataclass(frozen=True, slots=True)
 class PullRequestRecord:
+    """Immutable source view of one PR with its labels, files and events."""
+
     number: int
     title: str
-    body_excerpt: str
     url: str
     state: str
     is_draft: bool
     author: Actor
-    author_association: str
     base_ref: str
-    head_ref: str
     created_at: datetime
     updated_at: datetime
     closed_at: datetime | None
     merged_at: datetime | None
-    merge_commit_oid: str | None
     additions: int
     deletions: int
     labels: tuple[str, ...]
@@ -83,6 +90,8 @@ class PullRequestRecord:
 
 @dataclass(frozen=True, slots=True)
 class PageResult:
+    """One fetched page of PRs plus the cursor and update bounds sync needs."""
+
     repository: RepositoryInfo
     prs: tuple[PullRequestRecord, ...]
     end_cursor: str | None
@@ -93,48 +102,25 @@ class PageResult:
     skipped_prs: int = 0
 
 
-@dataclass(frozen=True, slots=True)
-class CiRun:
-    run_id: int
-    workflow_name: str
-    event: str
-    head_sha: str
-    status: str
-    conclusion: str | None
-    run_attempt: int
-    created_at: datetime
-    run_started_at: datetime | None
-    updated_at: datetime
-    pr_numbers: tuple[int, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class OwnershipRule:
-    source: str
-    pattern: str
-    owners: tuple[str, ...]
-    line_no: int
-
-
 class GitHubError(Exception):
     """Sanitized upstream error; never includes headers or response bodies."""
 
 
 class GitHubAuthError(GitHubError):
-    pass
+    """GitHub rejected the token (HTTP 401)."""
 
 
 class GitHubNotFoundError(GitHubError):
-    pass
+    """The repository or PR node does not exist or is not visible."""
 
 
 class GitHubRateLimited(GitHubError):  # noqa: N818
-    pass
+    """Rate-limit waits exceeded the retry or 15-minute wait budget."""
 
 
 class GitHubQueryError(GitHubError):
-    pass
+    """A non-retryable GraphQL or HTTP error, or a malformed response."""
 
 
 class GitHubTransientError(GitHubError):
-    pass
+    """A retryable network, upstream or pagination failure."""

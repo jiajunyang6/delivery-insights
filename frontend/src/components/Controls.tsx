@@ -1,17 +1,20 @@
-import type { Audience, DateLimits, Params, RepoStatus } from "../types";
-import { dateRange, viewDescriptions, viewLabels } from "../format";
-import { isPeriodSelected, periodError } from "../period";
+/** Report settings: repository, period presets, custom UTC dates and refresh. */
+import type { DateLimits, Params, RepoStatus } from "../types";
+import { dateRange, isPeriodSelected, periodError } from "../format";
 
+/** Current parameters and the callbacks and limits the controls need. */
 interface Props {
   params: Params;
   setParams: (p: Params) => void;
   repos: RepoStatus[];
-  audience: Audience;
-  setAudience: (a: Audience) => void;
   dateLimits: DateLimits | null;
   validationError: string | null;
   refresh: () => void;
 }
+/**
+ * Render the settings row. Presets outside the configured history are disabled with the
+ * reason as a tooltip; refresh stays disabled until the period is valid.
+ */
 export function Controls(p: Props) {
   return (
     <section className="controls" aria-label="Report settings">
@@ -85,31 +88,15 @@ export function Controls(p: Props) {
           Refresh report ↗
         </button>
       </div>
-      <div className="control-row secondary-controls">
-        <p>PRs opened or with human activity during the selected period.</p>
-        <div className="control-row compact">
-          <span className="label">View</span>
-          <div className="segmented">
-            {(["director", "manager"] as const).map((a) => (
-              <button
-                key={a}
-                className={p.audience === a ? "selected" : ""}
-                aria-pressed={p.audience === a}
-                title={viewDescriptions[a]}
-                onClick={() => p.setAudience(a)}
-              >
-                {viewLabels[a]}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-      {p.dateLimits && (
-        <p className="footnote">
-          Supported dates: {p.dateLimits.earliest_from} – {p.dateLimits.latest_to} (UTC).
-          Longer presets are unavailable when history is configured for a shorter period.
-        </p>
-      )}
+      <p className="footnote">
+        PRs opened or with human activity during the selected period.
+        {p.dateLimits && (
+          <>
+            {" "}Supported dates: {p.dateLimits.earliest_from} – {p.dateLimits.latest_to} (UTC).
+            Longer presets are unavailable when history is configured for a shorter period.
+          </>
+        )}
+      </p>
       {p.validationError && (
         <p className="error-text" role="alert">{p.validationError}</p>
       )}

@@ -1,7 +1,7 @@
+/** Period presets and validation against the API's UTC date limits. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dateRange } from "../src/format.ts";
-import { isPeriodSelected, periodError } from "../src/period.ts";
+import { dateRange, isPeriodSelected, periodError } from "../src/format.ts";
 
 const limits = {
   earliest_from: "2026-09-03",

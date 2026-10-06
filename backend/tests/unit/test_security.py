@@ -1,3 +1,5 @@
+"""Import boundaries and ignored local artifacts."""
+
 import subprocess
 import sys
 from pathlib import Path

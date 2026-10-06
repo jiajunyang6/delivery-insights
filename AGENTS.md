@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Instructions for coding agents working in this repository. Read this file first; `README.md`
-and `NOTES.md` describe the product, `docs/REFERENCE.md` holds the current contracts.
+describes the product and submission, `docs/TECHNICAL_DETAILS.md` holds the current contracts.
 
 ## Ground rules
 
@@ -18,18 +18,18 @@ and `NOTES.md` describe the product, `docs/REFERENCE.md` holds the current contr
 
 | Path | Responsibility |
 |---|---|
-| `backend/src/insights/sources/github/` | GraphQL/REST client, queries and normalization (the only GitHub I/O) |
-| `backend/src/insights/sync/` | arq jobs: `queue.py` job lifecycle and locks, `jobs.py` sync runs, `store.py` writes, `derive.py` timelines/facts/links and rederivation, `enrichment.py` CI and CODEOWNERS |
-| `backend/src/insights/db/` | SQLAlchemy models and loaders that turn rows into immutable records |
-| `backend/src/insights/analytics/` | Pure computation of the snapshot: timeline, facts, efficiency, bottlenecks, findings, headline |
-| `backend/src/insights/snapshots/` | Snapshot orchestration, caching, filters and domain errors |
+| `backend/src/insights/sources/` | `SourceAdapter` protocol; `github/` holds the GraphQL client and adapter (`client.py`), queries and normalization (the only GitHub I/O) |
+| `backend/src/insights/sync/` | arq jobs: `queue.py` job lifecycle and locks, `jobs.py` sync runs, `store.py` writes, `derive.py` timelines/facts and rederivation, `worker.py` entry point, precompute and housekeeping |
+| `backend/src/insights/db/` | SQLAlchemy models and engine factory (`models.py`), and loaders that turn rows into immutable records |
+| `backend/src/insights/analytics/` | Pure computation of the snapshot: timeline, facts, efficiency, time ledger, attribution |
+| `backend/src/insights/snapshots/` | Snapshot orchestration, readiness (202 Pending), caching and domain errors |
 | `backend/src/insights/narrative/` | Evidence pack, hypothesis scoring, prompt, validator, template fallback, LLM client |
-| `backend/src/insights/api/` | FastAPI routes, params, schemas (strict OpenAPI contract), errors, middleware |
+| `backend/src/insights/api/` | FastAPI report routes in `routes/insights.py`, health/repos, params, strict schemas, errors (`insights/main.py` builds the app and its request middleware) |
 | `backend/migrations/` | Alembic, currently one initial revision |
 | `backend/tests/` | Unit and integration tests, factories, golden snapshot (`tests/golden/`) |
 | `backend/eval/` | Synthetic scenarios and the narrative evaluation harness |
-| `frontend/src/` | React dashboard: components, `format.ts`, `hooks/useAbortable.ts` |
-| `docs/` | `REFERENCE.md` contracts, `DECISIONS.md` why, `EVALUATION.md` eval runs, `PLAN.md` historical plan (not authoritative) |
+| `frontend/src/` | React dashboard: components, `format.ts`, `api.ts` request cancellation |
+| `docs/` | `TECHNICAL_DETAILS.md` contracts, evaluation results and trade-offs; `diagrams/how-it-works.svg` architecture diagram |
 
 ## Commands
 
@@ -41,7 +41,7 @@ Python 3.12 with uv, Node 24, Docker Compose v2. Keep lockfiles; install with
 | `docker compose up --build -d` | Run the stack (dashboard :5173, API docs :8000/docs); needs `.env` from `.env.example` |
 | `make lint` / `make fmt` | Ruff + strict mypy / apply formatting and fixes |
 | `make test-unit` / `make test` | Unit tests / full suite (integration tests need Docker) |
-| `make eval-offline` | 20-case narrative evaluation with the stub LLM |
+| `make eval-offline` | 15-case narrative evaluation with the stub LLM |
 | `make eval` | Same against real Bedrock; needs the user's credentials, so ask the user to run it |
 | `npm test`, `npm run typecheck`, `npm run build` | Frontend checks (in `frontend/`) |
 
@@ -53,16 +53,18 @@ Without Make (Windows), run the equivalent `uv run` commands from the Makefile.
 - `analytics/` performs no database or HTTP I/O. API requests read local data only; workers
   are the only callers of GitHub.
 - `snapshots/`, `narrative/` and `sync/` never import `api.*`.
-- Keep `analytics/types.py`, `analytics/facts.py` and `analytics/pointer.py` as separate
-  modules; merging them creates import cycles. After moving code, import every module in a
-  fresh interpreter to catch cycles.
+- `analytics/__init__.py` (versions and thresholds) imports no analytics module, and
+  `analytics/facts.py` (`PrFacts`, flow eligibility, locations) imports only `timeline` and
+  `domain`; `dataset`, `db/records.py` and the eval depend on both, so anything more creates
+  import cycles. After moving code, import every module in a fresh interpreter to catch cycles.
 
 **Determinism and versions** (constants live in code; do not copy their values into docs)
 - Snapshots are pure functions of their inputs: the same data and parameters give the same
   bytes. The golden file pins this.
 - Bump `ANALYTICS_VERSION` (`analytics/__init__.py`) whenever snapshot output or derived facts
   change. It is part of the snapshot ID and of the derive key: new requests get new snapshot
-  IDs (old snapshots stay readable by ID, so caches are isolated, not invalidated) and workers
+  IDs (old snapshots stay stored until retention expires, so caches are isolated, not
+  invalidated) and workers
   rederive existing PRs in the background.
 - `SAMPLING_SEED_VERSION` (`analytics/stats.py`) freezes bootstrap seeds. Change it only to
   change statistical sampling on purpose.
@@ -71,12 +73,11 @@ Without Make (Windows), run the equivalent `uv run` commands from the Makefile.
 **Metric semantics**
 - Every section uses the period-active cohort: PRs opened, or with identified human activity,
   in the period. Comparisons apply the same rule to the previous period.
-- The time ledger covers merged PRs only. Finding `impact_share` divides by finished PR waiting
-  time: post-ready waiting time of eligible PRs merged or closed unmerged in the period (no open,
-  bot or backport PRs, no pre-ready coding time).
-- Wording must match what is measured: PR-hours are elapsed waiting, not effort; the top finding
-  is ranked by waiting time, not a proven cause; a large change can still be within normal
-  variation. Keep the frontend guides, narrative template and headline consistent.
+- The time ledger covers the post-ready waiting time of merged PRs only (no bot or backport
+  PRs, no pre-ready coding time).
+- Wording must match what is measured: PR-hours are elapsed waiting, not effort; a large
+  waiting share is not a proven cause; a large change can still be within normal variation.
+  Keep the frontend guides and the narrative template consistent.
 
 **Narrative**
 - Code computes every number; the LLM only writes wording. Outputs must pass the validator
@@ -92,12 +93,18 @@ Without Make (Windows), run the equivalent `uv run` commands from the Makefile.
 ## Comments
 
 - Every module starts with a one- or two-line docstring: responsibility and boundary.
-- Docstrings go on cross-layer entry points and contracts: one summary line, then only
+- Every package, class and function has a docstring (ruff `D1` enforces this; test functions
+  are exempt because their names state what they check). One summary line, then only
   non-obvious details (units, window semantics, when `None` is returned, determinism).
-- Inline comments explain why, not what; do not restate names or types.
+- Frontend: every file starts with a `/** ... */` header, and every component and function
+  has a JSDoc comment.
+- Important code blocks (multi-step flows, retry and fallback branches, SQL filters, cache
+  and lock handling) get a short comment on why they work that way.
+- Inline comments explain why, not what; do not restate names or types. A comment goes
+  after a docstring, never above it.
 - No change history, ticket numbers, authorship or commented-out code. Lines stay within 100
   characters. Update comments when behavior changes; long explanations belong in
-  `docs/REFERENCE.md`.
+  `docs/TECHNICAL_DETAILS.md`.
 
 ## Verification
 
@@ -106,8 +113,15 @@ Without Make (Windows), run the equivalent `uv run` commands from the Makefile.
 - Golden snapshot: regenerate with `UPDATE_GOLDEN=1 uv run pytest tests/unit/test_snapshot.py` (in `backend/`)
   and review the diff; it may contain only the intended changes.
 - Prompt changes need a real `make eval`: all gates pass, first-attempt validity at least 0.90
-  and numeric, citation and hedge consistency 1.00. Record results in `docs/EVALUATION.md`.
-- UI changes: check both views, 7/30/60-day periods, the pending state, Load more and the
-  narrative panel in a browser.
-- Update the docs your change affects: README (run), NOTES (submission), REFERENCE (contracts),
-  DECISIONS (reasons).
+  and numeric, citation and hedge consistency 1.00. Record results in the `docs/TECHNICAL_DETAILS.md` testing section.
+- UI changes: check 7/30/60-day and custom periods, the pending state, the configuration
+  notice, the narrative panel and the time ledger with its figures in a browser.
+- Update the docs your change affects, keeping each fact in one place:
+  - README: sections 1–4 are the submission notes the assignment brief requires (run it,
+    architecture and decisions, one more day, AI use). Sections 3 and 4 are the owner's own
+    account; change them only when asked. Later sections summarize checks, product,
+    configuration and development; keep test counts in "How the output was checked" current.
+  - TECHNICAL_DETAILS.md: contracts, metric semantics, scoring, operations, security, results
+    and trade-offs. Do not repeat what the README already says; link to it instead.
+  - `docs/diagrams/how-it-works.svg`: update it when components, data flow or the narrative
+    flow change, and render it to check that labels do not overlap.

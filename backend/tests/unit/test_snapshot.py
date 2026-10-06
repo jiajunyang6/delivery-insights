@@ -1,3 +1,5 @@
+"""Snapshot determinism (golden file), identity and rounding."""
+
 import os
 from dataclasses import replace
 from pathlib import Path
@@ -9,9 +11,9 @@ from tests.factories import at
 
 from insights.analytics import ANALYTICS_VERSION, derive_key
 from insights.analytics.dataset import SnapshotParams
-from insights.analytics.pointer import resolve_pointer
+from insights.analytics.insight import insight_view
 from insights.analytics.snapshot import build_snapshot, canonical, etag, identifiers, rounded
-from insights.api.schemas import Snapshot
+from insights.api.schemas import Insight
 from insights_eval.generator import ScenarioSpec, generate
 from insights_eval.pipeline import dataset_from_repo
 
@@ -31,7 +33,15 @@ def test_golden_determinism_contract_and_independent_accounting(synthetic):
     payload = build_snapshot(synthetic, params=params(synthetic))
     again = build_snapshot(synthetic, params=params(synthetic))
     assert canonical(payload) == canonical(again)
-    Snapshot.model_validate(payload)
+    Insight.model_validate(insight_view(payload))
+    assert set(payload["time_ledger"]) == {"merged_prs", "total_pr_hours", "states"}
+    assert set(payload["time_ledger"]["states"]) == {
+        "waiting_reviewer",
+        "waiting_author",
+        "waiting_merge",
+    }
+    assert "ci" not in payload["bottleneck_analysis"]
+    assert "ci_source" not in payload["meta"]
     if os.getenv("UPDATE_GOLDEN") == "1":
         GOLDEN.parent.mkdir(exist_ok=True)
         GOLDEN.write_bytes(
@@ -61,12 +71,6 @@ def test_golden_determinism_contract_and_independent_accounting(synthetic):
     assert allocated == pytest.approx(
         payload["time_ledger"]["states"]["waiting_reviewer"]["pr_hours"], abs=0.04
     )
-    for finding in payload["bottlenecks"]:
-        for evidence in finding["evidence"]:
-            resolved = resolve_pointer(payload, evidence["ref"])
-            assert evidence["value"] == (
-                resolved["value"] if isinstance(resolved, dict) else resolved
-            )
 
 
 def test_identity_and_rounding():
@@ -97,7 +101,6 @@ def test_partial_period_and_multi_repo_watermark():
     payload = build_snapshot(d, params=params(d))
     assert not payload["period"]["complete"]
     assert payload["efficiency"]["merged_prs"]["value"] == 0
-    assert payload["meta"]["sample"]["open_prs_at_as_of"] == 30
     second = replace(d.repos[0], repo="c/d", last_synced_at=at(65))
     d = replace(d, repos=(d.repos[0], second))
     payload = build_snapshot(d, params=params(d))

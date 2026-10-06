@@ -1,5 +1,6 @@
 """RFC 9457 problem+json responses and the exception handlers that produce them."""
 
+from http import HTTPStatus
 from typing import Any
 
 import structlog
@@ -59,11 +60,11 @@ async def handle_problem(request: Request, exc: Exception) -> JSONResponse:
             ),
         )
     if isinstance(exc, HTTPException):
-        slug, title = (
-            ("not-found", "Not found")
-            if exc.status_code == 404
-            else ("method-not-allowed", "Method not allowed")
-        )
+        # Framework errors (unknown route, wrong method) carry only a status; derive the
+        # title and slug from it rather than echoing the exception's detail text.
+        phrase = HTTPStatus(exc.status_code).phrase
+        title = phrase[0] + phrase[1:].lower()
+        slug = phrase.lower().replace(" ", "-")
         return problem_response(request, ProblemError(exc.status_code, slug, title, title))
     if isinstance(exc, (SQLAlchemyError, OSError, TimeoutError)):
         logger.error("database_unavailable", error_type=type(exc).__name__)

@@ -7,7 +7,7 @@ from datetime import datetime
 
 from insights.domain import Event, EventKind, PullRequestRecord
 
-WAITING_STATES = ("waiting_reviewer", "waiting_author", "waiting_ci", "waiting_merge")
+WAITING_STATES = ("waiting_reviewer", "waiting_author", "waiting_merge")
 # GitHub can report several actions at one instant; tie-breaking must not depend on page order.
 EVENT_ORDER = {
     kind: index
@@ -35,6 +35,8 @@ EVENT_ORDER = {
 
 @dataclass(frozen=True, slots=True)
 class PrInput:
+    """The PR lifecycle fields the timeline builder needs."""
+
     author_login: str | None
     created_at: datetime
     is_draft: bool
@@ -45,6 +47,8 @@ class PrInput:
 
 @dataclass(frozen=True, slots=True)
 class Interval:
+    """One contiguous state span; end_at is None while the PR is still open."""
+
     state: str
     start_at: datetime
     end_at: datetime | None
@@ -52,11 +56,11 @@ class Interval:
 
 @dataclass(frozen=True, slots=True)
 class TimelineResult:
+    """A PR's readiness time, state intervals and review-round count."""
+
     ready_at: datetime | None
     intervals: tuple[Interval, ...]
-    approved_at: datetime | None
     review_rounds: int
-    state_at_end: str | None
 
 
 def pr_input(pr: PullRequestRecord) -> PrInput:
@@ -108,15 +112,13 @@ def compute_ready_at(pr: PrInput, events: Sequence[Event]) -> datetime | None:
 def build_timeline(
     pr: PrInput,
     events: Sequence[Event],
-    ci_intervals: Sequence[tuple[datetime, datetime]],
     now: datetime,
 ) -> TimelineResult:
     """Split a PR's life into contiguous state intervals; pure and deterministic.
 
     Before ready_at there is at most one coding interval. From ready_at the state is re-evaluated
-    at every event and CI boundary until merge, close or now; an open PR's last interval has
+    at every event until merge, close or now; an open PR's last interval has
     end_at None. review_rounds counts entries into waiting_author caused by review feedback.
-    state_at_end is set only for PRs closed without merging.
 
     Consecutive feedback while already waiting_author is one round; approval-only PRs can
     have zero rounds. Pre-ready events establish initial state but do not add review rounds.
@@ -126,13 +128,14 @@ def build_timeline(
     horizon = end_at or now
     first_commit = first_commit_at(events)
     coding_start = min(first_commit, ready_at or horizon) if first_commit else pr.created_at
+    # A PR never marked ready has only a coding interval and no waiting time to account for.
     if ready_at is None:
         intervals = (
             (Interval("coding", coding_start, end_at),)
             if (end_at is None or coding_start < end_at)
             else ()
         )
-        return TimelineResult(None, intervals, None, 0, None)
+        return TimelineResult(None, intervals, 0)
     output = [Interval("coding", coding_start, ready_at)] if coding_start < ready_at else []
     ordered = sorted(events, key=lambda e: (e.occurred_at, EVENT_ORDER[e.kind], e.dedup_key))
     # Only a close that is later reopened pauses the PR; the terminal close ends the timeline.
@@ -166,8 +169,8 @@ def build_timeline(
         return False
 
     def dismiss(event: Event) -> bool:
-        # Dismissing an old review must not remove the reviewer's newer decisive review.
         """Remove the matching standing review decision; dismissal itself adds no feedback."""
+        # Dismissing an old review must not remove the reviewer's newer decisive review.
         review_id = event.payload.get("review_id")
         reviewer = (event.payload.get("review_author") or "").lower()
         for login, (_, recorded_id) in list(decisions.items()):
@@ -212,9 +215,9 @@ def build_timeline(
         return feedback
 
     # Precedence: paused, draft, approved with no outstanding change request, unanswered
-    # feedback, CI running, else waiting on a reviewer.
+    # feedback, else waiting on a reviewer.
     def evaluate(at: datetime) -> str:
-        """Choose the state using pause, draft, decision, feedback, CI and reviewer precedence."""
+        """Choose the state using pause, draft, decision, feedback and reviewer precedence."""
         if flags["paused"]:
             return "closed"
         if flags["draft"]:
@@ -224,21 +227,19 @@ def build_timeline(
             return "waiting_merge"
         if last_feedback is not None and (last_update is None or last_feedback > last_update):
             return "waiting_author"
-        if any(start <= at < end for start, end in ci_intervals):
-            return "waiting_ci"
         return "waiting_reviewer"
 
+    # Replay events up to ready_at to establish the starting state (decisions, feedback,
+    # author updates); later events are grouped by timestamp and walked in order below.
     grouped: dict[datetime, list[Event]] = defaultdict(list)
     for event in ordered:
         if event.occurred_at <= ready_at:
             apply(event)
         elif event.occurred_at < horizon:
             grouped[event.occurred_at].append(event)
+    # The PR is by definition not a draft at ready_at, whatever pre-ready toggles said.
     flags["draft"] = False
     boundaries = set(grouped)
-    boundaries.update(
-        point for pair in ci_intervals for point in pair if ready_at < point < horizon
-    )
     current, segment_start, rounds = evaluate(ready_at), ready_at, 0
     for at in sorted(boundaries):
         # Evaluate after all simultaneous events to avoid zero-length states and extra rounds.
@@ -246,6 +247,8 @@ def build_timeline(
         for event in grouped[at]:
             feedback = apply(event) or feedback
         new = evaluate(at)
+        # A review round starts when reviewer feedback hands the PR back to its author; a
+        # draft conversion or an already author-owned state is not a new round.
         if new == "waiting_author" and current != new and not flags["draft"] and feedback:
             rounds += 1
         if new != current:
@@ -254,43 +257,7 @@ def build_timeline(
             current, segment_start = new, at
     if end_at is None or segment_start < end_at:
         output.append(Interval(current, segment_start, end_at))
-    approved = next((i.start_at for i in output if i.state == "waiting_merge"), None)
-    return TimelineResult(
-        ready_at,
-        tuple(output),
-        approved,
-        rounds,
-        current if pr.state == "CLOSED" and pr.merged_at is None else None,
-    )
-
-
-def state_at(intervals: Sequence[Interval], at: datetime) -> Interval | None:
-    """Find the last interval containing at with an exclusive end, or None if no state exists."""
-    return next(
-        (
-            interval
-            for interval in reversed(intervals)
-            if interval.start_at <= at and (interval.end_at is None or at < interval.end_at)
-        ),
-        None,
-    )
-
-
-def is_open_at(
-    ready_at: datetime | None,
-    end_at: datetime | None,
-    intervals: Sequence[Interval],
-    at: datetime,
-) -> bool:
-    """Test readiness and lifecycle bounds and require a waiting interval at the given instant."""
-    interval = state_at(intervals, at)
-    return bool(
-        ready_at is not None
-        and ready_at <= at
-        and (end_at is None or end_at > at)
-        and interval
-        and interval.state in WAITING_STATES
-    )
+    return TimelineResult(ready_at, tuple(output), rounds)
 
 
 def ledger_hours(

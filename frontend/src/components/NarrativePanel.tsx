@@ -1,29 +1,23 @@
+/** Render cited narrative evidence and explanations from local report responses. */
 import { useState, type ReactNode } from "react";
-import { useAbortable } from "../hooks/useAbortable";
-import { GithubLink } from "./GithubLink";
-import { fetchJson, message } from "../api";
-import { format, percent, signed, capitalize, states, viewLabels } from "../format";
+import { fetchJson, message, useAbortable } from "../api";
+import { format, signed, capitalize } from "../format";
 import type {
   AbstainReason,
-  Audience,
   Evidence,
   Hypothesis,
   Narrative,
-  Snapshot,
-  State,
+  Insight,
 } from "../types";
 
 const hypothesisTitles: Record<string, string> = {
   H_review_capacity: "Limited review capacity",
-  H_ci_bottleneck: "Slow or congested CI",
   H_pr_size_growth: "Pull requests getting larger",
-  H_quality_tradeoff: "Speed gained by lighter review",
 };
 const openReasons: Record<string, string> = {
   insufficient_sample: "too few PRs to judge",
   no_data: "no data for this check",
   below_threshold: "evidence too weak",
-  not_selected: "weaker than the top three",
 };
 const stepLabels: Record<string, string> = {
   symptom: "What changed",
@@ -49,58 +43,56 @@ const abstainText: Record<AbstainReason, { title: string; detail: string }> = {
       "Root causes need a previous period with data. Choose a later period or sync more history.",
   },
 };
-const waitingOn: Record<State, string> = {
-  waiting_reviewer: "waiting on reviewers",
-  waiting_author: "waiting on authors",
-  waiting_ci: "waiting on CI",
-  waiting_merge: "waiting to merge after approval",
-};
-
 /** "dir:crates/bevy_pbr" → "crates/bevy_pbr (directory)". Labels stay as they are. */
-export function place(location: string): string {
+function place(location: string): string {
   if (location.startsWith("dir:")) return location.slice(4) + " (directory)";
-  if (location.startsWith("codeowners:"))
-    return location.slice(11) + " (CODEOWNERS)";
   return location;
 }
 
+/** The change to show on an evidence chip: points for shares, relative change otherwise. */
 function change(e: Evidence): string {
   if (e.change_pp != null) return signed(e.change_pp, " pp", 1);
   if (e.change_rel != null) return signed(e.change_rel);
   return "";
 }
 
-function LookFirst({ snapshot }: { snapshot: Snapshot }) {
-  const top = snapshot.bottlenecks[0];
-  if (top) {
-    return (
-      <aside className="look-first" aria-label="Where to look first">
-        <span className="eyebrow">WHERE TO LOOK FIRST</span>
-        <h3>{top.title}</h3>
-        <p>
-          <b>{percent(top.impact_share)} of finished PR waiting time</b> · {top.recommendation}
-        </p>
-        <a href="#bottlenecks">See all bottlenecks ↓</a>
-      </aside>
-    );
+/** Evidence label, with clearer wording for the queue (E22) and concentration (E24) items. */
+function evidenceLabel(e: Evidence): string {
+  if (e.id === "E22")
+    return "Weeks with more PRs ready for review than receiving a first review";
+  if (e.id === "E24") {
+    const k = e.extra?.k;
+    return k == null
+      ? "Share of reviews performed by the busiest reviewers"
+      : `Share of reviews performed by the top ${k} reviewers`;
   }
-  const ledger = snapshot.time_ledger.states;
-  const largest = states
-    .filter((s) => ledger[s])
-    .sort((a, b) => ledger[b].share - ledger[a].share)[0];
-  if (!largest) return null;
-  return (
-    <aside className="look-first" aria-label="Where to look first">
-      <span className="eyebrow">WHERE TO LOOK FIRST</span>
-      <h3>No single bottleneck stands out</h3>
-      <p>
-        The largest share of PR time,{" "}
-        <b>{percent(ledger[largest].share)}</b>, is spent {waitingOn[largest]}.
-      </p>
-    </aside>
-  );
+  return e.label;
 }
 
+/** Formatted evidence value; the queue item reads as "N of M weeks". */
+function evidenceValue(e: Evidence): string {
+  const total = e.extra?.weeks_total;
+  if (e.id === "E22" && total != null)
+    return `${format(e.value, e.unit)} of ${total} weeks`;
+  return format(e.value, e.unit);
+}
+
+/** How to read the two evidence items most often misread; null for the rest. */
+function evidenceDetail(e: Evidence): string | null {
+  if (e.id === "E22")
+    return "Counts weeks when more PRs became ready for review than received their first review. " +
+      "First reviews can serve PRs that became ready earlier. Partial weeks are included.";
+  if (e.id === "E24")
+    return "Ranked by human review events in each period; " +
+      "repeat reviews of a PR count separately. " +
+      "The top reviewers may differ between periods.";
+  return null;
+}
+
+/**
+ * One hypothesis: evidence strength, statement, evidence chain, counter-evidence, alternatives
+ * checked and the suggested next step with its check.
+ */
 function HypothesisCard({ h, text, chip }: {
   h: Hypothesis;
   text: (value: string, bare?: boolean) => ReactNode;
@@ -195,12 +187,13 @@ function HypothesisCard({ h, text, chip }: {
   );
 }
 
+/** Every cited evidence item; the one selected from a citation is highlighted. */
 function EvidenceList({ evidence, highlight }: { evidence: Evidence[]; highlight: string }) {
   return (
     <div className="evidence-list">
       <h3>Trace every claim</h3>
       <p className="muted">
-        Select a citation to find its value in the snapshot.
+        Select a citation to see the metric behind it.
       </p>
       {evidence.map((e) => (
         <article
@@ -213,9 +206,9 @@ function EvidenceList({ evidence, highlight }: { evidence: Evidence[]; highlight
         >
           <span className="evidence-id">{e.id}</span>
           <div>
-            <strong>{e.label}</strong>
+            <strong>{evidenceLabel(e)}</strong>
             <p>
-              <b>{format(e.value, e.unit)}</b>
+              <b>{evidenceValue(e)}</b>
               {e.previous != null && (
                 <> · Previous {format(e.previous, e.unit)}</>
               )}
@@ -224,14 +217,7 @@ function EvidenceList({ evidence, highlight }: { evidence: Evidence[]; highlight
                 <> · {signed(e.change_pp, " pp", 1)}</>
               )}
             </p>
-            <code>{e.ref}</code>
-            <div className="example-links">
-              {e.examples.map((url) => (
-                <GithubLink key={url} url={url} fallback={url}>
-                  PR #{url.split("/").pop()}
-                </GithubLink>
-              ))}
-            </div>
+            {evidenceDetail(e) && <p className="footnote">{evidenceDetail(e)}</p>}
           </div>
         </article>
       ))}
@@ -239,6 +225,7 @@ function EvidenceList({ evidence, highlight }: { evidence: Evidence[]; highlight
   );
 }
 
+// Why a template was shown instead of LLM wording, keyed by meta.fallback_reason.
 const fallbackText: Record<string, string> = {
   llm_disabled: "LLM narratives are off; set AWS_BEARER_TOKEN_BEDROCK in .env to enable them",
   llm_error: "the Bedrock request failed; see the Configuration notice above",
@@ -246,16 +233,18 @@ const fallbackText: Record<string, string> = {
   llm_busy: "another request is generating this narrative",
 };
 
+/**
+ * Load and render the narrative for the insight's snapshot. Citations become buttons that
+ * scroll to their evidence; a Bedrock failure asks the app to refresh the setup notice.
+ */
 export function NarrativePanel({
-  snapshot,
-  audience,
+  insight,
   onLlmError,
 }: {
-  snapshot: Snapshot;
-  audience: Audience;
+  insight: Insight;
   onLlmError?: () => void;
 }) {
-  const snapshotId = snapshot.snapshot_id;
+  const snapshotId = insight.snapshot_id;
   const [data, setData] = useState<Narrative | null>(null);
   const [error, setError] = useState("");
   const [highlight, setHighlight] = useState("");
@@ -263,10 +252,7 @@ export function NarrativePanel({
     setData(null);
     setError("");
     setHighlight("");
-    fetchJson<Narrative>(
-      "/v1/snapshots/" + snapshotId + "/narrative?audience=" + audience,
-      signal,
-    )
+    fetchJson<Narrative>("/v1/snapshots/" + snapshotId + "/narrative", signal)
       .then((r) => {
         if (signal.aborted) return;
         setData(r.data);
@@ -283,13 +269,15 @@ export function NarrativePanel({
           );
         }
       });
-  }, [snapshotId, audience]);
+  }, [snapshotId]);
+  /** Highlight an evidence item and scroll it into view. */
   function focus(id: string) {
     setHighlight(id);
     document
       .getElementById("evidence-" + id)
       ?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
+  /** Inline citation button for an evidence ID inside running text. */
   const tag = (id: string, key?: string) => (
     <button
       key={key ?? id}
@@ -300,18 +288,22 @@ export function NarrativePanel({
       {id}
     </button>
   );
-  // Bracketed citations in narrative text; bare IDs too in free-text reasons.
+  /**
+   * Split text into spans and citation buttons: bracketed [E..] citations in narrative text,
+   * and bare IDs too in free-text downgrade reasons.
+   */
   const text = (value: string, bare = false) =>
     value
-      .split(bare ? /(\[?\bE\d+\b\]?)/ : /(\[E\d+\])/)
+      .split(bare ? /(\[?\bE\d+\b]?)/ : /(\[E\d+])/)
       .map((part, i) =>
-        /^\[?E\d+\]?$/.test(part) && (bare || part.startsWith("[")) ? (
+        /^\[?E\d+]?$/.test(part) && (bare || part.startsWith("[")) ? (
           tag(part.replace(/[[\]]/g, ""), String(i))
         ) : (
           <span key={i}>{part}</span>
         ),
       );
   const byId = new Map((data?.evidence ?? []).map((e) => [e.id, e]));
+  /** Evidence chip showing an item's label, value and change, for evidence chains. */
   const chip = (id: string) => {
     const e = byId.get(id);
     return (
@@ -323,8 +315,8 @@ export function NarrativePanel({
       >
         {e ? (
           <>
-            <span>{e.label}</span>
-            <b>{format(e.value, e.unit)}</b>
+            <span>{evidenceLabel(e)}</span>
+            <b>{evidenceValue(e)}</b>
             {change(e) && <em>{change(e)}</em>}
           </>
         ) : (
@@ -347,7 +339,6 @@ export function NarrativePanel({
           <h2 id="narrative-heading">The evidence, in words</h2>
           <p>Possible explanations grounded in this report; select a citation to inspect its metric.</p>
         </div>
-        <span className="badge neutral">{viewLabels[audience]}</span>
       </div>
       {error ? (
         <p role="alert" className="error-text">
@@ -367,7 +358,6 @@ export function NarrativePanel({
               {abstainText[reason].detail}
             </p>
           )}
-          {data.abstained && <LookFirst snapshot={snapshot} />}
           <div className="hypotheses">
             {data.hypotheses.map((h) => (
               <HypothesisCard key={h.id} h={h} text={text} chip={chip} />

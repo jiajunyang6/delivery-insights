@@ -1,3 +1,5 @@
+"""Timeline state machine: specified cases, clipping and invariants."""
+
 import random
 from dataclasses import replace
 
@@ -7,10 +9,8 @@ from tests.factories import at, event, record
 from insights.analytics.timeline import (
     build_timeline,
     check_invariants,
-    is_open_at,
     ledger_hours,
     pr_input,
-    state_at,
 )
 from insights.domain import Actor
 
@@ -81,7 +81,7 @@ M = "waiting_merge"
             16,
             [event("review", 3, state="COMMENTED"), event("commit", 5), event("review", 7)],
             {},
-            [R, "waiting_ci", A, "waiting_ci", M],
+            [R, A, R, M],
             1,
         ),
         (17, [event("review", 2), event("review", 4, state="COMMENTED")], {}, [R, M], 0),
@@ -138,28 +138,20 @@ M = "waiting_merge"
 )
 def test_spec_cases(case, events, changes, states, rounds):
     pr = record(events=tuple(events), **changes)
-    ci = [(at(1), at(8))] if case == 16 else []
-    result = build_timeline(pr_input(pr), pr.events, ci, at(20))
+    result = build_timeline(pr_input(pr), pr.events, at(20))
     assert [i.state for i in result.intervals] == states
     assert result.review_rounds == rounds
     assert check_invariants(result, pr_input(pr)) == []
-    assert build_timeline(pr_input(pr), pr.events, ci, at(20)) == result
+    assert build_timeline(pr_input(pr), pr.events, at(20)) == result
     if case == 11:
         assert sum(ledger_hours(result.intervals, start=at(0), end=at(10)).values()) == 8
-        assert not is_open_at(result.ready_at, at(10), result.intervals, at(3))
     if case == 15:
         assert result.intervals[-1].end_at is None
-    if case == 10:
-        assert result.state_at_end == R
 
 
-def test_as_of_boundaries_and_clipping():
+def test_ledger_clipping_skips_closed_time():
     pr = record(events=(event("closed", 2), event("reopened", 4)))
-    timeline = build_timeline(pr_input(pr), pr.events, (), at(20))
-    assert is_open_at(at(0), at(10), timeline.intervals, at(0))
-    assert not is_open_at(at(0), at(10), timeline.intervals, at(10))
-    assert not is_open_at(None, None, timeline.intervals, at(0))
-    assert state_at(timeline.intervals, at(-1)) is None
+    timeline = build_timeline(pr_input(pr), pr.events, at(20))
     assert ledger_hours(timeline.intervals, start=at(1), end=at(5))[R] == 2
 
 
@@ -190,5 +182,5 @@ def test_random_legal_sequences_invariants():
         )
         if index % 5 == 0:
             pr = replace(pr, state="OPEN", merged_at=None, closed_at=None)
-        result = build_timeline(pr_input(pr), pr.events, (), at(40))
+        result = build_timeline(pr_input(pr), pr.events, at(40))
         assert not check_invariants(result, pr_input(pr)), (index, result)

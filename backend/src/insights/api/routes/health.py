@@ -18,11 +18,15 @@ router = APIRouter()
 
 
 class Health(BaseModel):
+    """Liveness response body."""
+
     model_config = ConfigDict(extra="forbid")
     status: str
 
 
 class Readiness(Health):
+    """Readiness response body with one result per dependency."""
+
     checks: dict[str, str]
 
 

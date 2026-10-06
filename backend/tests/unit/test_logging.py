@@ -1,3 +1,5 @@
+"""JSON logging and exception sanitizing for API, worker and CLI."""
+
 import json
 import logging
 import subprocess

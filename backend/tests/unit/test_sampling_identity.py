@@ -1,3 +1,9 @@
+"""Bootstrap seed identity and significance boundaries."""
+
+from dataclasses import replace
+
+import pytest
+
 from insights.analytics.dataset import SnapshotParams
 from insights.analytics.efficiency import Measure, compare
 from insights.analytics.snapshot import digest, sampling_hash
@@ -6,7 +12,8 @@ from insights_eval.generator import generate
 from insights_eval.scenarios import SCENARIOS
 
 
-def test_sampling_seeds_keep_the_complete_legacy_parameter_structure():
+@pytest.mark.parametrize("profile, source", [("default", "none"), ("github", "actions")])
+def test_sampling_seeds_keep_the_complete_legacy_parameter_structure(profile, source):
     for spec in SCENARIOS.values():
         for seed in (101, 202):
             repo = generate(spec, seed)
@@ -14,10 +21,12 @@ def test_sampling_seeds_keep_the_complete_legacy_parameter_structure():
                 (repo.repo,),
                 repo.period_from,
                 repo.period_to,
-                ci_source="actions" if repo.ci_runs else "none",
             )
+            params = replace(params, sampling_profile=profile)
             old = params.canonical_dict()
+            old.pop("sampling_profile")
             old["analytics_version"] = "1.4.0"
+            old["ci_source"] = source
             legacy_hash = digest(old)[:16]
             assert sampling_hash(params) == legacy_hash
             assert digest(params.canonical_dict())[:16] != legacy_hash
@@ -30,9 +39,6 @@ def test_sampling_seeds_keep_the_complete_legacy_parameter_structure():
                 "coding",
                 "waiting_share",
                 "revert_rate",
-                "ci.queue_p50_minutes",
-                "ci.run_p50_minutes",
-                "ci.flaky_rerun_rate",
             ):
                 assert seed_for(legacy_hash, metric) == seed_for(sampling_hash(params), metric)
 
@@ -41,7 +47,9 @@ def test_bootstrap_and_significance_near_zero_and_ten_percent_boundaries():
     repo = generate(SCENARIOS["no_signal"], 101)
     params = SnapshotParams((repo.repo,), repo.period_from, repo.period_to)
     old = params.canonical_dict()
+    old.pop("sampling_profile")
     old["analytics_version"] = "1.4.0"
+    old["ci_source"] = "none"
     legacy_hash, current_hash = digest(old)[:16], sampling_hash(params)
     previous = tuple(10 + (i - 10) / 3.5 for i in range(1, 20)) * 2
     for shift in (0.9999, 1.0, 1.0001):

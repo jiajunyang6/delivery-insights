@@ -1,4 +1,4 @@
-"""SQLAlchemy schema for synced source data, derived facts, snapshots and the job ledger."""
+"""SQLAlchemy schema for synced data, derived facts, snapshots and jobs; engine factory."""
 
 from datetime import date, datetime
 from typing import Any
@@ -20,11 +20,19 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from insights.config import Settings
 
 
 class Base(DeclarativeBase):
-    pass
+    """Declarative base for every table."""
 
 
 class Repository(Base):
@@ -32,8 +40,7 @@ class Repository(Base):
 
     `covered_since` starts the fully synced range, `sync_watermark` is the newest PR update
     seen, `backfill_cursor` is where backfill resumes, and `data_version` increments when
-    stored data changes. `links_pending` marks links as stale; `derived_key` is set once every
-    PR is derived with that key.
+    stored data changes, and `derived_key` is set once every PR is derived with that key.
     """
 
     __tablename__ = "repositories"
@@ -55,7 +62,6 @@ class Repository(Base):
     last_sync_error: Mapped[str | None] = mapped_column(Text)
     data_version: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))
     derived_key: Mapped[str | None] = mapped_column(Text)
-    links_pending: Mapped[bool] = mapped_column(Boolean, server_default=text("FALSE"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )
@@ -65,26 +71,24 @@ class Repository(Base):
 
 
 class PullRequest(Base):
+    """Source fields of one PR; content_hash skips unchanged re-reads."""
+
     __tablename__ = "pull_requests"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     repo_id: Mapped[int] = mapped_column(Integer, ForeignKey("repositories.id", ondelete="CASCADE"))
     number: Mapped[int] = mapped_column(Integer)
     title: Mapped[str] = mapped_column(Text)
-    body_excerpt: Mapped[str] = mapped_column(Text, server_default=text("''"))
     url: Mapped[str] = mapped_column(Text)
     state: Mapped[str] = mapped_column(Text)
     is_draft: Mapped[bool] = mapped_column(Boolean)
     author_login: Mapped[str | None] = mapped_column(Text)
-    author_association: Mapped[str] = mapped_column(Text)
     is_bot_author: Mapped[bool] = mapped_column(Boolean)
     base_ref: Mapped[str] = mapped_column(Text)
-    head_ref: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     merged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    merge_commit_oid: Mapped[str | None] = mapped_column(Text)
     additions: Mapped[int] = mapped_column(Integer)
     deletions: Mapped[int] = mapped_column(Integer)
     labels: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'"))
@@ -95,11 +99,12 @@ class PullRequest(Base):
         Index("ix_pr_repo_created", "repo_id", "created_at"),
         Index("ix_pr_repo_updated", "repo_id", "updated_at"),
         Index("ix_pr_repo_state", "repo_id", "state"),
-        Index("ix_pr_merge_commit", "repo_id", "merge_commit_oid"),
     )
 
 
 class PrEvent(Base):
+    """One normalized timeline event; unique per PR by dedup_key."""
+
     __tablename__ = "pr_events"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -120,6 +125,8 @@ class PrEvent(Base):
 
 
 class PrFile(Base):
+    """One path changed by a PR, used for directory locations."""
+
     __tablename__ = "pr_files"
 
     pr_id: Mapped[int] = mapped_column(
@@ -129,6 +136,8 @@ class PrFile(Base):
 
 
 class PrFact(Base):
+    """Derived per-PR facts; derive_key records which derivation produced them."""
+
     __tablename__ = "pr_facts"
 
     pr_id: Mapped[int] = mapped_column(
@@ -138,48 +147,18 @@ class PrFact(Base):
     number: Mapped[int] = mapped_column(Integer)
     is_bot_author: Mapped[bool] = mapped_column(Boolean)
     is_backport: Mapped[bool] = mapped_column(Boolean)
-    external_contributor: Mapped[bool] = mapped_column(Boolean)
-    first_commit_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     first_review_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    first_approval_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     merged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     end_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     coding_hours: Mapped[float | None] = mapped_column(Float)
     pickup_hours: Mapped[float | None] = mapped_column(Float)
-    review_hours: Mapped[float | None] = mapped_column(Float)
-    merge_hours: Mapped[float | None] = mapped_column(Float)
     cycle_hours: Mapped[float | None] = mapped_column(Float)
     review_rounds: Mapped[int] = mapped_column(Integer)
-    feedback_before_approval: Mapped[int] = mapped_column(Integer)
     commits_after_first_review: Mapped[int] = mapped_column(Integer)
-    updates_after_approval: Mapped[int] = mapped_column(Integer)
-    distinct_approvers: Mapped[int] = mapped_column(Integer)
-    second_approval_wait_hours: Mapped[float | None] = mapped_column(Float)
-    merged_without_approval: Mapped[bool] = mapped_column(Boolean)
-    review_requested_before_first_review: Mapped[bool] = mapped_column(Boolean)
-    human_reviews: Mapped[int] = mapped_column(Integer)
     size_lines: Mapped[int] = mapped_column(Integer)
-    size_bucket: Mapped[str] = mapped_column(Text)
     locations: Mapped[list[str]] = mapped_column(ARRAY(Text))
-    location_source: Mapped[str] = mapped_column(Text)
-    is_revert: Mapped[bool] = mapped_column(Boolean, server_default=text("FALSE"))
-    reverts_pr_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("pull_requests.id", ondelete="SET NULL")
-    )
-    reverted_by_pr_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("pull_requests.id", ondelete="SET NULL")
-    )
-    reverted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    reland_of_pr_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("pull_requests.id", ondelete="SET NULL")
-    )
-    close_class: Mapped[str | None] = mapped_column(Text)
-    state_at_close: Mapped[str | None] = mapped_column(Text)
-    late_rejection: Mapped[bool] = mapped_column(Boolean, server_default=text("FALSE"))
-    ci_covered: Mapped[bool] = mapped_column(Boolean, server_default=text("FALSE"))
     derive_key: Mapped[str | None] = mapped_column(Text)
     __table_args__ = (
         Index("ix_facts_repo_merged", "repo_id", "merged_at"),
@@ -189,6 +168,8 @@ class PrFact(Base):
 
 
 class PrInterval(Base):
+    """One derived state interval, ordered by seq within its PR."""
+
     __tablename__ = "pr_intervals"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -206,40 +187,9 @@ class PrInterval(Base):
     )
 
 
-class WorkflowRun(Base):
-    __tablename__ = "workflow_runs"
-
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
-    repo_id: Mapped[int] = mapped_column(Integer, ForeignKey("repositories.id", ondelete="CASCADE"))
-    workflow_name: Mapped[str] = mapped_column(Text)
-    event: Mapped[str] = mapped_column(Text)
-    head_sha: Mapped[str] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(Text)
-    conclusion: Mapped[str | None] = mapped_column(Text)
-    run_attempt: Mapped[int] = mapped_column(Integer)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    run_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    pr_numbers: Mapped[list[int]] = mapped_column(ARRAY(Integer), server_default=text("'{}'"))
-    __table_args__ = (
-        Index("ix_runs_repo_sha", "repo_id", "head_sha"),
-        Index("ix_runs_repo_created", "repo_id", "created_at"),
-    )
-
-
-class OwnershipRule(Base):
-    __tablename__ = "ownership_rules"
-
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    repo_id: Mapped[int] = mapped_column(Integer, ForeignKey("repositories.id", ondelete="CASCADE"))
-    source: Mapped[str] = mapped_column(Text)
-    pattern: Mapped[str] = mapped_column(Text)
-    owners: Mapped[list[str]] = mapped_column(ARRAY(Text))
-    line_no: Mapped[int] = mapped_column(Integer)
-    __table_args__ = (UniqueConstraint("repo_id", "source", "line_no"),)
-
-
 class Snapshot(Base):
+    """An immutable computed snapshot, kept for the retention period."""
+
     __tablename__ = "snapshots"
 
     snapshot_id: Mapped[str] = mapped_column(Text, primary_key=True)
@@ -257,14 +207,14 @@ class Snapshot(Base):
 
 
 class Narrative(Base):
+    """A stored narrative, unique per snapshot, prompt, model and evidence pack."""
+
     __tablename__ = "narratives"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     snapshot_id: Mapped[str] = mapped_column(
         Text, ForeignKey("snapshots.snapshot_id", ondelete="CASCADE")
     )
-    audience: Mapped[str] = mapped_column(Text)
-    lang: Mapped[str] = mapped_column(Text)
     prompt_version: Mapped[str] = mapped_column(Text)
     pack_hash: Mapped[str] = mapped_column(Text)
     model_id: Mapped[str] = mapped_column(Text)
@@ -274,14 +224,12 @@ class Narrative(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )
-    __table_args__ = (
-        UniqueConstraint(
-            "snapshot_id", "audience", "lang", "prompt_version", "model_id", "pack_hash"
-        ),
-    )
+    __table_args__ = (UniqueConstraint("snapshot_id", "prompt_version", "model_id", "pack_hash"),)
 
 
 class SyncJob(Base):
+    """Ledger row for one queued, running or finished worker job."""
+
     __tablename__ = "sync_jobs"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
@@ -297,3 +245,10 @@ class SyncJob(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     __table_args__ = (Index("ix_sync_jobs_repo_created", "repo_id", created_at.desc()),)
+
+
+def create_database(settings: Settings) -> tuple[AsyncEngine, async_sessionmaker[AsyncSession]]:
+    """Create an async engine and session factory that retains loaded attributes after commit."""
+    engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+    # Jobs keep reading ORM rows, such as Repository, after their session commits.
+    return engine, async_sessionmaker(engine, expire_on_commit=False)

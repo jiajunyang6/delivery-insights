@@ -1,6 +1,8 @@
+/** Configuration notice naming the `.env` variable to fix. */
 import { setupItems } from "../setup";
 import type { SetupStatus } from "../types";
 
+/** Show setup problems as an alert and information as a status; render nothing when healthy. */
 export function SetupNotice({ setup }: { setup: SetupStatus | null }) {
   const items = setup ? setupItems(setup) : [];
   if (!items.length) return null;

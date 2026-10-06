@@ -47,6 +47,8 @@ logger = structlog.get_logger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class NarrativeResult:
+    """A generated payload and whether it may be stored and cached long-term."""
+
     payload: dict[str, Any]
     persist: bool
     # Bedrock error code when a call failed; llm_reached means Bedrock returned an answer.
@@ -141,14 +143,11 @@ def assemble(
     )
     return {
         "snapshot_id": snapshot["snapshot_id"],
-        "audience": pack["audience"],
-        "lang": pack["lang"],
         "narrative": output["narrative"],
         "abstained": not candidates,
         "abstain_reason": pack["abstain_reason"],
         "hypotheses": hypotheses,
         "evidence": evidence,
-        "links": {"snapshot": f"/v1/snapshots/{snapshot['snapshot_id']}"},
         "meta": meta,
     }
 
@@ -156,9 +155,7 @@ def assemble(
 async def generate(
     snapshot: Mapping[str, Any],
     *,
-    audience: str,
     llm: LLMClient | None,
-    ci_complete: bool,
     now: datetime,
     prepared: tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]] | None = None,
     fallback_reason: str | None = None,
@@ -174,7 +171,7 @@ async def generate(
     deadline = monotonic() + NARRATIVE_DEADLINE_SECONDS
     if prepared is None:
         evidence = extract_evidence(snapshot)
-        pack, candidates = build_evidence_pack(snapshot, audience, ci_complete, evidence=evidence)
+        pack, candidates = build_evidence_pack(snapshot, evidence=evidence)
     else:
         pack, candidates, evidence = prepared
     meta: dict[str, Any] = {
@@ -189,7 +186,8 @@ async def generate(
         "pack_hash": digest(pack)[:16],
         "generated_at": iso(now),
     }
-    output = build_template(pack, snapshot)
+    # Start from the template so every exit path below has valid output to return.
+    output = build_template(pack)
     persist = llm is None and fallback_reason is None
     llm_error = "client_unavailable" if fallback_reason == "llm_error" else None
     llm_reached = False
@@ -215,7 +213,8 @@ async def generate(
                 break
             llm_reached = True
             usage.record(reply)
-            violations = validate(reply.tool_input, pack, snapshot, audience=audience)
+            # The LLM never decides what is shown: only output that passes every check is used.
+            violations = validate(reply.tool_input, pack)
             if not violations and reply.tool_input is not None:
                 output = reply.tool_input
                 meta.update(
@@ -262,7 +261,6 @@ async def generate(
     logger.info(
         "narrative_generated",
         snapshot_id=snapshot["snapshot_id"],
-        audience=audience,
         generated_by=meta["generated_by"],
         attempts=meta["attempts"],
         validation=meta["validation"],
@@ -326,6 +324,8 @@ async def check_llm(llm: LLMClient, redis: Redis, settings: Settings, now: datet
 
 
 class NarrativeService:
+    """Serves narratives from cache, storage or fresh generation."""
+
     def __init__(self, snapshots: SnapshotService, llm: LLMClient | None) -> None:
         """Bind snapshot/cache access and an optional LLM client for narrative orchestration."""
         self.snapshots, self.llm = snapshots, llm
@@ -363,33 +363,29 @@ class NarrativeService:
             pipe.expire(key, ttl)
             await self.snapshots.cache(pipe.execute())
 
-    async def get(self, sid: str, audience: str, conditional: str | None) -> Reply:
+    async def get(self, sid: str, conditional: str | None) -> Reply:
         """Serve a narrative from Redis, then Postgres, then fresh generation.
 
-        With the LLM enabled, one request per snapshot, audience and lang holds the lock;
+        With the LLM enabled, one request per snapshot holds the lock;
         others poll the cache and, after LOCK_WAIT_SECONDS, return an unstored template
         (llm_busy). On a concurrent insert the stored row wins, so every client gets the
         same body and ETag. Redis failures fail open; generation proceeds without the lock.
         """
-        lang = "en"
-        snapshot = orjson.loads((await self.snapshots.by_id(sid, None)).body)
+        snapshot = orjson.loads(await self.snapshots.by_id(sid))
         settings, redis = self.snapshots.settings, self.snapshots.redis
+        # The pack is built before any lookup because its hash is part of the cache identity.
         evidence = extract_evidence(snapshot)
-        pack, candidates = build_evidence_pack(
-            snapshot, audience, settings.ci_complete, evidence=evidence
-        )
+        pack, candidates = build_evidence_pack(snapshot, evidence=evidence)
         prepared = (pack, candidates, evidence)
         pack_hash = digest(pack)[:16]
         model_key = settings.bedrock_model_id if settings.llm_enabled else "template"
         # A new prompt version, model or pack content gives a new key, so stale wording is
         # never served; the same identity keys the Postgres row.
-        key = narrative_key(sid, audience, lang, PROMPT_VERSION, model_key, pack_hash)
+        key = narrative_key(sid, PROMPT_VERSION, model_key, pack_hash)
         if cached := await self.cached(key, conditional):
             return cached
         identity = {
             "snapshot_id": sid,
-            "audience": audience,
-            "lang": lang,
             "prompt_version": PROMPT_VERSION,
             "model_id": model_key,
             "pack_hash": pack_hash,
@@ -402,13 +398,14 @@ class NarrativeService:
         if created is None:
             raise not_found()
         ttl = cache_ttl(created, self.snapshots.now)
+        # A stored narrative is reused as is and re-cached for the snapshot's remaining life.
         if existing:
             body = canonical(existing.payload)
             await self.put_cache(key, body, existing.etag, True, ttl)
             return narrative_reply(body, existing.etag, conditional, True)
         # The lock is broader than the cache identity: even different model/prompt versions
-        # serialize generation for this snapshot and audience while Redis is available.
-        lock, token, locked = narrative_lock_key(sid, audience, lang), uuid4().hex, False
+        # serialize generation for this snapshot while Redis is available.
+        lock, token, locked = narrative_lock_key(sid), uuid4().hex, False
         if settings.llm_enabled:
             try:
                 acquired = await redis.set(
@@ -427,9 +424,7 @@ class NarrativeService:
                         return cached
                 result = await generate(
                     snapshot,
-                    audience=audience,
                     llm=None,
-                    ci_complete=settings.ci_complete,
                     now=self.snapshots.now,
                     prepared=prepared,
                     fallback_reason="llm_busy",
@@ -439,9 +434,7 @@ class NarrativeService:
         try:
             result = await generate(
                 snapshot,
-                audience=audience,
                 llm=self.llm if settings.llm_enabled else None,
-                ci_complete=settings.ci_complete,
                 now=self.snapshots.now,
                 prepared=prepared,
                 fallback_reason="llm_error" if settings.llm_enabled and self.llm is None else None,

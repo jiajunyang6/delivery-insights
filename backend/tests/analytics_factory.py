@@ -1,13 +1,16 @@
+"""Builders for analytics inputs: PrData with fixed intervals and Datasets."""
+
 from dataclasses import replace
 from datetime import date
 
 from insights.analytics.dataset import Dataset, PrData, RepoData, Review
+from insights.analytics.facts import PrFacts
 from insights.analytics.timeline import Interval
-from insights.analytics.types import PrFacts
 from tests.factories import at
 
 
 def pr(identifier, *, offset=24, reviewer=20, author=5, merge=5, locations=("area-A",), **facts):
+    """Build a merged flow PR whose intervals follow reviewer, author and merge hours."""
     ready = at(offset + 10)
     reviewed = at(offset + 10 + reviewer)
     approved = at(offset + 10 + reviewer + author)
@@ -16,20 +19,13 @@ def pr(identifier, *, offset=24, reviewer=20, author=5, merge=5, locations=("are
         number=identifier,
         ready_at=ready,
         first_review_at=reviewed,
-        first_approval_at=approved,
-        approved_at=approved,
         merged_at=merged,
         end_at=merged,
         coding_hours=10,
         pickup_hours=reviewer,
-        review_hours=author,
-        merge_hours=merge,
         cycle_hours=10 + reviewer + author + merge,
         locations=locations,
-        location_source="label",
-        human_reviews=2,
         size_lines=100,
-        size_bucket="M",
     )
     f = replace(f, **facts)
     intervals = tuple(
@@ -48,20 +44,17 @@ def pr(identifier, *, offset=24, reviewer=20, author=5, merge=5, locations=("are
         f,
         intervals,
         identifier,
-        f"PR {identifier}",
-        f"https://github.com/a/b/pull/{identifier}",
-        "author",
-        False,
         at(offset),
         human_activity_at=tuple(
             at
-            for at in (f.ready_at, f.first_review_at, f.approved_at, f.merged_at, f.closed_at)
+            for at in (f.ready_at, f.first_review_at, approved, f.merged_at, f.closed_at)
             if at is not None
         ),
     )
 
 
 def dataset(prs, *, repos=None, reviews=None, **changes):
+    """Build a one-repo Dataset for 2026-01-03, with one review per reviewed PR."""
     base = Dataset(
         repos or (RepoData("a/b", 1, at(-5000), at(72)),),
         tuple(prs),
@@ -73,7 +66,6 @@ def dataset(prs, *, repos=None, reviews=None, **changes):
                 if p.facts.first_review_at
             ]
         ),
-        (),
         date(2026, 1, 3),
         date(2026, 1, 3),
     )
