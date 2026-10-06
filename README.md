@@ -198,7 +198,8 @@ I would do one of the following if I had one more day:
 
 ## What you get
 
-![Dashboard: a report on bevyengine/bevy for 2026-09-03 to 2026-10-03](docs/screenshots/dashboard.jpeg)
+See [the dashboard screenshot](docs/screenshots/dashboard.jpeg) for a
+report on `bevyengine/bevy`.
 
 - **Repository and period:** a tracked repository and the last 7, 30 or 60 days (60 by
   default, or the longest the configured history supports), or custom UTC dates, compared
