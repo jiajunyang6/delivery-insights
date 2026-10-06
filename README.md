@@ -183,7 +183,7 @@ I would do one of the following if I had one more day:
 - **Claude Sonnet 4.6 on Bedrock** is part of the product: it writes narrative wording only,
   and the deterministic validator decides whether it is shown.
 
-## How the output was checked
+## 5. How the output was checked
 
 - 325 backend tests, 64 of them on real Postgres 16 and Redis 7, plus 22 frontend tests.
 - Strict ruff/mypy and the frontend typecheck and build.
@@ -196,7 +196,7 @@ I would do one of the following if I had one more day:
   a custom period, the pending state, the configuration notice, the narrative and the time
   ledger.
 
-## What you get
+## 6. What you get
 
 See [the dashboard screenshot](docs/screenshots/dashboard.jpeg) for a
 report on `bevyengine/bevy`.
@@ -213,7 +213,7 @@ report on `bevyengine/bevy`.
   waiting, current period against the previous one, with the insight's largest shift, median
   cycle time and merged PRs.
 
-## Configuration
+## 7. Configuration
 
 Settings come from `.env`; never commit it. Without `.env`, the code defaults in
 `backend/src/insights/config.py` apply.
@@ -231,7 +231,7 @@ Settings come from `.env`; never commit it. Without `.env`, the code defaults in
 
 Connection, CORS, rate-limit and logging settings are listed in [TECHNICAL_DETAILS.md](docs/TECHNICAL_DETAILS.md#additional-settings).
 
-## Development
+## 8. Development
 
 ```bash
 make lint          # ruff + strict mypy
@@ -259,7 +259,7 @@ The worker then collects history again from an empty database. Wait for reposito
 `last_sync_status=ok` and full coverage before checking the dashboard, and keep
 `BACKFILL_DAYS=120` for the 60-day view and its comparison period.
 
-## Documentation
+## 9. Documentation
 
 | Document | Contents |
 |---|---|
